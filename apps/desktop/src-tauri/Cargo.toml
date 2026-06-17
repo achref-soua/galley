@@ -1,7 +1,7 @@
 [package]
 name = "galley-desktop"
 description = "Galley desktop shell (Tauri 2)."
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 license = "MIT"
 authors = ["Achref Soua <achref.soua@outlook.com>"]
@@ -22,7 +22,11 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
 galley-core = { path = "../../../crates/galley-core" }
+galley-import = { path = "../../../crates/galley-import" }
+galley-security = { path = "../../../crates/galley-security" }
 
 [lints.rust]
 unsafe_code = "deny"

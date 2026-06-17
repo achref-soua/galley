@@ -22,11 +22,22 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.0.2`: the design system. Both themes —
-> **Onionskin** (light) and **Carbon** (dark) — the typewriter design tokens, a shared
-> UI kit, and the resizable workspace shell (sidebar · editor · preview) with a settings
-> panel are in place. Editing, compiling, the visual editor, and the AI layer arrive in
-> subsequent versioned releases.
+> **Status — early development.** This is `v0.0.3`: the project model and file tree. On top
+> of the design system and themes, you can now **create a project**, **open an existing
+> on-disk LaTeX folder**, browse it in the file-explorer sidebar, and edit and save its
+> files with unsaved-change tracking — all backed by a sandboxed file store confined to the
+> project root, with non-intrusive `.galley/` metadata that is safe to delete. Syntax-aware
+> editing, compiling, the visual editor, and the AI layer arrive in subsequent versioned
+> releases.
+
+## Projects
+
+A project is just a folder. **New project** scaffolds one with a starter `main.tex`;
+**Open a folder** imports any existing LaTeX directory in place — Galley scans it, detects
+the root document, and adds a single `.galley/project.toml` manifest that never affects
+compilation and can be deleted at any time. Files open and save with a dirty marker, and a
+guard catches unsaved edits before you switch away. Everything stays inside the project
+root: a sandboxed file store refuses absolute paths, `..` traversal, and escaping symlinks.
 
 ## Themes
 
@@ -58,13 +69,13 @@ native WebView — no bundled browser, no Node runtime in the shipped app.
 galley/
 ├─ apps/desktop/        # Tauri 2 + Svelte 5 app (UI in src/, shell in src-tauri/)
 ├─ crates/
-│  ├─ galley-core/      # pure, I/O-free domain (driven to full coverage)
+│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest
 │  ├─ galley-compile/   # Tectonic + latexmk adapters       (placeholder)
 │  ├─ galley-intel/     # TexLab (LSP) + SyncTeX             (placeholder)
 │  ├─ galley-vcs/       # git2 history / snapshots / revert  (placeholder)
-│  ├─ galley-import/    # folder/zip/git/arXiv importers     (placeholder)
+│  ├─ galley-import/    # create/open projects; folder importer
 │  ├─ galley-ai/        # provider-agnostic AI + MCP host    (placeholder)
-│  └─ galley-security/  # keychain + sandbox policy          (placeholder)
+│  └─ galley-security/  # sandboxed file store + keychain (sandbox policy)
 ├─ packages/ui-kit/     # design tokens, themes, shared components
 ├─ assets/brand/        # the double-strike "G" icon master
 ├─ docs/adr/            # architecture decision records

@@ -15,8 +15,8 @@ storybook-static/
 coverage/
 lcov.info
 *.profraw
-/playwright-report/
-/test-results/
+playwright-report/
+test-results/
 .vitest/
 
 # --- Tauri generated ---

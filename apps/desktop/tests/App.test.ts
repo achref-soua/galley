@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import App from '../src/App.svelte';
 import { firePointer } from './setup';
 
@@ -78,5 +78,93 @@ describe('App shell', () => {
     render(App);
     const hidden = screen.getAllByRole('button', { name: 'Show sidebar' });
     expect(hidden.length).toBeGreaterThan(0);
+  });
+});
+
+describe('App — projects, editing, and the unsaved-changes guard', () => {
+  async function openDemoFolder() {
+    render(App);
+    expect(screen.getByText('No document')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    // The demo project opens with its root document showing.
+    await screen.findByLabelText('Source');
+    return screen.getByLabelText('Source') as HTMLTextAreaElement;
+  }
+
+  it('creates a project from the sidebar and opens its root document', async () => {
+    render(App);
+    await fireEvent.input(screen.getByLabelText('New project name'), {
+      target: { value: 'My Paper' }
+    });
+    await fireEvent.submit(screen.getByLabelText('New project name').closest('form')!);
+
+    const textarea = (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
+    expect(textarea.value).toContain('Pull a proof');
+    // The name shows in the sidebar header and the recent list.
+    expect(screen.getAllByText('My Paper').length).toBeGreaterThan(0);
+  });
+
+  it('edits a document, marks it dirty, and saves with Ctrl+S', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, { target: { value: 'edited body' } });
+    // Dirty: the save action is enabled.
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(false);
+
+    await fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    );
+  });
+
+  it('raises the guard when switching files with unsaved edits, and discards', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, { target: { value: 'unsaved' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'introduction.tex' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect((screen.getByLabelText('Source') as HTMLTextAreaElement).value).toContain(
+      'Introduction'
+    );
+  });
+
+  it('cancels the guard, keeping the current document', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, { target: { value: 'unsaved' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'introduction.tex' }));
+    await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect((screen.getByLabelText('Source') as HTMLTextAreaElement).value).toBe('unsaved');
+  });
+
+  it('saves then continues from the guard', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, { target: { value: 'saved first' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'introduction.tex' }));
+    await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Save & continue' }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Source') as HTMLTextAreaElement).value).toContain(
+        'Introduction'
+      )
+    );
+  });
+
+  it('saves from the titlebar button', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, { target: { value: 'changed via button' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    );
+  });
+
+  it('re-opens a project from the recent list', async () => {
+    await openDemoFolder();
+    await fireEvent.click(screen.getByRole('button', { name: 'galley-project' }));
+    // Still showing the (re-opened) project's root document.
+    await waitFor(() => expect(screen.getByLabelText('Source')).toBeTruthy());
   });
 });
