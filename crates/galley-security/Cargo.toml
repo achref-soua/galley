@@ -1,0 +1,12 @@
+[package]
+name = "galley-security"
+description = "Security primitives: OS-keychain secret storage, compile/import sandbox policy, and input sanitizers."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

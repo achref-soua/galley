@@ -1,0 +1,47 @@
+# Galley CI — DORMANT.
+#
+# GitHub Actions is intentionally not enabled yet: the project runs its quality gate
+# locally via `just ci` (see CONTRIBUTING.md). This workflow mirrors that gate and is one
+# edit away from active. To enable it, uncomment the `push` and `pull_request` triggers
+# below, then add the `gate` job as a required status check on the protected `main` and
+# `develop` branches.
+name: CI
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main, develop]
+  # pull_request:
+  #   branches: [main, develop]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-audit,just
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Quality gate
+        run: just ci

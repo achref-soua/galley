@@ -1,0 +1,14 @@
+/*
+ * Galley design tokens — "black-and-red ribbon on paper".
+ * The seed of the design system; the full Onionskin/Carbon themes and shared
+ * components are built on top of these in v0.0.2.
+ */
+:root {
+  --galley-ink: #1c1a17;
+  --galley-paper: #ece3d0;
+  --galley-ribbon: #a8362b;
+  --galley-graphite: #4a443b;
+  --galley-muted: #9a8e7e;
+  --galley-carbon: #141210;
+  --galley-sage: #5e7561;
+}

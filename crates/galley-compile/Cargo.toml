@@ -1,0 +1,12 @@
+[package]
+name = "galley-compile"
+description = "Compile adapters: embedded Tectonic (warm pool + in-memory VFS) and opt-in latexmk/TeX Live."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

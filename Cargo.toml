@@ -1,0 +1,31 @@
+# Root Rust workspace: the pure/core crates.
+# The desktop app (apps/desktop/src-tauri) is a SEPARATE cargo workspace so that
+# `cargo test`/`clippy`/`llvm-cov` here never require the GTK/WebKit system libraries
+# that only the Tauri shell links against.
+[workspace]
+resolver = "2"
+members = [
+  "crates/galley-core",
+  "crates/galley-compile",
+  "crates/galley-intel",
+  "crates/galley-vcs",
+  "crates/galley-import",
+  "crates/galley-ai",
+  "crates/galley-security",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["Achref Soua <achref.soua@outlook.com>"]
+repository = "https://github.com/achref-soua/galley"
+rust-version = "1.96"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[profile.release]
+strip = true
+lto = "thin"

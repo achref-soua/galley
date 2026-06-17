@@ -1,0 +1,54 @@
+# --- Rust ---
+/target/
+**/target/
+
+# --- Node ---
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.tsbuildinfo
+.svelte-kit/
+
+# --- Coverage / tests ---
+coverage/
+lcov.info
+*.profraw
+/playwright-report/
+/test-results/
+.vitest/
+
+# --- Tauri generated ---
+gen/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Galley project metadata (never belongs in the source repo) ---
+.galley/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- AI coding-assistant meta files: must never be committed (defense in depth) ---
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.cursorrules
+.cursor/
+.windsurfrules
+.aider*
+.continue/
+.clinerules
+.github/copilot-instructions.md
+.codeium/
+.roo/
+*.prompt.md
+*.prompt
+galley-master-plan.md

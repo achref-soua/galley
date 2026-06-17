@@ -1,0 +1,12 @@
+[package]
+name = "galley-core"
+description = "Galley core domain: pure, I/O-free types shared across the app."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

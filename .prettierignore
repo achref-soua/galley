@@ -1,0 +1,9 @@
+target
+dist
+build
+node_modules
+coverage
+pnpm-lock.yaml
+apps/desktop/src-tauri/icons
+apps/desktop/src-tauri/target
+CHANGELOG.md

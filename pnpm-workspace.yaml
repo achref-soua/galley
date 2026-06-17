@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+allowBuilds:
+  esbuild: true
+
+# esbuild (pulled in by Vite/Vitest) ships a postinstall that materialises its
+# native binary. Allow just that one build script; everything else stays blocked.
+onlyBuiltDependencies:
+  - esbuild

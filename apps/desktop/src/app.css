@@ -1,0 +1,25 @@
+:root {
+  --ink: #1c1a17;
+  --paper: #ece3d0;
+  --ribbon: #a8362b;
+  --graphite: #4a443b;
+  --muted: #9a8e7e;
+  --carbon: #141210;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Galley">
+  <!-- Paper tile -->
+  <rect width="1024" height="1024" rx="180" fill="#ECE3D0"/>
+  <!-- Double-strike G: a font-independent geometric mark (ink + offset red ribbon ghost) -->
+  <g fill="none" stroke-width="128" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#A8362B" transform="translate(20,20)">
+      <path d="M 734 326 A 290 290 0 1 0 734 698"/>
+      <path d="M 734 512 L 552 512"/>
+    </g>
+    <g stroke="#1C1A17">
+      <path d="M 734 326 A 290 290 0 1 0 734 698"/>
+      <path d="M 734 512 L 552 512"/>
+    </g>
+  </g>
+  <!-- Platen baseline -->
+  <rect x="250" y="884" width="524" height="36" rx="18" fill="#1C1A17"/>
+</svg>

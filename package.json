@@ -1,0 +1,35 @@
+{
+  "name": "galley",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A local-first, blazing-fast LaTeX studio — pull a proof.",
+  "license": "MIT",
+  "author": "Achref Soua <achref.soua@outlook.com>",
+  "repository": "https://github.com/achref-soua/galley",
+  "type": "module",
+  "engines": {
+    "node": ">=20.9",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @galley/desktop dev",
+    "build": "pnpm --filter @galley/desktop build",
+    "check": "pnpm --filter @galley/desktop check",
+    "test": "pnpm --filter @galley/desktop test",
+    "test:e2e": "pnpm --filter @galley/desktop test:e2e",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-svelte": "^2.46.1",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^3.3.2",
+    "svelte": "^5.16.0",
+    "svelte-eslint-parser": "^0.43.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2"
+  }
+}

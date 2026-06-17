@@ -1,0 +1,28 @@
+[package]
+name = "galley-desktop"
+description = "Galley desktop shell (Tauri 2)."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["Achref Soua <achref.soua@outlook.com>"]
+repository = "https://github.com/achref-soua/galley"
+rust-version = "1.96"
+
+# Standalone workspace on purpose: this keeps the GTK/WebKit-linked desktop
+# shell out of the root `crates/*` workspace, so core tests and coverage never
+# require the system GUI libraries.
+[workspace]
+
+[lib]
+name = "galley_desktop_lib"
+crate-type = ["lib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+galley-core = { path = "../../../crates/galley-core" }
+
+[lints.rust]
+unsafe_code = "deny"

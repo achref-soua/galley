@@ -1,0 +1,14 @@
+{
+  "name": "@galley/ui-kit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Galley design system — tokens, themes, and shared Svelte components.",
+  "license": "MIT",
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  },
+  "files": [
+    "tokens.css"
+  ]
+}
