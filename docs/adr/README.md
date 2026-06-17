@@ -11,3 +11,4 @@ codebase stays legible.
 | 0004 | The UI kit as a tested component library             | Accepted |
 | 0005 | The project model and the sandboxed file store       | Accepted |
 | 0006 | Embedded Tectonic compilation and the PDF.js preview | Accepted |
+| 0007 | Fast, incremental compilation                        | Accepted |
