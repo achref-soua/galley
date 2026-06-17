@@ -12,5 +12,8 @@ cargo llvm-cov --workspace \
   --fail-under-functions 100 \
   --fail-under-regions 100
 
+echo "› UI-kit coverage (100% lines / branches / functions / statements)"
+pnpm --filter @galley/ui-kit test
+
 echo "› Frontend coverage (100% lines / branches / functions / statements)"
 pnpm --filter @galley/desktop test

@@ -4,6 +4,7 @@ packages:
 
 allowBuilds:
   esbuild: true
+  svelte-preprocess: false
 
 # esbuild (pulled in by Vite/Vitest) ships a postinstall that materialises its
 # native binary. Allow just that one build script; everything else stays blocked.

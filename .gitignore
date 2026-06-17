@@ -9,6 +9,7 @@ dist/
 build/
 *.tsbuildinfo
 .svelte-kit/
+storybook-static/
 
 # --- Coverage / tests ---
 coverage/
