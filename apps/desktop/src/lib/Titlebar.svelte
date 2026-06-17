@@ -3,15 +3,21 @@
 
   let {
     documentName,
+    dirty,
+    canSave,
     sidebarCollapsed,
     previewCollapsed,
+    onsave,
     ontogglesidebar,
     ontogglepreview,
     onopensettings
   }: {
     documentName: string;
+    dirty: boolean;
+    canSave: boolean;
     sidebarCollapsed: boolean;
     previewCollapsed: boolean;
+    onsave: () => void;
     ontogglesidebar: () => void;
     ontogglepreview: () => void;
     onopensettings: () => void;
@@ -24,9 +30,14 @@
     <Wordmark />
   </div>
 
-  <div class="doc" aria-live="polite">{documentName}</div>
+  <div class="doc" aria-live="polite">
+    {documentName}{#if dirty}<span class="dot" aria-label="unsaved changes">•</span>{/if}
+  </div>
 
   <div class="actions">
+    <IconButton label="Save" title="Save (⌘/Ctrl+S)" disabled={!canSave} onclick={onsave}>
+      <Icon name="save" />
+    </IconButton>
     <IconButton
       label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
       pressed={!sidebarCollapsed}
@@ -74,6 +85,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .dot {
+    margin-left: var(--galley-space-1);
+    color: var(--accent);
   }
 
   .actions {
