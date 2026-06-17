@@ -25,6 +25,10 @@ and fixes for confirmed issues will be released and credited (if you wish).
   provider, and then only the data you consent to send.
 - **No secrets in the repository.** API keys live in the OS keychain, never in plaintext,
   never in logs or commits.
+- **Confined filesystem access.** All project reads, writes, and listings go through a
+  sandboxed file store (`SafeRoot`) locked to a single canonical project root: absolute
+  paths, `..` traversal, and symlinks resolving outside the project are refused, and
+  Galley's `.galley/` metadata is never required for a project to build.
 - **Sandboxing (in progress).** Compilation and project import run with shell-escape
   disabled by default; archive extraction and `\input` handling guard against path
   traversal and symlink escape. Project configuration is parsed, never executed.

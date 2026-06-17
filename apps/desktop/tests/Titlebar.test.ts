@@ -4,24 +4,32 @@ import Titlebar from '../src/lib/Titlebar.svelte';
 
 const noop = () => {};
 
+const base = {
+  documentName: 'thesis.tex',
+  dirty: false,
+  canSave: false,
+  sidebarCollapsed: false,
+  previewCollapsed: false,
+  onsave: noop,
+  ontogglesidebar: noop,
+  ontogglepreview: noop,
+  onopensettings: noop
+};
+
 describe('Titlebar', () => {
   it('shows the wordmark, document name, and wires the actions when panes are open', async () => {
     const ontogglesidebar = vi.fn();
     const ontogglepreview = vi.fn();
     const onopensettings = vi.fn();
     render(Titlebar, {
-      props: {
-        documentName: 'thesis.tex',
-        sidebarCollapsed: false,
-        previewCollapsed: false,
-        ontogglesidebar,
-        ontogglepreview,
-        onopensettings
-      }
+      props: { ...base, ontogglesidebar, ontogglepreview, onopensettings }
     });
 
     expect(screen.getByText('Galley')).toBeTruthy();
     expect(screen.getByText('thesis.tex')).toBeTruthy();
+    // Clean document: no unsaved marker, save disabled.
+    expect(screen.queryByLabelText('unsaved changes')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true);
 
     const sidebar = screen.getByRole('button', { name: 'Hide sidebar' });
     expect(sidebar.getAttribute('aria-pressed')).toBe('true');
@@ -37,18 +45,21 @@ describe('Titlebar', () => {
 
   it('offers show-labels when panes are collapsed', () => {
     render(Titlebar, {
-      props: {
-        documentName: 'x.tex',
-        sidebarCollapsed: true,
-        previewCollapsed: true,
-        ontogglesidebar: noop,
-        ontogglepreview: noop,
-        onopensettings: noop
-      }
+      props: { ...base, documentName: 'x.tex', sidebarCollapsed: true, previewCollapsed: true }
     });
     expect(screen.getByRole('button', { name: 'Show sidebar' }).getAttribute('aria-pressed')).toBe(
       'false'
     );
     expect(screen.getByRole('button', { name: 'Show preview' })).toBeTruthy();
+  });
+
+  it('marks unsaved changes and enables saving', async () => {
+    const onsave = vi.fn();
+    render(Titlebar, { props: { ...base, dirty: true, canSave: true, onsave } });
+    expect(screen.getByLabelText('unsaved changes')).toBeTruthy();
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save.hasAttribute('disabled')).toBe(false);
+    await fireEvent.click(save);
+    expect(onsave).toHaveBeenCalledOnce();
   });
 });
