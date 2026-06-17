@@ -1,7 +1,7 @@
 [package]
 name = "galley-desktop"
 description = "Galley desktop shell (Tauri 2)."
-version = "0.0.3"
+version = "0.1.0"
 edition = "2021"
 license = "MIT"
 authors = ["Achref Soua <achref.soua@outlook.com>"]
@@ -25,6 +25,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 galley-core = { path = "../../../crates/galley-core" }
+galley-compile = { path = "../../../crates/galley-compile", features = ["real-compiler"] }
 galley-import = { path = "../../../crates/galley-import" }
 galley-security = { path = "../../../crates/galley-security" }
 

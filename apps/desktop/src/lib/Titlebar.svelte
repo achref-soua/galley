@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { Logo, Wordmark, IconButton, Icon } from '@galley/ui-kit';
+  import { Logo, Wordmark, IconButton, Icon, Button } from '@galley/ui-kit';
 
   let {
     documentName,
     dirty,
     canSave,
+    canCompile,
+    compiling,
     sidebarCollapsed,
     previewCollapsed,
+    oncompile,
     onsave,
     ontogglesidebar,
     ontogglepreview,
@@ -15,8 +18,11 @@
     documentName: string;
     dirty: boolean;
     canSave: boolean;
+    canCompile: boolean;
+    compiling: boolean;
     sidebarCollapsed: boolean;
     previewCollapsed: boolean;
+    oncompile: () => void;
     onsave: () => void;
     ontogglesidebar: () => void;
     ontogglepreview: () => void;
@@ -35,6 +41,16 @@
   </div>
 
   <div class="actions">
+    <Button
+      variant="primary"
+      size="sm"
+      title="Compile (⌘/Ctrl+B)"
+      disabled={!canCompile || compiling}
+      onclick={oncompile}
+    >
+      <Icon name="compile" />
+      {compiling ? 'Compiling…' : 'Compile'}
+    </Button>
     <IconButton label="Save" title="Save (⌘/Ctrl+S)" disabled={!canSave} onclick={onsave}>
       <Icon name="save" />
     </IconButton>

@@ -8,5 +8,18 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Links the real embedded Tectonic engine (vendored C/C++ + a package bundle).
+# Off by default so `cargo test`/`clippy`/`llvm-cov` over the workspace never
+# build the native engine; the desktop shell turns it on. See docs/adr/0006.
+real-compiler = ["dep:tectonic"]
+
+[dependencies]
+galley-core = { workspace = true }
+tectonic = { version = "0.16", default-features = false, features = [
+  "geturl-reqwest",
+  "serialization",
+], optional = true }
+
 [lints]
 workspace = true
