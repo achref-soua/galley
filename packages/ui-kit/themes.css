@@ -1,0 +1,71 @@
+/*
+ * Galley themes — the semantic layer.
+ *
+ * Every component reads these role tokens (--bg, --fg, --accent, …) so a single
+ * `data-theme` flip on the document element repaints the whole app. Onionskin
+ * is the light, freshly-typed sheet; Carbon is the dark carbon-copy. The
+ * default (no attribute) is Onionskin so the app is never unstyled.
+ */
+
+:root,
+[data-theme='onionskin'] {
+  color-scheme: light;
+
+  --bg: var(--galley-paper);
+  --bg-sunken: #dcd1b8; /* deepest recess — editor gutter, sunk wells */
+  --surface: #e4dac4; /* sidebar / preview chrome */
+  --surface-raised: #f3ecdc; /* menus, dialogs — a fresher sheet */
+
+  --fg: var(--galley-ink);
+  --fg-muted: var(--galley-graphite);
+  --fg-faint: #6f665a; /* hints, disabled — large/secondary only */
+
+  --border: #cdbfa3;
+  --border-strong: var(--galley-graphite);
+
+  --accent: var(--galley-ribbon);
+  --accent-fg: var(--galley-paper); /* type on an accent fill */
+  --accent-text: var(--galley-ribbon); /* accent-coloured type on --bg */
+
+  --danger: var(--galley-ribbon);
+  --danger-text: var(--galley-ribbon);
+  --success: var(--galley-sage);
+
+  --focus-ring: var(--galley-ribbon);
+  --selection-bg: rgba(168, 54, 43, 0.18);
+  --selection-fg: var(--galley-ink);
+  --overlay: rgba(20, 18, 16, 0.42);
+
+  --shadow-raised: 0 6px 22px rgba(28, 26, 23, 0.18);
+}
+
+[data-theme='carbon'] {
+  color-scheme: dark;
+
+  --bg: var(--galley-ink);
+  --bg-sunken: var(--galley-carbon);
+  --surface: #211e1a;
+  --surface-raised: #2a2620;
+
+  --fg: var(--galley-paper);
+  --fg-muted: var(--galley-muted);
+  --fg-faint: #756b5c;
+
+  --border: #34302a;
+  --border-strong: var(--galley-graphite);
+
+  --accent: var(--galley-ribbon);
+  --accent-fg: var(--galley-paper);
+  --accent-text: var(--galley-ribbon-bright); /* lifted so it reads on Carbon */
+
+  --danger: var(--galley-ribbon);
+  --danger-text: var(--galley-ribbon-bright);
+  --success: var(--galley-sage);
+
+  --focus-ring: var(--galley-ribbon-bright);
+  --selection-bg: rgba(217, 119, 107, 0.22);
+  --selection-fg: var(--galley-paper);
+  --overlay: rgba(0, 0, 0, 0.55);
+
+  --shadow-raised: 0 8px 26px rgba(0, 0, 0, 0.5);
+}

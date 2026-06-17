@@ -7,3 +7,5 @@ codebase stays legible.
 | ---- | ------------------------------------------- | -------- |
 | 0001 | Technology stack                            | Accepted |
 | 0002 | Coverage policy and the bootstrap exclusion | Accepted |
+| 0003 | Design tokens and theming                   | Accepted |
+| 0004 | The UI kit as a tested component library    | Accepted |

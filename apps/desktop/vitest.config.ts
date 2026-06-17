@@ -14,6 +14,12 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['tests/**/*.test.ts'],
+    setupFiles: ['tests/setup.ts'],
+    server: {
+      // Transform the linked workspace UI kit (Svelte source) instead of
+      // treating it as an externalised, pre-built dependency.
+      deps: { inline: [/@galley\/ui-kit/] }
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

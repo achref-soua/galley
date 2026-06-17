@@ -22,9 +22,19 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.0.1`: the foundation. The monorepo, the
-> build and quality tooling, the brand, and a packaged desktop shell are in place. Editing,
-> compiling, the visual editor, and the AI layer arrive in subsequent versioned releases.
+> **Status — early development.** This is `v0.0.2`: the design system. Both themes —
+> **Onionskin** (light) and **Carbon** (dark) — the typewriter design tokens, a shared
+> UI kit, and the resizable workspace shell (sidebar · editor · preview) with a settings
+> panel are in place. Editing, compiling, the visual editor, and the AI layer arrive in
+> subsequent versioned releases.
+
+## Themes
+
+Galley ships two first-class themes built from a single token system: **Onionskin**, the
+freshly-typed light sheet, and **Carbon**, the dark carbon-copy. The switcher follows your
+OS on first run, remembers your choice, and repaints the whole app — chrome, editor syntax
+colours, and PDF-viewer chrome — instantly. Reduced-motion is honoured throughout, and the
+palette is checked against WCAG contrast ratios in both themes on every build.
 
 ## Why Galley
 
