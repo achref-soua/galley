@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     SegmentedControl,
+    Toggle,
     IconButton,
     Icon,
     THEME_PREFERENCES,
@@ -11,21 +12,29 @@
   let {
     themePreference,
     reduceMotion,
+    autoCompile,
+    soundOnSuccess,
     onthemechange,
+    onautocompilechange,
+    onsoundchange,
     onclose
   }: {
     themePreference: ThemePreference;
     reduceMotion: boolean;
+    autoCompile: boolean;
+    soundOnSuccess: boolean;
     onthemechange: (pref: ThemePreference) => void;
+    onautocompilechange: (enabled: boolean) => void;
+    onsoundchange: (enabled: boolean) => void;
     onclose: () => void;
   } = $props();
 
-  type Section = 'appearance' | 'editor' | 'about';
+  type Section = 'appearance' | 'compilation' | 'about';
   let active = $state<Section>('appearance');
 
   const sections: { id: Section; label: string }[] = [
     { id: 'appearance', label: 'Appearance' },
-    { id: 'editor', label: 'Editor' },
+    { id: 'compilation', label: 'Compilation' },
     { id: 'about', label: 'About' }
   ];
 
@@ -80,9 +89,24 @@
             <span class="label">Reduced motion</span>
             <span class="value">{reduceMotion ? 'On (following your system)' : 'Off'}</span>
           </p>
-        {:else if active === 'editor'}
-          <h2>Editor</h2>
-          <p class="muted">Fonts, keymaps, and snippets settle in here in a later release.</p>
+        {:else if active === 'compilation'}
+          <h2>Compilation</h2>
+          <p class="row">
+            <span class="label">Compile as you type</span>
+            <Toggle
+              label="Compile as you type"
+              checked={autoCompile}
+              onchange={(checked) => onautocompilechange(checked)}
+            />
+          </p>
+          <p class="row">
+            <span class="label">Bell on success</span>
+            <Toggle
+              label="Bell on success"
+              checked={soundOnSuccess}
+              onchange={(checked) => onsoundchange(checked)}
+            />
+          </p>
         {:else}
           <h2>About</h2>
           <p class="muted">Galley — a local-first LaTeX studio. Pull a proof.</p>

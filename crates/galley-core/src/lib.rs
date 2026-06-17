@@ -7,6 +7,7 @@
 
 pub mod compile;
 pub mod document;
+pub mod hash;
 pub mod manifest;
 pub mod project;
 pub mod time;
@@ -19,6 +20,7 @@ pub use document::{
     basename, classify, is_main_named, looks_like_root, select_root_document, Document,
     DocumentKind, RootCandidate,
 };
+pub use hash::content_hash;
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
 pub use project::{project_name_from_path, Project};
 pub use time::iso8601_utc;
