@@ -1,6 +1,6 @@
 {
   "name": "@galley/desktop",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Galley desktop app (Tauri 2 + Svelte 5).",
@@ -16,9 +16,16 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/legacy-modes": "^6.5.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
     "@galley/ui-kit": "workspace:*",
+    "@lezer/highlight": "^1.2.3",
     "@tauri-apps/api": "^2.1.1",
-    "@tauri-apps/plugin-dialog": "^2.2.0"
+    "@tauri-apps/plugin-dialog": "^2.2.0",
+    "pdfjs-dist": "^6.0.227"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

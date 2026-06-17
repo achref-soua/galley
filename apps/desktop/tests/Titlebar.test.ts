@@ -8,8 +8,11 @@ const base = {
   documentName: 'thesis.tex',
   dirty: false,
   canSave: false,
+  canCompile: true,
+  compiling: false,
   sidebarCollapsed: false,
   previewCollapsed: false,
+  oncompile: noop,
   onsave: noop,
   ontogglesidebar: noop,
   ontogglepreview: noop,
@@ -61,5 +64,25 @@ describe('Titlebar', () => {
     expect(save.hasAttribute('disabled')).toBe(false);
     await fireEvent.click(save);
     expect(onsave).toHaveBeenCalledOnce();
+  });
+
+  it('compiles from the Compile button when a document is open', async () => {
+    const oncompile = vi.fn();
+    render(Titlebar, { props: { ...base, canCompile: true, compiling: false, oncompile } });
+    const compile = screen.getByRole('button', { name: 'Compile' });
+    expect(compile.hasAttribute('disabled')).toBe(false);
+    await fireEvent.click(compile);
+    expect(oncompile).toHaveBeenCalledOnce();
+  });
+
+  it('disables Compile when there is nothing to build', () => {
+    render(Titlebar, { props: { ...base, canCompile: false } });
+    expect(screen.getByRole('button', { name: 'Compile' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('shows a compiling state and disables the button while it runs', () => {
+    render(Titlebar, { props: { ...base, canCompile: true, compiling: true } });
+    const compile = screen.getByRole('button', { name: 'Compiling…' });
+    expect(compile.hasAttribute('disabled')).toBe(true);
   });
 });

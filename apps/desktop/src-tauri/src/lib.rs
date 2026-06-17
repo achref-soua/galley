@@ -7,7 +7,8 @@
 //! in those crates and is exercised there. This file holds no testable business
 //! logic and is excluded from coverage (see `docs/adr/0002`).
 
-use galley_core::{DocumentKind, VERSION};
+use galley_compile::{EmbeddedCompiler, TectonicEngine};
+use galley_core::{CompileRequest, Compiler, DocumentKind, Engine, VERSION};
 use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
 use galley_security::SafeRoot;
 use serde::Serialize;
@@ -95,6 +96,26 @@ fn save_document(root: String, rel: String, contents: String) -> Result<(), Stri
     store.write(&rel, &contents).map_err(|err| err.to_string())
 }
 
+/// The outcome of a compile as sent to the UI.
+#[derive(Serialize)]
+struct CompileDto {
+    ok: bool,
+    log: String,
+    pdf: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+fn compile_document(source: String, root_document: String) -> CompileDto {
+    let compiler = EmbeddedCompiler::new(TectonicEngine::new());
+    let request = CompileRequest::new(root_document, Engine::Tectonic);
+    let result = compiler.compile(&request, &source);
+    CompileDto {
+        ok: result.report.is_ok(),
+        log: result.report.log,
+        pdf: result.pdf,
+    }
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
@@ -110,7 +131,8 @@ pub fn run() {
             create_project,
             open_folder,
             read_document,
-            save_document
+            save_document,
+            compile_document
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

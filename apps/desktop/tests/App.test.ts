@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import App from '../src/App.svelte';
-import { firePointer } from './setup';
+import type { PdfRenderer } from '../src/lib/pdf';
+import { firePointer, fakeEditorFactory } from './setup';
+
+/** A fake PDF renderer that reports a one-page document. */
+const onePageRenderer = (): PdfRenderer => ({ render: () => Promise.resolve({ pageCount: 1 }) });
 
 describe('App shell', () => {
   it('renders the titlebar, sidebar, editor, and preview, painting the default theme', () => {
@@ -83,7 +87,7 @@ describe('App shell', () => {
 
 describe('App — projects, editing, and the unsaved-changes guard', () => {
   async function openDemoFolder() {
-    render(App);
+    render(App, { props: { editor: fakeEditorFactory(), createRenderer: onePageRenderer } });
     expect(screen.getByText('No document')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
     // The demo project opens with its root document showing.
@@ -92,7 +96,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
   }
 
   it('creates a project from the sidebar and opens its root document', async () => {
-    render(App);
+    render(App, { props: { editor: fakeEditorFactory(), createRenderer: onePageRenderer } });
     await fireEvent.input(screen.getByLabelText('New project name'), {
       target: { value: 'My Paper' }
     });
@@ -166,5 +170,19 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'galley-project' }));
     // Still showing the (re-opened) project's root document.
     await waitFor(() => expect(screen.getByLabelText('Source')).toBeTruthy());
+  });
+
+  it('compiles the open document and shows the proof in the preview', async () => {
+    await openDemoFolder();
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+    expect(screen.getByText('1 / 1')).toBeTruthy();
+  });
+
+  it('compiles with the Ctrl+B shortcut', async () => {
+    const editor = await openDemoFolder();
+    await fireEvent.input(editor, { target: { value: '\\documentclass{article}\\end{document}' } });
+    await fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
   });
 });

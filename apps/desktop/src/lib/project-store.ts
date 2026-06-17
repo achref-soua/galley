@@ -37,7 +37,25 @@ export interface ProjectState {
   pending: PendingOpen | null;
   /** The recent-projects list, most recent first. */
   recent: RecentProject[];
+  /** The state of the most recent compile. */
+  compile: CompileState;
 }
+
+/** Where a compile currently stands. */
+export type CompileStatus = 'idle' | 'running' | 'ok' | 'failed';
+
+/** The result of the latest compile, driving the preview. */
+export interface CompileState {
+  /** Whether a compile is idle, running, succeeded, or failed. */
+  status: CompileStatus;
+  /** The TeX log from the last compile (empty until one runs). */
+  log: string;
+  /** The produced PDF bytes, or `null` when none/failed. */
+  pdf: Uint8Array | null;
+}
+
+/** The starting compile state — nothing proofed yet. */
+const IDLE_COMPILE: CompileState = { status: 'idle', log: '', pdf: null };
 
 /** Owns project state and notifies subscribers on every change. */
 export class ProjectController {
@@ -56,7 +74,8 @@ export class ProjectController {
       savedContent: '',
       error: null,
       pending: null,
-      recent: recent.list()
+      recent: recent.list(),
+      compile: IDLE_COMPILE
     };
   }
 
@@ -96,7 +115,13 @@ export class ProjectController {
 
   async #load(snapshot: ProjectSnapshot): Promise<void> {
     this.#recent.record({ root: snapshot.root, name: snapshot.name });
-    this.#set({ project: snapshot, pending: null, recent: this.#recent.list() });
+    // A freshly loaded project starts with no proof on the galley.
+    this.#set({
+      project: snapshot,
+      pending: null,
+      recent: this.#recent.list(),
+      compile: IDLE_COMPILE
+    });
     if (snapshot.rootDocument !== '') {
       await this.#openFile(snapshot.root, snapshot.rootDocument);
     } else {
@@ -181,6 +206,31 @@ export class ProjectController {
     await this.#run(async () => {
       await this.#backend.saveDocument(project.root, path, this.#state.content);
       this.#set({ savedContent: this.#state.content });
+    });
+  }
+
+  /**
+   * Compile the open document and surface the result for the preview. The active
+   * document is saved first, so the `.tex` on disk is the canonical source. (For
+   * v0.1.0 the open document is the build root; multi-file root awareness lands
+   * with the language server in v0.2.1.)
+   */
+  async compile(): Promise<void> {
+    const project = this.#state.project;
+    const path = this.#state.activePath;
+    if (project === null || path === null) {
+      return;
+    }
+    await this.#run(async () => {
+      await this.#backend.saveDocument(project.root, path, this.#state.content);
+      this.#set({
+        savedContent: this.#state.content,
+        compile: { status: 'running', log: '', pdf: null }
+      });
+      const outcome = await this.#backend.compile(this.#state.content, path);
+      this.#set({
+        compile: { status: outcome.ok ? 'ok' : 'failed', log: outcome.log, pdf: outcome.pdf }
+      });
     });
   }
 

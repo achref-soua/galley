@@ -6,7 +6,9 @@
   import { ProjectController } from './lib/project-store';
   import { selectBackend } from './lib/project-backend';
   import { RecentProjectsStore } from './lib/recent-projects';
-  import { isSaveShortcut } from './lib/keymap';
+  import { createLatexEditor, type EditorFactory } from './lib/editor';
+  import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
+  import { isCompileShortcut, isSaveShortcut } from './lib/keymap';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import EditorPane from './lib/EditorPane.svelte';
@@ -14,6 +16,16 @@
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
   import UnsavedGuard from './lib/UnsavedGuard.svelte';
+
+  // The editor and PDF renderer are injectable so tests can drive the UI with
+  // fakes; the packaged app uses the real CodeMirror editor and PDF.js renderer.
+  let {
+    editor = createLatexEditor,
+    createRenderer = pdfjsRenderer
+  }: {
+    editor?: EditorFactory;
+    createRenderer?: () => PdfRenderer;
+  } = $props();
 
   const RESIZE_STEP = 16;
 
@@ -37,6 +49,8 @@
   const previewStyle = $derived(`width: ${layout.previewWidth}px`);
   const documentName = $derived(project.activePath ?? 'No document');
   const dirty = $derived(project.activePath !== null && project.content !== project.savedContent);
+  const canCompile = $derived(project.activePath !== null);
+  const compiling = $derived(project.compile.status === 'running');
 
   function changeTheme(pref: ThemePreference) {
     theme.setPreference(pref);
@@ -47,6 +61,9 @@
     if (isSaveShortcut(event)) {
       event.preventDefault();
       void projectController.save();
+    } else if (isCompileShortcut(event)) {
+      event.preventDefault();
+      void projectController.compile();
     }
   }
 
@@ -98,8 +115,11 @@
     {documentName}
     {dirty}
     canSave={dirty}
+    {canCompile}
+    {compiling}
     sidebarCollapsed={layout.sidebarCollapsed}
     previewCollapsed={layout.previewCollapsed}
+    oncompile={() => void projectController.compile()}
     onsave={() => void projectController.save()}
     ontogglesidebar={toggleSidebar}
     ontogglepreview={togglePreview}
@@ -134,6 +154,7 @@
         content={project.content}
         {dirty}
         onedit={(content) => projectController.edit(content)}
+        createEditor={editor}
       />
     </div>
 
@@ -146,7 +167,12 @@
         onstep={stepPreview}
       />
       <div class="pane preview" style={previewStyle}>
-        <PreviewPane />
+        <PreviewPane
+          status={project.compile.status}
+          log={project.compile.log}
+          pdf={project.compile.pdf}
+          {createRenderer}
+        />
       </div>
     {/if}
   </main>

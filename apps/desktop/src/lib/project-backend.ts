@@ -32,6 +32,16 @@ export interface ProjectSnapshot {
   documents: ProjectFile[];
 }
 
+/** The outcome of a compile: whether a PDF was produced, the log, and the bytes. */
+export interface CompileOutcome {
+  /** Whether the compile produced a PDF. */
+  ok: boolean;
+  /** The TeX log (or a short message). */
+  log: string;
+  /** The produced PDF bytes, or `null` when the compile failed. */
+  pdf: Uint8Array | null;
+}
+
 /** The operations the UI needs to work with projects on disk. */
 export interface ProjectBackend {
   /** Create a new project named `name` inside `parent`. */
@@ -42,6 +52,8 @@ export interface ProjectBackend {
   readDocument(root: string, rel: string): Promise<string>;
   /** Save a project file. */
   saveDocument(root: string, rel: string, contents: string): Promise<void>;
+  /** Compile `source` as `rootDocument`, returning the result. */
+  compile(source: string, rootDocument: string): Promise<CompileOutcome>;
   /** Ask the user to pick a folder, returning its path or `null` if cancelled. */
   pickFolder(title: string): Promise<string | null>;
 }
@@ -52,6 +64,13 @@ interface RawProject {
   root: string;
   root_document: string;
   documents: ProjectFile[];
+}
+
+/** The compile result as serialized by the Rust command layer. */
+interface RawCompile {
+  ok: boolean;
+  log: string;
+  pdf: number[] | null;
 }
 
 function fromRaw(raw: RawProject): ProjectSnapshot {
@@ -78,6 +97,14 @@ export function tauriProjectBackend(): ProjectBackend {
     async saveDocument(root, rel, contents) {
       await invoke('save_document', { root, rel, contents });
     },
+    async compile(source, rootDocument) {
+      const raw = await invoke<RawCompile>('compile_document', { source, rootDocument });
+      return {
+        ok: raw.ok,
+        log: raw.log,
+        pdf: raw.pdf === null ? null : new Uint8Array(raw.pdf)
+      };
+    },
     async pickFolder(title) {
       const selected = await open({ directory: true, multiple: false, title });
       return typeof selected === 'string' ? selected : null;
@@ -95,6 +122,24 @@ const DEMO_FILES: ReadonlyArray<[string, string]> = [
   ['sections/introduction.tex', '\\section{Introduction}\nWelcome to Galley.\n'],
   ['references.bib', '@book{galley, title = {Galley}}\n']
 ];
+
+/**
+ * A tiny, valid one-page PDF (base64) returned by the in-memory compile, so the
+ * browser/dev build and the Playwright e2e exercise the real PDF.js preview
+ * without a TeX engine. The packaged app compiles for real via the Rust backend.
+ */
+const DEMO_PDF_BASE64 =
+  'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvUmVzb3VyY2VzIDw8ID4+ID4+CmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKMjAzCiUlRU9G';
+
+/** Decode the embedded demo PDF to bytes. */
+function demoPdfBytes(): Uint8Array {
+  const binary = atob(DEMO_PDF_BASE64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
 /**
  * An in-memory backend for the browser, dev, and tests. It keeps one project's
@@ -129,6 +174,14 @@ export function browserProjectBackend(): ProjectBackend {
     },
     async saveDocument(_root, rel, contents) {
       files.set(rel, contents);
+    },
+    async compile(source) {
+      // A deterministic local proof: a document that closes compiles to the demo
+      // PDF; otherwise it "fails" with a message, so both states can be exercised.
+      if (source.includes('\\end{document}')) {
+        return { ok: true, log: 'Compiled locally (demo).', pdf: demoPdfBytes() };
+      }
+      return { ok: false, log: 'Missing \\end{document}.', pdf: null };
     },
     async pickFolder() {
       return '/demo/galley-project';

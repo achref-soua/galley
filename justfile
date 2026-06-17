@@ -59,6 +59,16 @@ package:
 e2e:
     pnpm --filter @galley/desktop test:e2e
 
+# Pre-warm the Tectonic package cache so the first real compile needs no network.
+# Run once on a machine with connectivity; afterwards compiles work fully offline.
+prewarm:
+    cargo test -p galley-compile --features real-compiler --test real_compile -- --ignored
+
+# Run the real embedded-Tectonic integration tests (needs the feature + a warm
+# cache from `just prewarm`). These are excluded from `just ci` by design.
+compile-itest:
+    cargo test -p galley-compile --features real-compiler --test real_compile -- --ignored
+
 # Sign & notarize artifacts — wired but a no-op until signing certs exist.
 sign:
     @echo "Signing is wired but disabled until certs are configured (see SECURITY.md)."

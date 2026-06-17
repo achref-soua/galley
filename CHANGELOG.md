@@ -4,6 +4,29 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0] - 2026-06-17
+
+Editing and compile — a real editor, an embedded TeX engine, and a live proof.
+
+### Added
+
+- A real **CodeMirror 6** LaTeX editor over the canonical `.tex` source, with syntax
+  highlighting, environment folding, bracket matching, and history, themed for both
+  Onionskin and Carbon through the design tokens. It replaces the placeholder editing
+  surface.
+- **Embedded Tectonic** compilation behind the `Compiler` port: the pure build planning and
+  result shaping live in covered crates (`galley-core`, `galley-compile`), and the native
+  engine sits behind a mockable `LatexEngine` seam, compiled only under the `real-compiler`
+  feature (see ADR-0006).
+- A **PDF.js** preview that renders the compiled proof onto a canvas and reports the page
+  count, replacing the placeholder. The renderer is injectable and PDF.js is lazily loaded.
+- A manual **Compile** action — a titlebar button and the `Ctrl`/`⌘`+`B` shortcut — that
+  saves the source and compiles it, surfacing the proof or the failure log in the preview.
+- Offline compilation: `just prewarm` warms the Tectonic package cache once so subsequent
+  compiles need no network; an offline integration test verifies a stock `article` builds
+  with connectivity disabled.
+- ADR-0006 (embedded Tectonic compilation and the PDF.js preview).
+
 ## [0.0.3] - 2026-06-17
 
 The project model and the file tree — create, open, edit, and save real projects.
@@ -69,6 +92,7 @@ The first scaffold — a real, buildable, fully-gated foundation.
 - Founding documents: README, LICENSE (MIT), SECURITY, CONTRIBUTING, and ADR-0001
   (technology stack) and ADR-0002 (coverage policy and the bootstrap exclusion).
 
+[0.1.0]: https://github.com/achref-soua/galley/releases/tag/v0.1.0
 [0.0.3]: https://github.com/achref-soua/galley/releases/tag/v0.0.3
 [0.0.2]: https://github.com/achref-soua/galley/releases/tag/v0.0.2
 [0.0.1]: https://github.com/achref-soua/galley/releases/tag/v0.0.1
