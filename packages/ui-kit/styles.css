@@ -1,0 +1,77 @@
+/*
+ * Galley design system — the single stylesheet an app imports.
+ *
+ * Pulls in the primitive tokens, the themed semantic layer, and the editor
+ * syntax theme, then lays down the small base reset and brand defaults that
+ * every Galley surface shares.
+ */
+@import './tokens.css';
+@import './themes.css';
+@import './syntax.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--galley-font-mono);
+  font-size: var(--galley-text-md);
+  line-height: var(--galley-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+
+:focus-visible {
+  outline: var(--galley-border-thick) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Slim, paper-toned scrollbars that follow the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--galley-radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * Reduce motion: honour the OS preference everywhere. Mechanical motion is a
+ * brand touch, never a barrier — when asked to be still, be still.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

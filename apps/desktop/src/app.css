@@ -1,25 +1,17 @@
-:root {
-  --ink: #1c1a17;
-  --paper: #ece3d0;
-  --ribbon: #a8362b;
-  --graphite: #4a443b;
-  --muted: #9a8e7e;
-  --carbon: #141210;
-}
-
-* {
-  box-sizing: border-box;
-}
+/*
+ * The desktop app's global stylesheet: pull in the Galley design system
+ * (tokens, themes, syntax theme, base reset) and set the app-window defaults.
+ * The active theme is applied as `data-theme` on <html> by the theme controller.
+ */
+@import '@galley/ui-kit/styles.css';
 
 html,
-body {
-  margin: 0;
-  padding: 0;
+body,
+#app {
+  height: 100%;
 }
 
-body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: 'Courier Prime', 'Courier New', ui-monospace, monospace;
-  -webkit-font-smoothing: antialiased;
+#app {
+  display: flex;
+  flex-direction: column;
 }

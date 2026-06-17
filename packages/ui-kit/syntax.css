@@ -1,0 +1,35 @@
+/*
+ * Galley editor syntax theme.
+ *
+ * Per-theme colours for LaTeX source highlighting. The real CodeMirror 6 theme
+ * (v0.1.0) binds its tags to these tokens; defining them here keeps the editor
+ * palette part of the design system and themed in lockstep with the chrome. The
+ * preview pane in v0.0.2 already renders a sample using them.
+ */
+
+:root,
+[data-theme='onionskin'] {
+  --syn-text: var(--galley-ink); /* plain text */
+  --syn-command: #8a2f24; /* \command — a deepened ribbon */
+  --syn-keyword: #5a3ea8; /* \begin/\end, document structure */
+  --syn-bracket: var(--galley-graphite); /* { } [ ] */
+  --syn-math: #2f5d50; /* $…$ math */
+  --syn-string: #6b5a2e; /* literals, lengths */
+  --syn-comment: #9a8e7e; /* % comments */
+  --syn-label: #2f5da8; /* \ref / \label / \cite keys */
+  --syn-gutter-fg: #9a8e7e;
+  --syn-active-line: rgba(168, 54, 43, 0.07);
+}
+
+[data-theme='carbon'] {
+  --syn-text: var(--galley-paper);
+  --syn-command: var(--galley-ribbon-bright);
+  --syn-keyword: #b6a4f0;
+  --syn-bracket: var(--galley-muted);
+  --syn-math: #8fc7b3;
+  --syn-string: #d3bd84;
+  --syn-comment: #756b5c;
+  --syn-label: #8fb6f0;
+  --syn-gutter-fg: #756b5c;
+  --syn-active-line: rgba(217, 119, 107, 0.1);
+}

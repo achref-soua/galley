@@ -3,6 +3,7 @@ dist
 build
 node_modules
 coverage
+storybook-static
 pnpm-lock.yaml
 apps/desktop/src-tauri/icons
 apps/desktop/src-tauri/target

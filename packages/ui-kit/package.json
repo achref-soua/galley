@@ -1,14 +1,50 @@
 {
   "name": "@galley/ui-kit",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "description": "Galley design system — tokens, themes, and shared Svelte components.",
   "license": "MIT",
+  "svelte": "./src/index.ts",
   "exports": {
-    "./tokens.css": "./tokens.css"
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./styles.css": "./styles.css",
+    "./tokens.css": "./tokens.css",
+    "./themes.css": "./themes.css",
+    "./syntax.css": "./syntax.css"
   },
   "files": [
-    "tokens.css"
-  ]
+    "src",
+    "tokens.css",
+    "themes.css",
+    "syntax.css",
+    "styles.css"
+  ],
+  "scripts": {
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "storybook": "storybook dev -p 6006 --no-open",
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@storybook/addon-essentials": "^8.4.7",
+    "@storybook/addon-svelte-csf": "^5.1.2",
+    "@storybook/svelte": "^8.4.7",
+    "@storybook/svelte-vite": "^8.4.7",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@testing-library/svelte": "^5.2.6",
+    "@vitest/coverage-v8": "^2.1.8",
+    "jsdom": "^25.0.1",
+    "storybook": "^8.4.7",
+    "svelte": "^5.16.0",
+    "svelte-check": "^4.1.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
 }

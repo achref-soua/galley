@@ -26,6 +26,7 @@ lint:
 # Run all tests (without the coverage gate).
 test:
     cargo test --workspace
+    pnpm --filter @galley/ui-kit test
     pnpm --filter @galley/desktop test
 
 # Coverage gate — fails below 100%.
