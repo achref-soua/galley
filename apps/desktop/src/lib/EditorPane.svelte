@@ -1,22 +1,41 @@
 <script lang="ts">
-  // A plain editing surface over the open document. The real CodeMirror 6
-  // editor (syntax highlighting, folding, the visual mode) lands in v0.1.0; for
-  // now this is a faithful textarea bound to the source — the single source of
-  // truth — with a dirty marker on the tab.
+  // The editing surface over the open document. A real CodeMirror 6 editor
+  // (syntax highlighting, folding, themed for both Onionskin and Carbon) is
+  // mounted over the canonical `.tex` source — the single source of truth. The
+  // editor is built through an injectable factory so the component can be driven
+  // with a fake in tests; the real factory is covered in `editor.test.ts`.
+  import { createLatexEditor, type EditorFactory, type LatexEditor } from './editor';
+
   let {
     documentName,
     content,
     dirty,
-    onedit
+    onedit,
+    createEditor = createLatexEditor
   }: {
     documentName: string | null;
     content: string;
     dirty: boolean;
     onedit: (content: string) => void;
+    createEditor?: EditorFactory;
   } = $props();
 
-  function onInput(event: Event) {
-    onedit((event.currentTarget as HTMLTextAreaElement).value);
+  // A Svelte action: build the editor when the surface mounts, push external
+  // content changes in, and tear it down on unmount.
+  function mountEditor(node: HTMLElement, value: string) {
+    const editor: LatexEditor = createEditor({
+      parent: node,
+      doc: value,
+      onChange: (next) => onedit(next)
+    });
+    return {
+      update(next: string) {
+        editor.setDoc(next);
+      },
+      destroy() {
+        editor.destroy();
+      }
+    };
   }
 </script>
 
@@ -32,13 +51,7 @@
         {documentName}{#if dirty}<span class="dot" aria-label="unsaved changes">•</span>{/if}
       </span>
     </header>
-    <textarea
-      class="surface"
-      aria-label="Source"
-      spellcheck="false"
-      value={content}
-      oninput={onInput}
-    ></textarea>
+    <div class="surface" use:mountEditor={content}></div>
   {/if}
 </section>
 
@@ -84,17 +97,8 @@
   .surface {
     flex: 1 1 auto;
     min-height: 0;
-    width: 100%;
-    resize: none;
-    border: none;
-    outline: none;
-    padding: var(--galley-space-4);
+    overflow: auto;
     background: var(--bg-sunken);
-    color: var(--syn-text);
-    font-family: var(--galley-font-mono);
-    font-size: var(--galley-text-md);
-    line-height: var(--galley-leading-normal);
-    tab-size: 2;
   }
 
   .empty {

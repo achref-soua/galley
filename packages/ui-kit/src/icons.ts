@@ -7,7 +7,8 @@ export type IconName =
   | 'save'
   | 'file'
   | 'folder'
-  | 'folder-open';
+  | 'folder-open'
+  | 'compile';
 
 /** Path data for each icon, drawn with `fill: none; stroke: currentColor`. */
 export const ICON_PATHS: Record<IconName, string> = {
@@ -18,5 +19,6 @@ export const ICON_PATHS: Record<IconName, string> = {
   save: 'M5 4h11l3 3v13H5z M8 4v5h7 M8 20v-6h8v6',
   file: 'M7 3h7l4 4v14H7z M14 3v4h4',
   folder: 'M3 6h6l2 2h10v11H3z',
-  'folder-open': 'M3 6h6l2 2h10 M3 8h18l-2 11H3z'
+  'folder-open': 'M3 6h6l2 2h10 M3 8h18l-2 11H3z',
+  compile: 'M8 5l11 7-11 7z'
 };

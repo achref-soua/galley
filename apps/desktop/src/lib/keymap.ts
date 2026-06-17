@@ -11,3 +11,8 @@ export interface KeyChord {
 export function isSaveShortcut(event: KeyChord): boolean {
   return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's';
 }
+
+/** Whether an event is the "compile" shortcut (Ctrl+B or ⌘B). */
+export function isCompileShortcut(event: KeyChord): boolean {
+  return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b';
+}

@@ -26,14 +26,17 @@ test('a pane can be collapsed from the titlebar', async ({ page }) => {
   await expect(page.getByLabel('Preview', { exact: true })).toBeVisible();
 });
 
-test('open a project, edit a file, and meet the unsaved-changes guard', async ({ page }) => {
+test('open a project, edit in the CodeMirror editor, and meet the unsaved-changes guard', async ({
+  page
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open a folder…' }).click();
 
-  // The root document opens for editing.
-  const editor = page.getByLabel('Source');
+  // The root document opens in the CodeMirror editor.
+  const editor = page.getByLabel('LaTeX source');
   await expect(editor).toBeVisible();
-  await editor.fill('an edit that is not saved');
+  await editor.click();
+  await page.keyboard.type(' an unsaved edit');
 
   // Switching files with unsaved edits raises the guard.
   await page.getByRole('button', { name: 'introduction.tex' }).click();
@@ -42,5 +45,17 @@ test('open a project, edit a file, and meet the unsaved-changes guard', async ({
   // Discarding moves on to the chosen file.
   await page.getByRole('button', { name: 'Discard' }).click();
   await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toBeHidden();
-  await expect(page.getByLabel('Source')).toHaveValue(/Introduction/);
+  await expect(page.getByLabel('LaTeX source')).toContainText('Introduction');
+});
+
+test('compile the open document and see the proof in the preview', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a folder…' }).click();
+  await expect(page.getByLabel('LaTeX source')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Compile' }).click();
+
+  // The PDF.js preview renders the proof onto a canvas and reports one page.
+  await expect(page.getByLabel('Proof')).toBeVisible();
+  await expect(page.getByText('1 / 1')).toBeVisible();
 });

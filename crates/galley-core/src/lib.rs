@@ -5,11 +5,16 @@
 //! exercised to full coverage with plain unit tests. As the product grows, the
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
+pub mod compile;
 pub mod document;
 pub mod manifest;
 pub mod project;
 pub mod time;
 
+pub use compile::{
+    tex_job_name, BuildPlan, CompileReport, CompileRequest, CompileResult, CompileStatus, Compiler,
+    Engine, PlanError,
+};
 pub use document::{
     basename, classify, is_main_named, looks_like_root, select_root_document, Document,
     DocumentKind, RootCandidate,
