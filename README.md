@@ -22,21 +22,26 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.1.0`: editing and compile. On top of the
-> project model and themes, you now edit in a real **CodeMirror 6** LaTeX editor (syntax
-> highlighting and folding, themed for both Onionskin and Carbon), **compile** with an
-> embedded **Tectonic** engine, and see the result in a **PDF.js** preview — a stock
-> `article` compiles correctly offline, and editing the source and recompiling updates the
-> proof. Fast incremental recompiles, friendly error messages, the visual editor, and the
-> AI layer arrive in subsequent versioned releases.
+> **Status — early development.** This is `v0.1.1`: fast, incremental compilation. On top of
+> the CodeMirror 6 editor, embedded **Tectonic** engine, and **PDF.js** preview, recompiles
+> now feel instant — a warm engine, an in-memory build cache that skips unchanged builds, and
+> a debounced **compile-as-you-type** that keeps the last proof on screen while the next one
+> builds. Friendly error messages, the visual editor, and the AI layer arrive in subsequent
+> versioned releases.
 
 ## Editing & compiling
 
 The editor is CodeMirror 6 over the canonical `.tex` source — there is no parallel model.
-Press **Compile** (or `Ctrl`/`⌘`+`B`) and Galley saves the source and builds it with an
-embedded Tectonic engine, rendering the PDF in the preview pane; a failed build shows its
-log instead. Tectonic fetches its package bundle once and caches it, so after a single
-`just prewarm` (or first online compile) every later compile works **fully offline**.
+Galley compiles that buffer directly with an embedded Tectonic engine and renders the PDF in
+the preview pane; a failed build shows its log instead. Compilation is **incremental and
+warm**: one long-lived engine reuses Tectonic's cached format and bundle, and an in-memory
+content cache returns the previous proof unchanged when nothing changed — so a cached
+single-edit recompile is sub-second. It runs **as you type** (debounced, and stale builds are
+dropped), or on demand with **Compile** / `Ctrl`/`⌘`+`B`; the preview keeps the last good
+proof on screen rather than flickering, shows the build time, and can ring a bell on success
+(off by default — Settings → Compilation). Saving stays a separate, explicit action. Tectonic
+fetches its package bundle once and caches it, so after a single `just prewarm` (or first
+online compile) every later compile works **fully offline**.
 
 ## Projects
 

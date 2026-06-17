@@ -2,6 +2,7 @@
   import { Logo } from '@galley/ui-kit';
   import { pdfjsRenderer, type PdfRenderer } from './pdf';
   import type { CompileStatus } from './project-store';
+  import { compileTiming } from './timing';
 
   // The PDF-viewer chrome plus the live proof. PDF.js renders the compiled PDF
   // onto a canvas; the renderer is built behind a factory so the component is
@@ -10,11 +11,15 @@
     status,
     log,
     pdf,
+    durationMs = null,
+    cached = false,
     createRenderer = pdfjsRenderer
   }: {
     status: CompileStatus;
     log: string;
     pdf: Uint8Array | null;
+    durationMs?: number | null;
+    cached?: boolean;
     createRenderer?: () => PdfRenderer;
   } = $props();
 
@@ -30,6 +35,7 @@
   let renderError = $state<string | null>(null);
 
   const statusLabel = $derived(STATUS_LABELS[status]);
+  const timingLabel = $derived(compileTiming(durationMs, cached));
   const pageLabel = $derived(pageCount > 0 ? `1 / ${pageCount}` : '— / —');
 
   // A Svelte action: (re)render the proof whenever the canvas mounts or the PDF
@@ -61,6 +67,7 @@
 <section class="preview" aria-label="Preview">
   <header class="viewer-bar">
     <span class="status">{statusLabel}</span>
+    <span class="timing">{timingLabel}</span>
     <span class="pages">{pageLabel}</span>
     <span class="zoom">150%</span>
   </header>
@@ -68,6 +75,12 @@
     {#if pdf !== null}
       <canvas class="page" use:renderProof={pdf} aria-label="Proof"></canvas>
       <p class="render-error" role="alert">{renderError}</p>
+      {#if status === 'failed'}
+        <div class="stale" role="status">
+          <p class="note">Showing the last good proof — the latest build failed.</p>
+          <pre class="log" aria-label="Compile log">{log}</pre>
+        </div>
+      {/if}
     {:else if status === 'failed'}
       <div class="failed">
         <p class="empty">That didn't compile.</p>
@@ -113,6 +126,15 @@
     letter-spacing: var(--galley-tracking-caps);
   }
 
+  .viewer-bar .timing {
+    color: var(--fg-faint);
+  }
+
+  /* Hidden until there is a duration (or "cached") to show. */
+  .viewer-bar .timing:empty {
+    display: none;
+  }
+
   .viewer-bar .pages {
     margin-left: auto;
   }
@@ -142,6 +164,17 @@
     color: var(--accent-text);
     font-size: var(--galley-text-sm);
     text-align: center;
+  }
+
+  .stale {
+    width: 100%;
+    text-align: center;
+  }
+
+  .stale .note {
+    margin: 0 0 var(--galley-space-2);
+    color: var(--accent-text);
+    font-size: var(--galley-text-xs);
   }
 
   /* Hidden until the renderer reports a problem. */

@@ -12,8 +12,14 @@
 //!   build gates do not. The real engine is exercised by the manual integration
 //!   tests in `tests/` (run like the filesystem tests, with the bundle present).
 //!
-//! Architecture: §4.3. The warm engine pool and in-memory VFS arrive in v0.1.1;
-//! v0.1.0 compiles a single canonical source string into a PDF.
+//! Architecture: §4.3. Speed comes from three layers that compose here: the
+//! warm engine (the format and bundle stay hot in process — see
+//! [`TectonicEngine`]), the in-memory VFS (intermediate `.aux`/`.pdf`/`.log`
+//! never touch disk), and the incremental [`CachingCompiler`] (unchanged inputs
+//! skip the engine entirely).
+
+mod cache;
+pub use cache::{CacheKey, CachedCompile, CachingCompiler, CompileCache};
 
 #[cfg(feature = "real-compiler")]
 mod tectonic_engine;

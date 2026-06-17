@@ -4,6 +4,35 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-06-17
+
+Fast, incremental compilation — recompiles that feel instant.
+
+### Added
+
+- An **incremental compile cache**: a dependency-free FNV-1a `content_hash` in `galley-core`
+  and a `CachingCompiler` in `galley-compile` that serves the previous proof when the source
+  is unchanged, so a no-change recompile never touches the engine.
+- A **warm engine**: the desktop shell keeps one long-lived compiler in memory (rather than
+  building one per compile), reusing Tectonic's on-disk format and bundle caches so only the
+  first build pays the cold-start cost.
+- **Compile as you type**: a debounced, cancellable auto-compile that coalesces a burst of
+  keystrokes into one build and drops a stale build so it can never overwrite a newer proof.
+  Toggleable under Settings → Compilation (on by default).
+- **Build status and timing** in the preview bar, including a `cached` indicator when the
+  proof came straight from the cache.
+- An optional success **bell** — a short Web Audio "ding" on a successful build, **off by
+  default**, under Settings → Compilation.
+- ADR-0007 (fast, incremental compilation).
+
+### Changed
+
+- The preview now **keeps the last good proof on screen** while a new build runs and when a
+  rebuild fails (showing the error alongside it), so it never flickers to empty.
+- **Compiling no longer saves the document.** Galley compiles the editor's canonical buffer
+  directly; saving stays the explicit `Ctrl`/`⌘`+`S` action (and the unsaved-changes guard),
+  which keeps dirty-tracking meaningful and lets auto-compile preview unsaved work.
+
 ## [0.1.0] - 2026-06-17
 
 Editing and compile — a real editor, an embedded TeX engine, and a live proof.

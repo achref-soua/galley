@@ -40,6 +40,8 @@ export interface CompileOutcome {
   log: string;
   /** The produced PDF bytes, or `null` when the compile failed. */
   pdf: Uint8Array | null;
+  /** Whether the result was served from the incremental cache (no engine run). */
+  cached: boolean;
 }
 
 /** The operations the UI needs to work with projects on disk. */
@@ -71,6 +73,7 @@ interface RawCompile {
   ok: boolean;
   log: string;
   pdf: number[] | null;
+  cached: boolean;
 }
 
 function fromRaw(raw: RawProject): ProjectSnapshot {
@@ -102,7 +105,8 @@ export function tauriProjectBackend(): ProjectBackend {
       return {
         ok: raw.ok,
         log: raw.log,
-        pdf: raw.pdf === null ? null : new Uint8Array(raw.pdf)
+        pdf: raw.pdf === null ? null : new Uint8Array(raw.pdf),
+        cached: raw.cached
       };
     },
     async pickFolder(title) {
@@ -147,6 +151,9 @@ function demoPdfBytes(): Uint8Array {
  */
 export function browserProjectBackend(): ProjectBackend {
   const files = new Map<string, string>(DEMO_FILES);
+  // A one-entry source cache mirroring the Rust incremental cache, so the demo
+  // and the e2e exercise the "cached" indicator on an unchanged recompile.
+  let lastSource: string | null = null;
 
   const snapshot = (name: string, root: string, rootDocument: string): ProjectSnapshot => ({
     name,
@@ -178,10 +185,12 @@ export function browserProjectBackend(): ProjectBackend {
     async compile(source) {
       // A deterministic local proof: a document that closes compiles to the demo
       // PDF; otherwise it "fails" with a message, so both states can be exercised.
+      const cached = source === lastSource;
+      lastSource = source;
       if (source.includes('\\end{document}')) {
-        return { ok: true, log: 'Compiled locally (demo).', pdf: demoPdfBytes() };
+        return { ok: true, log: 'Compiled locally (demo).', pdf: demoPdfBytes(), cached };
       }
-      return { ok: false, log: 'Missing \\end{document}.', pdf: null };
+      return { ok: false, log: 'Missing \\end{document}.', pdf: null, cached };
     },
     async pickFolder() {
       return '/demo/galley-project';

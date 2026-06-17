@@ -5,7 +5,11 @@ import Settings from '../src/lib/Settings.svelte';
 const base = {
   themePreference: 'onionskin' as const,
   reduceMotion: false,
+  autoCompile: true,
+  soundOnSuccess: false,
   onthemechange: () => {},
+  onautocompilechange: () => {},
+  onsoundchange: () => {},
   onclose: () => {}
 };
 
@@ -34,12 +38,31 @@ describe('Settings', () => {
 
   it('switches between sections', async () => {
     render(Settings, { props: base });
-    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
-    expect(screen.getByText(/Fonts, keymaps/)).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Compilation' }));
+    expect(screen.getByText('Compile as you type')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'About' }));
     expect(screen.getByText(/local-first LaTeX studio/)).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Appearance' }));
     expect(screen.getByText('Theme')).toBeTruthy();
+  });
+
+  it('reflects and toggles the compilation preferences', async () => {
+    const onautocompilechange = vi.fn();
+    const onsoundchange = vi.fn();
+    render(Settings, {
+      props: { ...base, soundOnSuccess: false, onautocompilechange, onsoundchange }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Compilation' }));
+
+    const autoSwitch = screen.getByRole('switch', { name: 'Compile as you type' });
+    const bellSwitch = screen.getByRole('switch', { name: 'Bell on success' });
+    expect(autoSwitch.getAttribute('aria-checked')).toBe('true');
+    expect(bellSwitch.getAttribute('aria-checked')).toBe('false');
+
+    await fireEvent.click(autoSwitch); // currently on → turning off
+    expect(onautocompilechange).toHaveBeenCalledWith(false);
+    await fireEvent.click(bellSwitch); // currently off → turning on
+    expect(onsoundchange).toHaveBeenCalledWith(true);
   });
 
   it('closes via the close button', async () => {
