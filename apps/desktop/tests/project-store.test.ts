@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ProjectController } from '../src/lib/project-store';
-import { type ProjectBackend, type ProjectSnapshot } from '../src/lib/project-backend';
+import {
+  type CompileOutcome,
+  type ProjectBackend,
+  type ProjectSnapshot
+} from '../src/lib/project-backend';
 import { RecentProjectsStore } from '../src/lib/recent-projects';
 
 function snapshot(over: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
@@ -27,6 +31,8 @@ class FakeBackend implements ProjectBackend {
   createError: unknown = null;
   openError: unknown = null;
   saveError: unknown = null;
+  compileResult: CompileOutcome = { ok: true, log: 'Output written.', pdf: new Uint8Array([1, 2]) };
+  compileCalls: Array<{ source: string; rootDocument: string }> = [];
 
   async createProject(parent: string, name: string): Promise<ProjectSnapshot> {
     if (this.createError !== null) {
@@ -55,6 +61,11 @@ class FakeBackend implements ProjectBackend {
       throw this.saveError;
     }
     this.files.set(rel, contents);
+  }
+
+  async compile(source: string, rootDocument: string): Promise<CompileOutcome> {
+    this.compileCalls.push({ source, rootDocument });
+    return this.compileResult;
   }
 
   async pickFolder(): Promise<string | null> {
@@ -262,5 +273,55 @@ describe('ProjectController — the unsaved-changes guard', () => {
     await controller.discardChanges();
     await controller.saveAndContinue();
     expect(controller.state.activePath).toBe('main.tex');
+  });
+});
+
+describe('ProjectController — compiling', () => {
+  beforeEach(async () => {
+    await controller.createProject('/parent', 'Paper');
+  });
+
+  it('saves the source first, then compiles it and stores the proof', async () => {
+    controller.edit('\\documentclass{article}');
+    await controller.compile();
+    // The active source was saved before compiling (canonical on disk).
+    expect(backend.files.get('main.tex')).toBe('\\documentclass{article}');
+    expect(controller.isDirty).toBe(false);
+    expect(backend.compileCalls).toEqual([
+      { source: '\\documentclass{article}', rootDocument: 'main.tex' }
+    ]);
+    expect(controller.state.compile.status).toBe('ok');
+    expect(controller.state.compile.log).toBe('Output written.');
+    expect(controller.state.compile.pdf).toEqual(new Uint8Array([1, 2]));
+  });
+
+  it('records a failed compile with its log and no PDF', async () => {
+    backend.compileResult = { ok: false, log: '! Undefined control sequence.', pdf: null };
+    await controller.compile();
+    expect(controller.state.compile.status).toBe('failed');
+    expect(controller.state.compile.log).toContain('Undefined control sequence');
+    expect(controller.state.compile.pdf).toBeNull();
+  });
+
+  it('does nothing without a project', async () => {
+    const fresh = new ProjectController(backend, makeRecent());
+    await fresh.compile();
+    expect(fresh.state.compile.status).toBe('idle');
+  });
+
+  it('does nothing when a project has no open document', async () => {
+    backend.openResult = snapshot({ rootDocument: '' });
+    await controller.openFolder('/empty');
+    expect(controller.state.activePath).toBeNull();
+    await controller.compile();
+    expect(controller.state.compile.status).toBe('idle');
+  });
+
+  it('clears a stale proof when another project is opened', async () => {
+    await controller.compile();
+    expect(controller.state.compile.status).toBe('ok');
+    await controller.openFolder('/another');
+    expect(controller.state.compile.status).toBe('idle');
+    expect(controller.state.compile.pdf).toBeNull();
   });
 });

@@ -1,21 +1,89 @@
 <script lang="ts">
   import { Logo } from '@galley/ui-kit';
-  // The PDF-viewer chrome — toolbar + proof surface. PDF.js rendering arrives in
-  // v0.1.0; here the chrome is fully themed and shows the empty proof.
+  import { pdfjsRenderer, type PdfRenderer } from './pdf';
+  import type { CompileStatus } from './project-store';
+
+  // The PDF-viewer chrome plus the live proof. PDF.js renders the compiled PDF
+  // onto a canvas; the renderer is built behind a factory so the component is
+  // driven with a fake in tests (the real renderer is covered in `pdf.test.ts`).
+  let {
+    status,
+    log,
+    pdf,
+    createRenderer = pdfjsRenderer
+  }: {
+    status: CompileStatus;
+    log: string;
+    pdf: Uint8Array | null;
+    createRenderer?: () => PdfRenderer;
+  } = $props();
+
+  const SCALE = 1.5;
+  const STATUS_LABELS: Record<CompileStatus, string> = {
+    idle: 'No proof',
+    running: 'Compiling…',
+    ok: 'Proof',
+    failed: 'Failed'
+  };
+
+  let pageCount = $state(0);
+  let renderError = $state<string | null>(null);
+
+  const statusLabel = $derived(STATUS_LABELS[status]);
+  const pageLabel = $derived(pageCount > 0 ? `1 / ${pageCount}` : '— / —');
+
+  // A Svelte action: (re)render the proof whenever the canvas mounts or the PDF
+  // bytes change. The renderer is built here (not in the component body) so it
+  // reads the latest `createRenderer` without capturing only its initial value.
+  function renderProof(node: HTMLCanvasElement, bytes: Uint8Array) {
+    const renderer = createRenderer();
+    const draw = (data: Uint8Array) => {
+      renderError = null;
+      renderer
+        .render(data, node, 1, SCALE)
+        .then((result) => {
+          pageCount = result.pageCount;
+        })
+        .catch((error) => {
+          const reason = error instanceof Error ? error.message : String(error);
+          renderError = `Could not render the proof: ${reason}`;
+        });
+    };
+    draw(bytes);
+    return {
+      update(next: Uint8Array) {
+        draw(next);
+      }
+    };
+  }
 </script>
 
 <section class="preview" aria-label="Preview">
   <header class="viewer-bar">
-    <span class="status">No proof</span>
-    <span class="pages">— / —</span>
-    <span class="zoom">100%</span>
+    <span class="status">{statusLabel}</span>
+    <span class="pages">{pageLabel}</span>
+    <span class="zoom">150%</span>
   </header>
   <div class="proof">
-    <div class="placeholder">
-      <Logo size={48} title="" />
-      <p class="empty">Nothing to proof yet.</p>
-      <p class="hint">Your live galley proof shows here once a document compiles.</p>
-    </div>
+    {#if pdf !== null}
+      <canvas class="page" use:renderProof={pdf} aria-label="Proof"></canvas>
+      <p class="render-error" role="alert">{renderError}</p>
+    {:else if status === 'failed'}
+      <div class="failed">
+        <p class="empty">That didn't compile.</p>
+        <pre class="log" aria-label="Compile log">{log}</pre>
+      </div>
+    {:else if status === 'running'}
+      <div class="placeholder">
+        <p class="empty">Pulling a proof…</p>
+      </div>
+    {:else}
+      <div class="placeholder">
+        <Logo size={48} title="" />
+        <p class="empty">Nothing to proof yet.</p>
+        <p class="hint">Your live galley proof shows here once a document compiles.</p>
+      </div>
+    {/if}
   </div>
 </section>
 
@@ -53,10 +121,45 @@
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: var(--galley-space-3);
     overflow: auto;
+    padding: var(--galley-space-4);
     background: var(--bg-sunken);
+  }
+
+  .page {
+    max-width: 100%;
+    height: auto;
+    background: var(--galley-paper);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+  }
+
+  .render-error,
+  .failed {
+    color: var(--accent-text);
+    font-size: var(--galley-text-sm);
+    text-align: center;
+  }
+
+  /* Hidden until the renderer reports a problem. */
+  .render-error:empty {
+    display: none;
+  }
+
+  .log {
+    max-width: 48ch;
+    margin: var(--galley-space-2) 0 0;
+    padding: var(--galley-space-3);
+    overflow: auto;
+    background: var(--galley-carbon);
+    color: var(--galley-paper);
+    font-family: var(--galley-font-mono);
+    font-size: var(--galley-text-xs);
+    text-align: left;
+    white-space: pre-wrap;
   }
 
   .placeholder {

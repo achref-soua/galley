@@ -1,17 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Galley">
-  <!-- Paper tile -->
+  <!-- App icon master. The mark is the EXACT double-strike "G" from
+       assets/brand/galley-logo.svg (Courier Prime Bold, outlined to a path so it
+       is font-independent), with the same red-ribbon ghost offset, the same
+       platen baseline, and the same onionskin colours — just scaled and centred
+       on the icon tile. Regenerate the OS icon set with `just icons`. -->
   <rect width="1024" height="1024" rx="180" fill="#ECE3D0"/>
-  <!-- Double-strike G: a font-independent geometric mark (ink + offset red ribbon ghost) -->
-  <g fill="none" stroke-width="128" stroke-linecap="round" stroke-linejoin="round">
-    <g stroke="#A8362B" transform="translate(20,20)">
-      <path d="M 734 326 A 290 290 0 1 0 734 698"/>
-      <path d="M 734 512 L 552 512"/>
+  <g transform="translate(-264.087,-337.666) scale(7.60870)">
+    <!-- red ribbon ghost (behind), offset down-right like a real mis-strike -->
+    <g transform="translate(62.0,142.0) scale(0.057617,-0.057617)">
+      <path d="M1084 1146V802Q1084 768 1053.5 753.5Q1023 739 952 739Q905 739 879.5 745.5Q854 752 844.0 765.0Q834 778 834 802Q834 888 782.0 935.0Q730 982 624 982Q485 982 413.0 882.0Q341 782 341 594Q341 408 417.5 306.5Q494 205 634 205Q745 205 844 235V402H651Q627 402 614.0 410.0Q601 418 594.5 440.0Q588 462 588 504Q588 546 594.5 568.0Q601 590 614.0 598.5Q627 607 651 607H1125Q1149 607 1162.0 598.5Q1175 590 1181.5 568.0Q1188 546 1188 504Q1188 462 1181.5 440.0Q1175 418 1162.0 410.0Q1149 402 1125 402H1094V143Q1094 119 1084.5 101.0Q1075 83 1058 74Q965 26 854.0 2.0Q743 -22 624 -22Q460 -22 335.0 53.0Q210 128 141.5 267.5Q73 407 73 594Q73 780 140.0 919.5Q207 1059 325.5 1134.0Q444 1209 594 1209Q770 1209 854 1091V1146Q854 1180 883.0 1194.5Q912 1209 976 1209Q1038 1209 1061.0 1195.0Q1084 1181 1084 1146Z" fill="#A8362B"/>
     </g>
-    <g stroke="#1C1A17">
-      <path d="M 734 326 A 290 290 0 1 0 734 698"/>
-      <path d="M 734 512 L 552 512"/>
+    <!-- ink impression -->
+    <g transform="translate(58.0,138.0) scale(0.057617,-0.057617)">
+      <path d="M1084 1146V802Q1084 768 1053.5 753.5Q1023 739 952 739Q905 739 879.5 745.5Q854 752 844.0 765.0Q834 778 834 802Q834 888 782.0 935.0Q730 982 624 982Q485 982 413.0 882.0Q341 782 341 594Q341 408 417.5 306.5Q494 205 634 205Q745 205 844 235V402H651Q627 402 614.0 410.0Q601 418 594.5 440.0Q588 462 588 504Q588 546 594.5 568.0Q601 590 614.0 598.5Q627 607 651 607H1125Q1149 607 1162.0 598.5Q1175 590 1181.5 568.0Q1188 546 1188 504Q1188 462 1181.5 440.0Q1175 418 1162.0 410.0Q1149 402 1125 402H1094V143Q1094 119 1084.5 101.0Q1075 83 1058 74Q965 26 854.0 2.0Q743 -22 624 -22Q460 -22 335.0 53.0Q210 128 141.5 267.5Q73 407 73 594Q73 780 140.0 919.5Q207 1059 325.5 1134.0Q444 1209 594 1209Q770 1209 854 1091V1146Q854 1180 883.0 1194.5Q912 1209 976 1209Q1038 1209 1061.0 1195.0Q1084 1181 1084 1146Z" fill="#1C1A17"/>
     </g>
+    <!-- platen baseline -->
+    <rect x="56.0" y="150.0" width="92.0" height="5.0" rx="2.5" fill="#1C1A17"/>
   </g>
-  <!-- Platen baseline -->
-  <rect x="250" y="884" width="524" height="36" rx="18" fill="#1C1A17"/>
 </svg>

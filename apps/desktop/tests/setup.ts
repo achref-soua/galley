@@ -1,4 +1,28 @@
 import { beforeEach } from 'vitest';
+import type { EditorFactory } from '../src/lib/editor';
+
+/** A fake editor factory backed by a plain `<textarea aria-label="Source">`, so
+ *  integration tests can drive the editing surface without CodeMirror (which is
+ *  covered directly in `editor.test.ts` and exercised by the Playwright e2e). */
+export function fakeEditorFactory(): EditorFactory {
+  return ({ parent, doc, onChange }) => {
+    const area = document.createElement('textarea');
+    area.setAttribute('aria-label', 'Source');
+    area.value = doc;
+    area.addEventListener('input', () => onChange(area.value));
+    parent.appendChild(area);
+    return {
+      setDoc(value) {
+        if (value !== area.value) {
+          area.value = value;
+        }
+      },
+      destroy() {
+        area.remove();
+      }
+    };
+  };
+}
 
 /** Dispatch a pointer event carrying `clientX` (jsdom drops it from
  *  `fireEvent`'s synthetic pointer events). */

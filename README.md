@@ -22,13 +22,21 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.0.3`: the project model and file tree. On top
-> of the design system and themes, you can now **create a project**, **open an existing
-> on-disk LaTeX folder**, browse it in the file-explorer sidebar, and edit and save its
-> files with unsaved-change tracking — all backed by a sandboxed file store confined to the
-> project root, with non-intrusive `.galley/` metadata that is safe to delete. Syntax-aware
-> editing, compiling, the visual editor, and the AI layer arrive in subsequent versioned
-> releases.
+> **Status — early development.** This is `v0.1.0`: editing and compile. On top of the
+> project model and themes, you now edit in a real **CodeMirror 6** LaTeX editor (syntax
+> highlighting and folding, themed for both Onionskin and Carbon), **compile** with an
+> embedded **Tectonic** engine, and see the result in a **PDF.js** preview — a stock
+> `article` compiles correctly offline, and editing the source and recompiling updates the
+> proof. Fast incremental recompiles, friendly error messages, the visual editor, and the
+> AI layer arrive in subsequent versioned releases.
+
+## Editing & compiling
+
+The editor is CodeMirror 6 over the canonical `.tex` source — there is no parallel model.
+Press **Compile** (or `Ctrl`/`⌘`+`B`) and Galley saves the source and builds it with an
+embedded Tectonic engine, rendering the PDF in the preview pane; a failed build shows its
+log instead. Tectonic fetches its package bundle once and caches it, so after a single
+`just prewarm` (or first online compile) every later compile works **fully offline**.
 
 ## Projects
 
@@ -69,8 +77,8 @@ native WebView — no bundled browser, no Node runtime in the shipped app.
 galley/
 ├─ apps/desktop/        # Tauri 2 + Svelte 5 app (UI in src/, shell in src-tauri/)
 ├─ crates/
-│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest
-│  ├─ galley-compile/   # Tectonic + latexmk adapters       (placeholder)
+│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile
+│  ├─ galley-compile/   # embedded Tectonic behind the Compiler port
 │  ├─ galley-intel/     # TexLab (LSP) + SyncTeX             (placeholder)
 │  ├─ galley-vcs/       # git2 history / snapshots / revert  (placeholder)
 │  ├─ galley-import/    # create/open projects; folder importer
@@ -117,7 +125,14 @@ before every change:
 | `just lint`    | clippy (deny warnings) + eslint                                |
 | `just build`   | Build all crates and the frontend bundle                       |
 | `just icons`   | Regenerate the app icon set from the brand master              |
+| `just prewarm` | Warm the Tectonic package cache so compiles work offline       |
+| `just e2e`     | Playwright end-to-end smoke tests (needs a browser)            |
 | `just package` | Build the native installer for the current OS                  |
+
+The embedded Tectonic engine is built only by `just package` (and the manual
+`just prewarm` / `just compile-itest`), behind the `real-compiler` feature, so the core
+test and coverage runs never need the native TeX libraries. See
+[ADR-0006](docs/adr/0006-embedded-compile-and-preview.md).
 
 ## Documentation
 
