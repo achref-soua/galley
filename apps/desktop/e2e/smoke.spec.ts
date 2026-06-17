@@ -59,3 +59,15 @@ test('compile the open document and see the proof in the preview', async ({ page
   await expect(page.getByLabel('Proof')).toBeVisible();
   await expect(page.getByText('1 / 1')).toBeVisible();
 });
+
+test('editing auto-compiles and shows a fresh proof', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a folder…' }).click();
+
+  const editor = page.getByLabel('LaTeX source');
+  await editor.click();
+  await page.keyboard.type(' edited');
+
+  // No Compile click — the debounced auto-compile produces the proof on its own.
+  await expect(page.getByLabel('Proof')).toBeVisible();
+});

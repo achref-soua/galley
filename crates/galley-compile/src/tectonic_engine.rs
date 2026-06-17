@@ -15,8 +15,22 @@ use tectonic::status::NoopStatusBackend;
 /// The embedded Tectonic engine.
 ///
 /// It compiles a single canonical source string into a PDF, capturing the TeX
-/// log. The warm engine pool and in-memory VFS that make recompiles instant
-/// arrive in v0.1.1; this is the correct-and-offline baseline.
+/// log. Two things make repeat compiles fast:
+///
+/// * **In-memory VFS.** The source is fed from a `primary_input_buffer` and the
+///   outputs are pulled from `into_file_data()` with `do_not_write_output_files`,
+///   so the `.tex`/`.aux`/`.pdf`/`.log` of a build never touch disk.
+/// * **Warm caches.** Tectonic persists the compiled LaTeX *format* and the
+///   resource *bundle* to its on-disk cache (`format_cache_path` + the default
+///   bundle). A long-lived engine — Galley keeps exactly one for the life of the
+///   process, behind the [`CachingCompiler`](crate::CachingCompiler) in the app's
+///   managed state — reuses those across builds, so only the first compile pays
+///   the format-build cost.
+///
+/// A Tectonic `ProcessingSession` is single-use by design, so each build still
+/// constructs its own session; "warm" means the engine instance and its caches
+/// stay hot, not that a session object is reused. The [`CachingCompiler`] sits in
+/// front and skips the engine entirely when the input is unchanged.
 pub struct TectonicEngine {
     only_cached: bool,
 }

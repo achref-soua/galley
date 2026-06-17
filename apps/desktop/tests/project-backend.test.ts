@@ -68,8 +68,8 @@ describe('tauriProjectBackend', () => {
     expect(await tauriProjectBackend().pickFolder('t')).toBeNull();
   });
 
-  it('compiles, decoding the PDF byte array', async () => {
-    invoke.mockResolvedValueOnce({ ok: true, log: 'Done.', pdf: [37, 80, 68, 70] });
+  it('compiles, decoding the PDF byte array and the cache flag', async () => {
+    invoke.mockResolvedValueOnce({ ok: true, log: 'Done.', pdf: [37, 80, 68, 70], cached: true });
     const result = await tauriProjectBackend().compile('\\documentclass{article}', 'main.tex');
     expect(invoke).toHaveBeenCalledWith('compile_document', {
       source: '\\documentclass{article}',
@@ -78,13 +78,15 @@ describe('tauriProjectBackend', () => {
     expect(result.ok).toBe(true);
     expect(result.log).toBe('Done.');
     expect(result.pdf).toEqual(new Uint8Array([37, 80, 68, 70]));
+    expect(result.cached).toBe(true);
   });
 
   it('maps a null PDF on a failed compile', async () => {
-    invoke.mockResolvedValueOnce({ ok: false, log: '! error', pdf: null });
+    invoke.mockResolvedValueOnce({ ok: false, log: '! error', pdf: null, cached: false });
     const result = await tauriProjectBackend().compile('bad', 'main.tex');
     expect(result.ok).toBe(false);
     expect(result.pdf).toBeNull();
+    expect(result.cached).toBe(false);
   });
 });
 
@@ -125,18 +127,22 @@ describe('browserProjectBackend', () => {
 
   it('compiles a closing document to the demo PDF, and fails otherwise', async () => {
     const backend = browserProjectBackend();
-    const ok = await backend.compile(
-      '\\documentclass{article}\\begin{document}x\\end{document}',
-      'main.tex'
-    );
+    const source = '\\documentclass{article}\\begin{document}x\\end{document}';
+    const ok = await backend.compile(source, 'main.tex');
     expect(ok.ok).toBe(true);
     expect(ok.pdf).not.toBeNull();
     // A real, parseable PDF (starts with the %PDF- header).
     expect(ok.pdf!.slice(0, 5)).toEqual(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]));
+    expect(ok.cached).toBe(false);
+
+    // Recompiling the unchanged source is served from the one-entry cache.
+    const again = await backend.compile(source, 'main.tex');
+    expect(again.cached).toBe(true);
 
     const bad = await backend.compile('no end here', 'main.tex');
     expect(bad.ok).toBe(false);
     expect(bad.pdf).toBeNull();
+    expect(bad.cached).toBe(false);
   });
 });
 

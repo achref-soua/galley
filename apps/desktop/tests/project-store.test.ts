@@ -1,11 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { ProjectController } from '../src/lib/project-store';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ProjectController, type CompileDeps } from '../src/lib/project-store';
 import {
   type CompileOutcome,
   type ProjectBackend,
   type ProjectSnapshot
 } from '../src/lib/project-backend';
 import { RecentProjectsStore } from '../src/lib/recent-projects';
+import type { Timer } from '../src/lib/debounce';
+import type { Clock } from '../src/lib/timing';
+import type { Bell } from '../src/lib/bell';
 
 function snapshot(over: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
   return {
@@ -20,6 +23,19 @@ function snapshot(over: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
   };
 }
 
+/** A promise whose resolution a test controls, for stale-build ordering. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+function ok(over: Partial<CompileOutcome> = {}): CompileOutcome {
+  return { ok: true, log: 'Output written.', pdf: new Uint8Array([1, 2]), cached: false, ...over };
+}
+
 class FakeBackend implements ProjectBackend {
   files = new Map<string, string>([
     ['main.tex', 'original main'],
@@ -31,7 +47,10 @@ class FakeBackend implements ProjectBackend {
   createError: unknown = null;
   openError: unknown = null;
   saveError: unknown = null;
-  compileResult: CompileOutcome = { ok: true, log: 'Output written.', pdf: new Uint8Array([1, 2]) };
+  compileResult: CompileOutcome = ok();
+  compileError: unknown = null;
+  /** Queued deferred results; when present, each compile takes the next one. */
+  compileQueue: Array<Promise<CompileOutcome>> = [];
   compileCalls: Array<{ source: string; rootDocument: string }> = [];
 
   async createProject(parent: string, name: string): Promise<ProjectSnapshot> {
@@ -63,9 +82,15 @@ class FakeBackend implements ProjectBackend {
     this.files.set(rel, contents);
   }
 
-  async compile(source: string, rootDocument: string): Promise<CompileOutcome> {
+  compile(source: string, rootDocument: string): Promise<CompileOutcome> {
     this.compileCalls.push({ source, rootDocument });
-    return this.compileResult;
+    if (this.compileError !== null) {
+      return Promise.reject(this.compileError);
+    }
+    if (this.compileQueue.length > 0) {
+      return this.compileQueue.shift()!;
+    }
+    return Promise.resolve(this.compileResult);
   }
 
   async pickFolder(): Promise<string | null> {
@@ -73,8 +98,41 @@ class FakeBackend implements ProjectBackend {
   }
 }
 
+/** A debounce timer a test fires by hand. */
+class FakeTimer implements Timer {
+  pending: (() => void) | null = null;
+  clears = 0;
+  set(callback: () => void): void {
+    this.pending = callback;
+  }
+  clear(): void {
+    this.pending = null;
+    this.clears += 1;
+  }
+  fire(): void {
+    const run = this.pending;
+    this.pending = null;
+    run?.();
+  }
+}
+
+/** A clock returning queued times, then holding the last one. */
+class FakeClock implements Clock {
+  times: number[] = [];
+  #last = 0;
+  now(): number {
+    if (this.times.length > 0) {
+      this.#last = this.times.shift()!;
+    }
+    return this.#last;
+  }
+}
+
 let backend: FakeBackend;
 let controller: ProjectController;
+let timer: FakeTimer;
+let clock: FakeClock;
+let bell: Bell & { ding: ReturnType<typeof vi.fn> };
 
 function makeRecent() {
   const map = new Map<string, string>();
@@ -84,9 +142,16 @@ function makeRecent() {
   });
 }
 
+function makeController(deps: Partial<CompileDeps> = {}) {
+  return new ProjectController(backend, makeRecent(), { timer, clock, bell, ...deps });
+}
+
 beforeEach(() => {
   backend = new FakeBackend();
-  controller = new ProjectController(backend, makeRecent());
+  timer = new FakeTimer();
+  clock = new FakeClock();
+  bell = { ding: vi.fn() };
+  controller = makeController();
 });
 
 describe('ProjectController — opening and creating', () => {
@@ -184,7 +249,7 @@ describe('ProjectController — editing, dirty tracking and saving', () => {
   });
 
   it('save is a no-op with no active document', async () => {
-    const fresh = new ProjectController(backend, makeRecent());
+    const fresh = makeController();
     await fresh.save();
     expect(fresh.state.error).toBeNull();
   });
@@ -211,7 +276,7 @@ describe('ProjectController — the unsaved-changes guard', () => {
   });
 
   it('does nothing when there is no project', async () => {
-    const fresh = new ProjectController(backend, makeRecent());
+    const fresh = makeController();
     await fresh.requestOpenFile('main.tex');
     expect(fresh.state.activePath).toBeNull();
   });
@@ -230,7 +295,6 @@ describe('ProjectController — the unsaved-changes guard', () => {
       root: '/parent/Paper',
       path: 'intro.tex'
     });
-    // Still on the original document.
     expect(controller.state.activePath).toBe('main.tex');
   });
 
@@ -281,30 +345,55 @@ describe('ProjectController — compiling', () => {
     await controller.createProject('/parent', 'Paper');
   });
 
-  it('saves the source first, then compiles it and stores the proof', async () => {
+  it('compiles the canonical buffer without saving and stores the proof', async () => {
     controller.edit('\\documentclass{article}');
+    clock.times = [100, 142];
     await controller.compile();
-    // The active source was saved before compiling (canonical on disk).
-    expect(backend.files.get('main.tex')).toBe('\\documentclass{article}');
-    expect(controller.isDirty).toBe(false);
+    // Compile does NOT persist — the buffer stays dirty, the file unchanged.
+    expect(backend.files.get('main.tex')).toBe('original main');
+    expect(controller.isDirty).toBe(true);
     expect(backend.compileCalls).toEqual([
       { source: '\\documentclass{article}', rootDocument: 'main.tex' }
     ]);
     expect(controller.state.compile.status).toBe('ok');
     expect(controller.state.compile.log).toBe('Output written.');
     expect(controller.state.compile.pdf).toEqual(new Uint8Array([1, 2]));
+    expect(controller.state.compile.durationMs).toBe(42);
+    expect(controller.state.compile.cached).toBe(false);
   });
 
-  it('records a failed compile with its log and no PDF', async () => {
-    backend.compileResult = { ok: false, log: '! Undefined control sequence.', pdf: null };
+  it('marks a cache hit as cached', async () => {
+    backend.compileResult = ok({ cached: true });
+    await controller.compile();
+    expect(controller.state.compile.cached).toBe(true);
+  });
+
+  it('records a failed compile and, on the first build, shows no proof', async () => {
+    backend.compileResult = {
+      ok: false,
+      log: '! Undefined control sequence.',
+      pdf: null,
+      cached: false
+    };
     await controller.compile();
     expect(controller.state.compile.status).toBe('failed');
     expect(controller.state.compile.log).toContain('Undefined control sequence');
     expect(controller.state.compile.pdf).toBeNull();
   });
 
+  it('keeps the last good proof on screen when a later build fails', async () => {
+    await controller.compile(); // succeeds, proof shown
+    expect(controller.state.compile.pdf).toEqual(new Uint8Array([1, 2]));
+    backend.compileResult = { ok: false, log: 'broken', pdf: null, cached: false };
+    await controller.compile();
+    expect(controller.state.compile.status).toBe('failed');
+    expect(controller.state.compile.log).toBe('broken');
+    // The previous proof is still on screen — no flicker to empty.
+    expect(controller.state.compile.pdf).toEqual(new Uint8Array([1, 2]));
+  });
+
   it('does nothing without a project', async () => {
-    const fresh = new ProjectController(backend, makeRecent());
+    const fresh = makeController();
     await fresh.compile();
     expect(fresh.state.compile.status).toBe('idle');
   });
@@ -323,5 +412,101 @@ describe('ProjectController — compiling', () => {
     await controller.openFolder('/another');
     expect(controller.state.compile.status).toBe('idle');
     expect(controller.state.compile.pdf).toBeNull();
+  });
+
+  it('surfaces an Error thrown by the backend as a failed build', async () => {
+    backend.compileError = new Error('ipc died');
+    await controller.compile();
+    expect(controller.state.error).toBe('ipc died');
+    expect(controller.state.compile.status).toBe('failed');
+  });
+
+  it('surfaces a non-Error rejection from the backend', async () => {
+    backend.compileError = 'boom';
+    await controller.compile();
+    expect(controller.state.error).toBe('boom');
+    expect(controller.state.compile.status).toBe('failed');
+  });
+
+  it('drops a stale build so it cannot overwrite a newer proof', async () => {
+    const first = deferred<CompileOutcome>();
+    const second = deferred<CompileOutcome>();
+    backend.compileQueue = [first.promise, second.promise];
+
+    const p1 = controller.compile(); // generation 1
+    const p2 = controller.compile(); // generation 2 — supersedes 1
+
+    first.resolve(ok({ log: 'stale', pdf: new Uint8Array([9]) }));
+    await p1;
+    // The stale build was dropped; we are still waiting on the newer one.
+    expect(controller.state.compile.status).toBe('running');
+
+    second.resolve(ok({ log: 'fresh', pdf: new Uint8Array([7]) }));
+    await p2;
+    expect(controller.state.compile.log).toBe('fresh');
+    expect(controller.state.compile.pdf).toEqual(new Uint8Array([7]));
+  });
+});
+
+describe('ProjectController — auto-compile and the bell', () => {
+  beforeEach(async () => {
+    await controller.createProject('/parent', 'Paper');
+  });
+
+  it('debounces edits into a single compile when the timer fires', async () => {
+    controller.edit('first');
+    controller.edit('second'); // replaces the pending compile
+    expect(backend.compileCalls).toEqual([]);
+    timer.fire();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(backend.compileCalls).toEqual([{ source: 'second', rootDocument: 'main.tex' }]);
+  });
+
+  it('does not schedule an auto-compile when disabled', () => {
+    const manual = makeController({ autoCompile: false });
+    void manual.createProject('/p', 'P');
+    manual.edit('typing');
+    expect(timer.pending).toBeNull();
+  });
+
+  it('cancels any pending auto-compile when disabled mid-stream', () => {
+    controller.edit('typing');
+    expect(timer.pending).not.toBeNull();
+    controller.setAutoCompile(false);
+    expect(timer.pending).toBeNull();
+    controller.setAutoCompile(true); // re-enabling does not re-arm on its own
+    expect(timer.pending).toBeNull();
+  });
+
+  it('does not auto-schedule when there is no open document', async () => {
+    backend.openResult = snapshot({ rootDocument: '' });
+    await controller.openFolder('/empty');
+    controller.edit('typed into nothing');
+    expect(timer.pending).toBeNull();
+  });
+
+  it('rings the bell on success only when sound is enabled', async () => {
+    controller.setSoundOnSuccess(true);
+    await controller.compile();
+    expect(bell.ding).toHaveBeenCalledOnce();
+  });
+
+  it('stays silent on success when sound is disabled', async () => {
+    await controller.compile();
+    expect(bell.ding).not.toHaveBeenCalled();
+  });
+
+  it('does not ring on a failed build even with sound enabled', async () => {
+    controller.setSoundOnSuccess(true);
+    backend.compileResult = { ok: false, log: 'no', pdf: null, cached: false };
+    await controller.compile();
+    expect(bell.ding).not.toHaveBeenCalled();
+  });
+
+  it('uses real defaults when no deps are injected', () => {
+    // Exercises the default timer/clock/bell/preferences in the constructor.
+    const plain = new ProjectController(backend, makeRecent());
+    expect(plain.state.compile.status).toBe('idle');
   });
 });

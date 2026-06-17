@@ -15,8 +15,9 @@
 
 #[cfg(feature = "real-compiler")]
 mod real {
-    use galley_compile::{EmbeddedCompiler, TectonicEngine};
+    use galley_compile::{CachingCompiler, EmbeddedCompiler, TectonicEngine};
     use galley_core::{CompileRequest, Compiler, Engine};
+    use std::time::Instant;
 
     const ARTICLE: &str = r"\documentclass{article}
 \begin{document}
@@ -51,6 +52,49 @@ Hello from Galley. Pull a proof.
             result.report.log
         );
         assert!(result.pdf.is_some());
+    }
+
+    #[test]
+    #[ignore = "needs the Tectonic bundle (network on a cold cache); run manually"]
+    fn warm_recompiles_serve_from_cache_and_are_fast() {
+        // One warm, long-lived compiler — the shape the desktop shell keeps in
+        // its managed state. The first build runs the engine; an unchanged
+        // recompile is served from the cache without touching it again.
+        let mut compiler = CachingCompiler::new(EmbeddedCompiler::new(TectonicEngine::new()));
+        let request = CompileRequest::new("main.tex", Engine::Tectonic);
+
+        let cold_start = Instant::now();
+        let first = compiler.compile(&request, ARTICLE);
+        let cold = cold_start.elapsed();
+        assert!(!first.cached, "the first build is a cache miss");
+        assert!(
+            first.result.report.is_ok(),
+            "log:\n{}",
+            first.result.report.log
+        );
+
+        let warm_start = Instant::now();
+        let second = compiler.compile(&request, ARTICLE);
+        let warm = warm_start.elapsed();
+        assert!(second.cached, "an unchanged recompile is served from cache");
+        assert_eq!(second.result.pdf, first.result.pdf, "identical bytes");
+
+        // A changed source is a genuine miss but reuses the warm format/bundle.
+        let edited = ARTICLE.replace("Pull a proof.", "Pull a proof. Again.");
+        let edit_start = Instant::now();
+        let third = compiler.compile(&request, &edited);
+        let incremental = edit_start.elapsed();
+        assert!(!third.cached, "an edit invalidates the cache");
+        assert!(
+            third.result.report.is_ok(),
+            "log:\n{}",
+            third.result.report.log
+        );
+
+        eprintln!("cold={cold:?} cached={warm:?} incremental={incremental:?}");
+        // The cache hit is effectively free; the incremental build reuses the
+        // warm format and should be well under the cold build.
+        assert!(warm < cold, "a cache hit must beat a cold build");
     }
 
     #[test]

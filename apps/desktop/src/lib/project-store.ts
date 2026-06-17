@@ -10,6 +10,9 @@
 import { type ProjectBackend, type ProjectSnapshot } from './project-backend';
 import { type RecentProject, RecentProjectsStore } from './recent-projects';
 import { basename } from './file-tree';
+import { type Timer, windowTimer } from './debounce';
+import { type Clock, systemClock } from './timing';
+import { type Bell, webAudioBell } from './bell';
 
 /** A navigation the user must resolve because the open document is unsaved. */
 export interface PendingOpen {
@@ -50,12 +53,45 @@ export interface CompileState {
   status: CompileStatus;
   /** The TeX log from the last compile (empty until one runs). */
   log: string;
-  /** The produced PDF bytes, or `null` when none/failed. */
+  /**
+   * The PDF bytes currently on screen, or `null` when none yet. This holds the
+   * last good proof across reruns — it is only replaced when a new proof has
+   * been produced — so the preview never flickers to empty mid-build.
+   */
   pdf: Uint8Array | null;
+  /** How long the last completed build took, in milliseconds, or `null`. */
+  durationMs: number | null;
+  /** Whether the last completed build was served from the cache. */
+  cached: boolean;
 }
 
 /** The starting compile state — nothing proofed yet. */
-const IDLE_COMPILE: CompileState = { status: 'idle', log: '', pdf: null };
+const IDLE_COMPILE: CompileState = {
+  status: 'idle',
+  log: '',
+  pdf: null,
+  durationMs: null,
+  cached: false
+};
+
+/** How long to wait after the last edit before an auto-compile fires. */
+const DEFAULT_DEBOUNCE_MS = 400;
+
+/** Injectable timing/sound dependencies and compile preferences. */
+export interface CompileDeps {
+  /** The debounce timer for auto-compile (defaults to a real `setTimeout`). */
+  timer?: Timer;
+  /** The clock used to measure build duration (defaults to `performance`). */
+  clock?: Clock;
+  /** The success bell (defaults to a Web Audio bell). */
+  bell?: Bell;
+  /** Debounce delay in milliseconds. */
+  debounceMs?: number;
+  /** Whether to recompile automatically as the document changes. */
+  autoCompile?: boolean;
+  /** Whether to ring the bell when a build succeeds. */
+  soundOnSuccess?: boolean;
+}
 
 /** Owns project state and notifies subscribers on every change. */
 export class ProjectController {
@@ -63,10 +99,25 @@ export class ProjectController {
   #recent: RecentProjectsStore;
   #state: ProjectState;
   #listeners = new Set<(state: ProjectState) => void>();
+  #timer: Timer;
+  #clock: Clock;
+  #bell: Bell;
+  #debounceMs: number;
+  #autoCompile: boolean;
+  #soundOnSuccess: boolean;
+  // A monotonic id stamped on each compile so a stale build that finishes after
+  // a newer one started can be dropped instead of overwriting the fresh proof.
+  #compileGeneration = 0;
 
-  constructor(backend: ProjectBackend, recent: RecentProjectsStore) {
+  constructor(backend: ProjectBackend, recent: RecentProjectsStore, deps: CompileDeps = {}) {
     this.#backend = backend;
     this.#recent = recent;
+    this.#timer = deps.timer ?? windowTimer();
+    this.#clock = deps.clock ?? systemClock();
+    this.#bell = deps.bell ?? webAudioBell();
+    this.#debounceMs = deps.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+    this.#autoCompile = deps.autoCompile ?? true;
+    this.#soundOnSuccess = deps.soundOnSuccess ?? false;
     this.#state = {
       project: null,
       activePath: null,
@@ -104,6 +155,11 @@ export class ProjectController {
     }
   }
 
+  /** Merge a partial change into the compile slice, leaving other fields as-is. */
+  #setCompile(partial: Partial<CompileState>): void {
+    this.#set({ compile: { ...this.#state.compile, ...partial } });
+  }
+
   async #run(action: () => Promise<void>): Promise<void> {
     this.#set({ error: null });
     try {
@@ -114,6 +170,10 @@ export class ProjectController {
   }
 
   async #load(snapshot: ProjectSnapshot): Promise<void> {
+    // Cancel any pending auto-compile and retire any in-flight build, so a proof
+    // from the previous project can never land on the new one.
+    this.#timer.clear();
+    this.#compileGeneration += 1;
     this.#recent.record({ root: snapshot.root, name: snapshot.name });
     // A freshly loaded project starts with no proof on the galley.
     this.#set({
@@ -188,12 +248,28 @@ export class ProjectController {
     });
   }
 
-  /** Update the editor contents. */
+  /** Update the editor contents, scheduling a debounced auto-compile. */
   edit(content: string): void {
     if (content === this.#state.content) {
       return;
     }
     this.#set({ content });
+    if (this.#autoCompile && this.#state.activePath !== null) {
+      this.#timer.set(() => void this.compile(), this.#debounceMs);
+    }
+  }
+
+  /** Enable or disable compile-as-you-type; disabling cancels any pending run. */
+  setAutoCompile(enabled: boolean): void {
+    this.#autoCompile = enabled;
+    if (!enabled) {
+      this.#timer.clear();
+    }
+  }
+
+  /** Enable or disable the success bell. */
+  setSoundOnSuccess(enabled: boolean): void {
+    this.#soundOnSuccess = enabled;
   }
 
   /** Save the open document. */
@@ -210,10 +286,15 @@ export class ProjectController {
   }
 
   /**
-   * Compile the open document and surface the result for the preview. The active
-   * document is saved first, so the `.tex` on disk is the canonical source. (For
-   * v0.1.0 the open document is the build root; multi-file root awareness lands
-   * with the language server in v0.2.1.)
+   * Compile the open document and surface the result for the preview.
+   *
+   * Galley compiles the editor's canonical source directly (§0.5) — it does not
+   * force a save first, so dirty tracking stays meaningful and auto-compile can
+   * preview unsaved work; persisting is the separate, explicit save action. The
+   * previous proof stays on screen until a new one is produced (no flicker), and
+   * a build superseded by a newer one is dropped rather than allowed to overwrite
+   * the fresh proof. (For v0.1.1 the open document is the build root; multi-file
+   * root awareness lands with the language server in v0.2.1.)
    */
   async compile(): Promise<void> {
     const project = this.#state.project;
@@ -221,17 +302,40 @@ export class ProjectController {
     if (project === null || path === null) {
       return;
     }
-    await this.#run(async () => {
-      await this.#backend.saveDocument(project.root, path, this.#state.content);
-      this.#set({
-        savedContent: this.#state.content,
-        compile: { status: 'running', log: '', pdf: null }
-      });
+    // An explicit compile pre-empts any pending auto-compile.
+    this.#timer.clear();
+    const generation = ++this.#compileGeneration;
+    this.#set({ error: null });
+    this.#setCompile({ status: 'running' });
+    const start = this.#clock.now();
+
+    let next: Partial<CompileState> | { error: string };
+    try {
       const outcome = await this.#backend.compile(this.#state.content, path);
-      this.#set({
-        compile: { status: outcome.ok ? 'ok' : 'failed', log: outcome.log, pdf: outcome.pdf }
-      });
-    });
+      const durationMs = this.#clock.now() - start;
+      next = outcome.ok
+        ? { status: 'ok', log: outcome.log, pdf: outcome.pdf, durationMs, cached: outcome.cached }
+        : // A failed build keeps the last good proof on screen; only the status,
+          // log and timing change.
+          { status: 'failed', log: outcome.log, durationMs, cached: outcome.cached };
+    } catch (err) {
+      next = { error: err instanceof Error ? err.message : String(err) };
+    }
+
+    // A newer compile started while this one was running — drop this result.
+    if (generation !== this.#compileGeneration) {
+      return;
+    }
+    if ('error' in next) {
+      this.#set({ error: next.error });
+      this.#setCompile({ status: 'failed' });
+      return;
+    }
+    const succeeded = next.status === 'ok';
+    this.#setCompile(next);
+    if (succeeded && this.#soundOnSuccess) {
+      this.#bell.ding();
+    }
   }
 
   /** Resolve the guard by discarding edits and continuing the pending open. */

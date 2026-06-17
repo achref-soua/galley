@@ -33,18 +33,53 @@ describe('PreviewPane', () => {
     expect(screen.getByText('Failed', { exact: true })).toBeTruthy();
   });
 
-  it('renders the proof onto a canvas and shows the page count', async () => {
+  it('renders the proof onto a canvas and shows the page count and timing', async () => {
     render(PreviewPane, {
       props: {
         status: 'ok',
         log: 'ok',
         pdf: new Uint8Array([1]),
+        durationMs: 420,
+        cached: false,
         createRenderer: rendererWith(() => Promise.resolve({ pageCount: 2 }))
       }
     });
     expect(screen.getByLabelText('Proof')).toBeTruthy();
     await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
     expect(screen.getByText('Proof', { exact: true })).toBeTruthy();
+    expect(screen.getByText('420 ms')).toBeTruthy();
+  });
+
+  it('shows "cached" when the proof came from the cache', () => {
+    render(PreviewPane, {
+      props: {
+        status: 'ok',
+        log: 'ok',
+        pdf: new Uint8Array([1]),
+        durationMs: 5,
+        cached: true,
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    expect(screen.getByText('cached')).toBeTruthy();
+  });
+
+  it('keeps the last proof on screen and notes the failure when a rebuild fails', () => {
+    render(PreviewPane, {
+      props: {
+        status: 'failed',
+        log: '! Missing $ inserted.',
+        pdf: new Uint8Array([1]),
+        durationMs: 12,
+        cached: false,
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    // The proof canvas is still shown...
+    expect(screen.getByLabelText('Proof')).toBeTruthy();
+    // ...alongside a note and the failing log.
+    expect(screen.getByText('Showing the last good proof — the latest build failed.')).toBeTruthy();
+    expect(screen.getByLabelText('Compile log').textContent).toContain('Missing $ inserted');
   });
 
   it('reports a render failure carrying an Error message', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import App from '../src/App.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
@@ -86,8 +86,60 @@ describe('App shell', () => {
 });
 
 describe('App — projects, editing, and the unsaved-changes guard', () => {
+  /** A debounce timer the test fires by hand, so auto-compile never fires on a
+   *  real `setTimeout` and leaves a timeout dangling between tests. */
+  class FakeTimer {
+    pending: (() => void) | null = null;
+    set(callback: () => void) {
+      this.pending = callback;
+    }
+    clear() {
+      this.pending = null;
+    }
+    fire() {
+      const run = this.pending;
+      this.pending = null;
+      run?.();
+    }
+  }
+
+  /** A clock returning queued times, then holding the last, for stable timing. */
+  class FakeClock {
+    times: number[] = [];
+    #last = 0;
+    now() {
+      if (this.times.length > 0) {
+        this.#last = this.times.shift()!;
+      }
+      return this.#last;
+    }
+  }
+
+  let timer: FakeTimer;
+  let clock: FakeClock;
+  let bell: { ding: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    timer = new FakeTimer();
+    clock = new FakeClock();
+    bell = { ding: vi.fn() };
+  });
+
+  function renderApp(extra: Record<string, unknown> = {}) {
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        ...extra
+      }
+    });
+  }
+
   async function openDemoFolder() {
-    render(App, { props: { editor: fakeEditorFactory(), createRenderer: onePageRenderer } });
+    renderApp();
     expect(screen.getByText('No document')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
     // The demo project opens with its root document showing.
@@ -96,7 +148,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
   }
 
   it('creates a project from the sidebar and opens its root document', async () => {
-    render(App, { props: { editor: fakeEditorFactory(), createRenderer: onePageRenderer } });
+    renderApp();
     await fireEvent.input(screen.getByLabelText('New project name'), {
       target: { value: 'My Paper' }
     });
@@ -184,5 +236,53 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.input(editor, { target: { value: '\\documentclass{article}\\end{document}' } });
     await fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
     await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+  });
+
+  it('auto-compiles after an edit once the debounce fires', async () => {
+    const editor = await openDemoFolder();
+    await fireEvent.input(editor, {
+      target: { value: '\\documentclass{article}\\begin{document}auto\\end{document}' }
+    });
+    // Nothing compiles until the debounce elapses.
+    expect(screen.queryByLabelText('Proof')).toBeNull();
+    timer.fire();
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+  });
+
+  it('shows the build timing in the preview', async () => {
+    await openDemoFolder();
+    clock.times = [0, 420];
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    await waitFor(() => expect(screen.getByText('420 ms')).toBeTruthy());
+  });
+
+  it('toggles compile preferences, persisting them and ringing the bell when on', async () => {
+    await openDemoFolder();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Compilation' }));
+
+    // Turn auto-compile off and the success bell on.
+    await fireEvent.click(screen.getByRole('switch', { name: 'Compile as you type' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Bell on success' }));
+    expect(JSON.parse(window.localStorage.getItem('galley:compile-prefs')!)).toEqual({
+      autoCompile: false,
+      soundOnSuccess: true
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    await waitFor(() => expect(bell.ding).toHaveBeenCalledOnce());
+  });
+
+  it('does not auto-compile after preferences disable it', async () => {
+    const editor = await openDemoFolder();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Compilation' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Compile as you type' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await fireEvent.input(editor, { target: { value: 'edited with auto-compile off' } });
+    // No auto-compile was scheduled.
+    expect(timer.pending).toBeNull();
   });
 });

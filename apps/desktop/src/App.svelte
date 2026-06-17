@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { type ThemePreference } from '@galley/ui-kit';
   import { ThemeController, browserThemeEnv } from './lib/theme';
   import { LayoutController } from './lib/layout-store';
@@ -6,8 +7,12 @@
   import { ProjectController } from './lib/project-store';
   import { selectBackend } from './lib/project-backend';
   import { RecentProjectsStore } from './lib/recent-projects';
+  import { CompilePrefsStore } from './lib/settings-store';
   import { createLatexEditor, type EditorFactory } from './lib/editor';
   import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
+  import { windowTimer, type Timer } from './lib/debounce';
+  import { systemClock, type Clock } from './lib/timing';
+  import { webAudioBell, type Bell } from './lib/bell';
   import { isCompileShortcut, isSaveShortcut } from './lib/keymap';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
@@ -17,29 +22,46 @@
   import Settings from './lib/Settings.svelte';
   import UnsavedGuard from './lib/UnsavedGuard.svelte';
 
-  // The editor and PDF renderer are injectable so tests can drive the UI with
-  // fakes; the packaged app uses the real CodeMirror editor and PDF.js renderer.
+  // The editor, PDF renderer, and compile timing/sound are injectable so tests
+  // can drive the UI with fakes; the packaged app uses the real CodeMirror
+  // editor, PDF.js renderer, debounce timer, clock, and Web Audio bell.
   let {
     editor = createLatexEditor,
-    createRenderer = pdfjsRenderer
+    createRenderer = pdfjsRenderer,
+    compileTimer = windowTimer(),
+    compileClock = systemClock(),
+    bell = webAudioBell()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
+    compileTimer?: Timer;
+    compileClock?: Clock;
+    bell?: Bell;
   } = $props();
 
   const RESIZE_STEP = 16;
 
   const theme = new ThemeController(browserThemeEnv());
   const layoutController = new LayoutController(window.localStorage);
-  const projectController = new ProjectController(
-    selectBackend(),
-    new RecentProjectsStore(window.localStorage)
+  const prefsStore = new CompilePrefsStore(window.localStorage);
+  // The injected timer/clock/bell are construction-time configuration, not
+  // reactive inputs, so read their initial values untracked.
+  const projectController = untrack(
+    () =>
+      new ProjectController(selectBackend(), new RecentProjectsStore(window.localStorage), {
+        timer: compileTimer,
+        clock: compileClock,
+        bell,
+        autoCompile: prefsStore.prefs.autoCompile,
+        soundOnSuccess: prefsStore.prefs.soundOnSuccess
+      })
   );
 
   let preference = $state<ThemePreference>(theme.preference);
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
   let project = $state(projectController.state);
+  let compilePrefs = $state(prefsStore.prefs);
   projectController.subscribe((state) => (project = state));
   const reduceMotion = prefersReducedMotion();
 
@@ -55,6 +77,18 @@
   function changeTheme(pref: ThemePreference) {
     theme.setPreference(pref);
     preference = pref;
+  }
+
+  function changeAutoCompile(enabled: boolean) {
+    prefsStore.setAutoCompile(enabled);
+    projectController.setAutoCompile(enabled);
+    compilePrefs = prefsStore.prefs;
+  }
+
+  function changeSound(enabled: boolean) {
+    prefsStore.setSoundOnSuccess(enabled);
+    projectController.setSoundOnSuccess(enabled);
+    compilePrefs = prefsStore.prefs;
   }
 
   function onWindowKeydown(event: KeyboardEvent) {
@@ -171,6 +205,8 @@
           status={project.compile.status}
           log={project.compile.log}
           pdf={project.compile.pdf}
+          durationMs={project.compile.durationMs}
+          cached={project.compile.cached}
           {createRenderer}
         />
       </div>
@@ -181,7 +217,11 @@
     <Settings
       themePreference={preference}
       {reduceMotion}
+      autoCompile={compilePrefs.autoCompile}
+      soundOnSuccess={compilePrefs.soundOnSuccess}
       onthemechange={changeTheme}
+      onautocompilechange={changeAutoCompile}
+      onsoundchange={changeSound}
       onclose={() => (settingsOpen = false)}
     />
   {/if}
