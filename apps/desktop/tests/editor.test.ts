@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EditorState, StateEffect, RangeSet } from '@codemirror/state';
 import { GutterMarker } from '@codemirror/view';
+import { CompletionContext } from '@codemirror/autocomplete';
 import {
   latexFold,
   latexFoldService,
@@ -10,7 +11,10 @@ import {
   markerSpecs,
   diagnosticMarker,
   diagnosticsField,
-  setDiagnosticsEffect
+  setDiagnosticsEffect,
+  LATEX_SNIPPETS,
+  latexSnippetSource,
+  keymapExtension
 } from '../src/lib/editor';
 import type { Diagnostic } from '../src/lib/diagnostics';
 
@@ -212,5 +216,99 @@ describe('diagnosticsField', () => {
     // A plain edit maps the marker set across the change without an effect.
     state = state.update({ changes: { from: 0, insert: 'x' } }).state;
     expect(state.field(diagnosticsField).size).toBe(0);
+  });
+});
+
+describe('LATEX_SNIPPETS', () => {
+  it('contains at least 10 built-in LaTeX snippets', () => {
+    expect(LATEX_SNIPPETS.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('includes the \\begin{}…\\end{} and \\frac{}{} snippets', () => {
+    const labels = LATEX_SNIPPETS.map((s) => s.label);
+    expect(labels).toContain('\\begin{}…\\end{}');
+    expect(labels).toContain('\\frac{}{}');
+  });
+});
+
+describe('latexSnippetSource', () => {
+  function makeContext(doc: string, pos: number, explicit = false): CompletionContext {
+    const state = EditorState.create({ doc });
+    return new CompletionContext(state, pos, explicit);
+  }
+
+  it('returns null when at a word boundary with no explicit trigger', () => {
+    // At position 0 with no backslash typed, completionStart === pos → return null.
+    expect(latexSnippetSource(makeContext('', 0, false))).toBeNull();
+  });
+
+  it('returns completions when the cursor is after a backslash', () => {
+    const ctx = makeContext('\\fr', 3, false);
+    const result = latexSnippetSource(ctx);
+    expect(result).not.toBeNull();
+    expect(result!.options.length).toBeGreaterThan(0);
+  });
+
+  it('returns all snippets on an explicit request at position 0', () => {
+    const ctx = makeContext('', 0, true);
+    const result = latexSnippetSource(ctx);
+    expect(result).not.toBeNull();
+    expect(result!.options).toHaveLength(LATEX_SNIPPETS.length);
+  });
+});
+
+describe('keymapExtension', () => {
+  it('returns a non-null extension for "default" mode', () => {
+    expect(keymapExtension('default')).toBeTruthy();
+  });
+
+  it('returns a non-null extension for "vim" mode', () => {
+    expect(keymapExtension('vim')).toBeTruthy();
+  });
+
+  it('returns different extensions for "vim" and "default"', () => {
+    const def = keymapExtension('default');
+    const vim = keymapExtension('vim');
+    // They are distinct objects, not the same reference.
+    expect(def).not.toBe(vim);
+  });
+});
+
+describe('createLatexEditor — setKeymapMode and setSpellChecker', () => {
+  it('switches keymap mode at runtime without throwing', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({ parent: host, doc: 'test', onChange: vi.fn() });
+    expect(() => editor.setKeymapMode('vim')).not.toThrow();
+    expect(() => editor.setKeymapMode('default')).not.toThrow();
+    editor.destroy();
+    host.remove();
+  });
+
+  it('enables and disables spell-check at runtime without throwing', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const fakeChecker = { correct: () => true };
+    const editor = createLatexEditor({ parent: host, doc: 'test', onChange: vi.fn() });
+    expect(() => editor.setSpellChecker(fakeChecker)).not.toThrow();
+    expect(() => editor.setSpellChecker(null)).not.toThrow();
+    editor.destroy();
+    host.remove();
+  });
+
+  it('constructs with explicit keymapMode and spellChecker options', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const fakeChecker = { correct: () => true };
+    const editor = createLatexEditor({
+      parent: host,
+      doc: 'doc',
+      onChange: vi.fn(),
+      keymapMode: 'vim',
+      spellChecker: fakeChecker
+    });
+    expect(host.querySelector('.cm-editor')).not.toBeNull();
+    editor.destroy();
+    host.remove();
   });
 });

@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 authors = ["Achref Soua <achref.soua@outlook.com>"]
@@ -25,6 +25,7 @@ rust-version = "1.96"
 [workspace.dependencies]
 galley-core = { path = "crates/galley-core" }
 galley-security = { path = "crates/galley-security" }
+regex = "1"
 serde_json = "1"
 tempfile = "3"
 

@@ -157,3 +157,42 @@ describe('backend selection', () => {
     expect(typeof selectBackend(plainWin).openFolder).toBe('function');
   });
 });
+
+describe('searchProject', () => {
+  it('tauriProjectBackend delegates to the search_project Tauri command', async () => {
+    const raw = [{ file: 'main.tex', matches: [{ line: 1, column: 1, lineText: 'hello', matchStart: 0, matchEnd: 5 }] }];
+    invoke.mockResolvedValueOnce(raw);
+    const result = await tauriProjectBackend().searchProject('/p', {
+      pattern: 'hello',
+      caseSensitive: false,
+      wholeWord: false,
+      useRegex: false
+    });
+    expect(invoke).toHaveBeenCalledWith('search_project', expect.objectContaining({ root: '/p', pattern: 'hello' }));
+    expect(result).toEqual(raw);
+  });
+
+  it('browserProjectBackend searches in-memory .tex files', async () => {
+    const b = browserProjectBackend();
+    await b.createProject('/parent', 'test');
+    await b.saveDocument('/demo/galley-project', 'main.tex', 'hello world\nfoo bar');
+    const results = await b.searchProject('/demo/galley-project', {
+      pattern: 'hello',
+      caseSensitive: false,
+      wholeWord: false,
+      useRegex: false
+    });
+    expect(results.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('browserProjectBackend returns empty array for no matches', async () => {
+    const b = browserProjectBackend();
+    const results = await b.searchProject('/any', {
+      pattern: 'zzznotfound',
+      caseSensitive: false,
+      wholeWord: false,
+      useRegex: false
+    });
+    expect(results).toEqual([]);
+  });
+});

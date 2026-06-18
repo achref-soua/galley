@@ -19,6 +19,8 @@ export function fakeEditorFactory(): EditorFactory {
       },
       setDiagnostics() {},
       gotoLine() {},
+      setKeymapMode() {},
+      setSpellChecker() {},
       destroy() {
         area.remove();
       }
