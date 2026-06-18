@@ -583,6 +583,8 @@ export interface LatexEditor {
   setDiagnostics(diagnostics: Diagnostic[]): void;
   /** Move the cursor to a 1-based line (clamped) and scroll it into view. */
   gotoLine(line: number): void;
+  /** The 1-based line the cursor is on. Used for SyncTeX forward search. */
+  currentLine(): number;
   /** Switch the active key-map mode at runtime. */
   setKeymapMode(mode: KeymapMode): void;
   /** Swap the spell checker; pass `null` to disable spell-check. */
@@ -631,6 +633,9 @@ export const createLatexEditor: EditorFactory = ({
     },
     gotoLine(line) {
       revealLine(view, line);
+    },
+    currentLine() {
+      return view.state.doc.lineAt(view.state.selection.main.head).number;
     },
     setKeymapMode(mode) {
       view.dispatch({ effects: keymapCompartment.reconfigure(keymapExtension(mode)) });

@@ -9,16 +9,18 @@
   import { selectLanguageBackend, type LanguageBackend } from './lib/language-backend';
   import { mergeDiagnostics } from './lib/diagnostics';
   import { RecentProjectsStore } from './lib/recent-projects';
-  import { CompilePrefsStore } from './lib/settings-store';
+  import { CompilePrefsStore, PreviewPrefsStore } from './lib/settings-store';
   import { EditorPrefsStore, type EditorPrefs, type KeymapMode } from './lib/keymap-prefs';
   import { type SpellChecker, buildSpellChecker } from './lib/spell-check';
   import {
     createLatexEditor,
     type EditorFactory,
     type LanguageContext,
+    type LatexEditor,
     type RevealRequest
   } from './lib/editor';
   import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
+  import { selectSyncTexBackend, type SyncTexBackend, type SyncTexBox } from './lib/synctex-backend';
   import { windowTimer, type Timer } from './lib/debounce';
   import { systemClock, type Clock } from './lib/timing';
   import { webAudioBell, type Bell } from './lib/bell';
@@ -52,7 +54,8 @@
     compileTimer = windowTimer(),
     compileClock = systemClock(),
     bell = webAudioBell(),
-    language = selectLanguageBackend()
+    language = selectLanguageBackend(),
+    synctex = selectSyncTexBackend()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -60,6 +63,7 @@
     compileClock?: Clock;
     bell?: Bell;
     language?: LanguageBackend;
+    synctex?: SyncTexBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -67,6 +71,7 @@
   const theme = new ThemeController(browserThemeEnv());
   const layoutController = new LayoutController(window.localStorage);
   const prefsStore = new CompilePrefsStore(window.localStorage);
+  const previewPrefsStore = new PreviewPrefsStore(window.localStorage);
   const editorPrefsStore = new EditorPrefsStore(window.localStorage);
   const backend = selectBackend();
   // The injected timer/clock/bell are construction-time configuration, not
@@ -106,6 +111,24 @@
   let resizeBaseline = 0;
   // A monotonic stamp so clicking the same problem twice still re-jumps.
   let revealNonce = 0;
+
+  // SyncTeX: the live editor reference (set by EditorPane's oncreate callback)
+  // and the current forward-search highlight box.
+  let editorRef = $state<LatexEditor | null>(null);
+  let highlightBox = $state<SyncTexBox | null>(null);
+
+  async function handleForwardSearch() {
+    const file = project.activePath;
+    if (file === null || editorRef === null) return;
+    const line = editorRef.currentLine();
+    highlightBox = await synctex.forward(file, line);
+  }
+
+  async function handleInverseSearch(page: number, x: number, y: number) {
+    const loc = await synctex.inverse(page, x, y);
+    if (loc === null) return;
+    jumpToLine(loc.line);
+  }
 
   // Load the English dictionary when spell-check is toggled on; release on off.
   $effect(() => {
@@ -242,6 +265,9 @@
     if (isSaveShortcut(event)) {
       event.preventDefault();
       void projectController.save();
+    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      void handleForwardSearch();
     } else if (isCompileShortcut(event)) {
       event.preventDefault();
       void projectController.compile();
@@ -356,6 +382,7 @@
             keymapMode={editorPrefs.keymapMode}
             {spellChecker}
             onedit={(content) => projectController.edit(content)}
+            oncreate={(e) => { editorRef = e; }}
             createEditor={editor}
           />
         </div>
@@ -395,6 +422,8 @@
           pdf={project.compile.pdf}
           durationMs={project.compile.durationMs}
           cached={project.compile.cached}
+          {highlightBox}
+          oninversesearch={handleInverseSearch}
           {createRenderer}
         />
       </div>

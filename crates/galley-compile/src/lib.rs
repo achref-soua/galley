@@ -33,6 +33,8 @@ use std::fmt;
 pub struct EngineArtifacts {
     /// The rendered PDF bytes.
     pub pdf: Vec<u8>,
+    /// The `.synctex.gz` bytes when the engine produced them.
+    pub synctex: Option<Vec<u8>>,
     /// The captured TeX log.
     pub log: String,
 }
@@ -95,7 +97,7 @@ impl<E: LatexEngine> Compiler for EmbeddedCompiler<E> {
             Err(err) => return CompileResult::failed(err.to_string()),
         };
         match self.engine.run(&plan, source) {
-            Ok(artifacts) => CompileResult::succeeded(artifacts.pdf, artifacts.log),
+            Ok(artifacts) => CompileResult::succeeded(artifacts.pdf, artifacts.synctex, artifacts.log),
             Err(failure) => CompileResult::failed(failure.log),
         }
     }
@@ -121,6 +123,7 @@ mod tests {
             } else {
                 Ok(EngineArtifacts {
                     pdf: vec![source.len() as u8],
+                    synctex: None,
                     log: format!("ran {} via {}", plan.job_name, plan.engine.label()),
                 })
             }
@@ -135,6 +138,7 @@ mod tests {
         assert_eq!(result.report.status, CompileStatus::Succeeded);
         assert_eq!(result.report.log, "ran main via tectonic");
         assert_eq!(result.pdf, Some(vec![5]));
+        assert_eq!(result.synctex, None);
     }
 
     #[test]
