@@ -22,11 +22,12 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.2.0`: **language intelligence**. On top of the
-> warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core and its structured
-> diagnostics, the editor now understands LaTeX — completion, hovers, go-to-definition, a
-> document outline, and live ChkTeX diagnostics — powered by the **TexLab** language server.
-> The visual editor and the AI layer arrive in subsequent versioned releases.
+> **Status — early development.** This is `v0.2.1`: **outline & multi-file navigation**. On top
+> of the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core, structured diagnostics,
+> and TexLab language intelligence (completion, hovers, go-to-definition, live ChkTeX), the
+> editor now shows a **structure sidebar** with the include graph and a jump-to-anything filter,
+> and compiles from the project root when editing an included file. The visual editor and the AI
+> layer arrive in subsequent versioned releases.
 
 ## Editing & compiling
 
@@ -60,12 +61,24 @@ Galley speaks LaTeX through the **TexLab** language server, kept warm in process
 get context-aware **completion** — commands, environments, packages, document classes, `\ref`
 labels, `\cite` keys, and file paths — each with the right icon and insertion. **Hover** a symbol
 for help, press `F12` to **jump to a definition** (a `\ref` to its `\label`, a `\cite` to its
-entry — **across files** in a multi-file project), and read the **document outline** in a panel
-that clicks through to any section. The server's **diagnostics** (ChkTeX style notes and TexLab's
-own analysis) are merged into the same gutter and problems panel as the compile-log ones. All of
-the protocol and mapping is pure, covered Rust; the live `texlab` process sits behind a feature
-seam (like the compile engine), and the editor degrades gracefully when it is absent. _(`texlab`
-is a host requirement for the packaged app — install it with `cargo install --locked texlab`.)_
+entry — **across files** in a multi-file project). The server's **diagnostics** (ChkTeX style
+notes and TexLab's own analysis) are merged into the same gutter and problems panel as the
+compile-log ones. All of the protocol and mapping is pure, covered Rust; the live `texlab` process
+sits behind a feature seam (like the compile engine), and the editor degrades gracefully when it
+is absent. _(`texlab` is a host requirement for the packaged app — install it with
+`cargo install --locked texlab`.)_
+
+## Structure & multi-file navigation
+
+The **structure sidebar** shows the open document's include tree — every `\input{}`, `\include{}`,
+and `\subfile{}` reference parsed live from the editor buffer — and the structural outline from
+TexLab (sections and environments). A **jump-to-anything** search input at the top filters both
+sections simultaneously; clicking an include opens the file, clicking a symbol scrolls to it.
+
+Multi-file projects compile correctly out of the box: when the active file is included by a root
+document, Galley sends the **root** to Tectonic, so the proof always reflects the whole document.
+The root is detected from the project manifest (`project.toml`) and can be set in the project
+settings.
 
 ## Projects
 

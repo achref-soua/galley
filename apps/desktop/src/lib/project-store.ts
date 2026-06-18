@@ -316,8 +316,12 @@ export class ProjectController {
    * preview unsaved work; persisting is the separate, explicit save action. The
    * previous proof stays on screen until a new one is produced (no flicker), and
    * a build superseded by a newer one is dropped rather than allowed to overwrite
-   * the fresh proof. (For v0.1.1 the open document is the build root; multi-file
-   * root awareness lands with the language server in v0.2.1.)
+   * the fresh proof.
+   *
+   * When the project has a root document configured, that file is used as the
+   * compile target so editing any included file proofs the whole document. When
+   * the active file is not the root, the root is read from disk — unsaved edits
+   * to the active file are not visible until saved (ADR-0010).
    */
   async compile(): Promise<void> {
     const project = this.#state.project;
@@ -331,10 +335,19 @@ export class ProjectController {
     this.#set({ error: null });
     this.#setCompile({ status: 'running' });
     const start = this.#clock.now();
+    // Use the project root document as the compile target when configured;
+    // fall back to the active path for single-file projects (ADR-0010).
+    const rootDoc = project.rootDocument !== '' ? project.rootDocument : path;
 
     let next: Partial<CompileState> | { error: string };
     try {
-      const outcome = await this.#backend.compile(this.#state.content, path);
+      // When editing an included file, read the root file from disk so Tectonic
+      // gets the correct primary input; \input-ed files are then resolved from disk.
+      const source =
+        rootDoc !== path
+          ? await this.#backend.readDocument(project.root, rootDoc)
+          : this.#state.content;
+      const outcome = await this.#backend.compile(source, rootDoc);
       const durationMs = this.#clock.now() - start;
       next = outcome.ok
         ? {

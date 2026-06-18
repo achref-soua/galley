@@ -4,6 +4,27 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-18
+
+Outline & multi-file navigation — the structure sidebar and root-document compile awareness.
+
+### Added
+
+- An **include-graph parser** (`galley-core::include_graph`, mirrored in `include-graph.ts`)
+  that reads `\input{}`, `\include{}`, and `\subfile{}` directives from the live buffer — pure,
+  no I/O, 100% branch-covered — and resolves extensionless paths to `.tex` following LaTeX's own
+  rule.
+- A **structure sidebar** (the elaborated `OutlinePanel`): two sections — *Includes* (resolved
+  paths from the include graph, clickable to open the file) and *Outline* (LSP symbol tree,
+  clickable to jump) — with a **jump-to-anything search input** at the top that filters both
+  sections simultaneously.
+- **Multi-file compile root awareness**: when the open project has a root document configured and
+  the active file is not that root, `ProjectController.compile()` reads the root file from disk
+  and sends it to Tectonic so the proof always reflects the whole document, not just the
+  currently edited file. Unsaved edits to included files are not previewed until saved (consistent
+  with how Tectonic resolves `\input` at build time).
+- ADR-0010 (include graph, root-document compile, structure sidebar).
+
 ## [0.2.0] - 2026-06-18
 
 Language intelligence — the editor now understands LaTeX, powered by the TexLab language server.
