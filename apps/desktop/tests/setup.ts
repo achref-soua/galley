@@ -5,12 +5,13 @@ import type { EditorFactory } from '../src/lib/editor';
  *  integration tests can drive the editing surface without CodeMirror (which is
  *  covered directly in `editor.test.ts` and exercised by the Playwright e2e). */
 export function fakeEditorFactory(): EditorFactory {
-  return ({ parent, doc, onChange }) => {
+  return ({ parent, doc, onChange, onscroll }) => {
     const area = document.createElement('textarea');
     area.setAttribute('aria-label', 'Source');
     area.value = doc;
     area.addEventListener('input', () => onChange(area.value));
     parent.appendChild(area);
+    if (onscroll !== undefined) onscroll(0);
     return {
       setDoc(value) {
         if (value !== area.value) {

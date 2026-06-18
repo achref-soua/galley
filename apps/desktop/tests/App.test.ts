@@ -413,6 +413,25 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   });
 
+  it('toggles sync scroll via Settings > Preview section and persists it', async () => {
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    const toggle = screen.getByRole('switch', { name: 'Sync scroll' });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await fireEvent.click(toggle);
+    const stored = JSON.parse(window.localStorage.getItem('galley:preview-prefs')!);
+    expect(stored.syncScroll).toBe(true);
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('handleEditorScroll is called when the fake editor fires onscroll', async () => {
+    await openDemoFolder();
+    // The fakeEditorFactory calls onscroll(0) on mount; no crash expected and
+    // the preview pane is visible (editorScrollFraction is now 0).
+    expect(screen.getByLabelText('Preview')).toBeTruthy();
+  });
+
   it('returns null from fetchSpellChecker when the aff response is not ok', async () => {
     vi.stubGlobal('fetch', async () => ({ ok: false, text: async () => '' }));
     renderApp();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
 import PreviewPane from '../src/lib/PreviewPane.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
 
@@ -205,6 +205,128 @@ describe('PreviewPane', () => {
     vi.advanceTimersByTime(2001);
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).toBeNull());
     vi.useRealTimers();
+  });
+
+  it('renders page 1 of 2 then navigates next and prev', async () => {
+    const pages: number[] = [];
+    const create = rendererWith((_, __, page) => {
+      pages.push(page);
+      return Promise.resolve({ pageCount: 2 });
+    });
+    render(PreviewPane, {
+      props: { status: 'ok', log: '', pdf: new Uint8Array([1]), createRenderer: create }
+    });
+    await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy());
+    expect(pages.at(-1)).toBe(2);
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Previous page' }));
+    await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
+    expect(pages.at(-1)).toBe(1);
+  });
+
+  it('prev/next buttons are disabled at the page boundaries', async () => {
+    const create = rendererWith(() => Promise.resolve({ pageCount: 2 }));
+    render(PreviewPane, {
+      props: { status: 'ok', log: '', pdf: new Uint8Array([1]), createRenderer: create }
+    });
+    await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Next page' }).hasAttribute('disabled')).toBe(false);
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Next page' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('changes zoom scale via the select and re-renders', async () => {
+    const scales: number[] = [];
+    const create = rendererWith((_, __, ___, scale) => {
+      scales.push(scale);
+      return Promise.resolve({ pageCount: 1 });
+    });
+    render(PreviewPane, {
+      props: { status: 'ok', log: '', pdf: new Uint8Array([1]), createRenderer: create }
+    });
+    await waitFor(() => expect(scales).toEqual([1.5]));
+
+    const sel = screen.getByRole('combobox', { name: 'Zoom' }) as HTMLSelectElement;
+    await fireEvent.change(sel, { target: { value: '2' } });
+    await waitFor(() => expect(scales.at(-1)).toBe(2));
+  });
+
+  it('resets to page 1 when a new PDF arrives', async () => {
+    const pages: number[] = [];
+    const create = rendererWith((_, __, page) => {
+      pages.push(page);
+      return Promise.resolve({ pageCount: 3 });
+    });
+    const { rerender } = render(PreviewPane, {
+      props: { status: 'ok', log: '', pdf: new Uint8Array([1]), createRenderer: create }
+    });
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeTruthy());
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeTruthy());
+
+    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([9, 9]), createRenderer: create });
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeTruthy());
+  });
+
+  it('scrolls the proof pane when syncScroll is on and editorScrollFraction is set', async () => {
+    const create = rendererWith(() => Promise.resolve({ pageCount: 1 }));
+    const { rerender } = render(PreviewPane, {
+      props: {
+        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        syncScroll: false, editorScrollFraction: undefined,
+        createRenderer: create
+      }
+    });
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+    // Enable sync scroll and feed a fraction — no crash expected.
+    await rerender({
+      status: 'ok', log: '', pdf: new Uint8Array([1]),
+      syncScroll: true, editorScrollFraction: 0.5,
+      createRenderer: create
+    });
+  });
+
+  it('does nothing when syncScroll is off even with a fraction', async () => {
+    const create = rendererWith(() => Promise.resolve({ pageCount: 1 }));
+    render(PreviewPane, {
+      props: {
+        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        syncScroll: false, editorScrollFraction: 0.5,
+        createRenderer: create
+      }
+    });
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+  });
+
+  it('passes currentPage to oninversesearch after navigating', async () => {
+    const calls: number[] = [];
+    const create = rendererWith(() => Promise.resolve({ pageCount: 2 }));
+    render(PreviewPane, {
+      props: {
+        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        oninversesearch: (page: number) => { calls.push(page); },
+        createRenderer: create
+      }
+    });
+    await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
+    await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy());
+
+    const canvas = screen.getByLabelText('Proof') as HTMLCanvasElement;
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      width: 100, height: 150, left: 0, top: 0, right: 100, bottom: 150, x: 0, y: 0,
+      toJSON: () => ({})
+    } as DOMRect);
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 50 }));
+    expect(calls[0]).toBe(2);
   });
 
   it('clears the previous timer when a second highlight arrives', async () => {

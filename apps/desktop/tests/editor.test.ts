@@ -324,4 +324,30 @@ describe('createLatexEditor — setKeymapMode and setSpellChecker', () => {
     editor.destroy();
     host.remove();
   });
+
+  it('calls onscroll when provided and fires on a scroll event', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const onscroll = vi.fn();
+    const editor = createLatexEditor({ parent: host, doc: 'test', onChange: vi.fn(), onscroll });
+    const scroller = host.querySelector('.cm-scroller') as HTMLElement | null;
+    if (scroller !== null) {
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    }
+    expect(onscroll).toHaveBeenCalled();
+    editor.destroy();
+    host.remove();
+  });
+
+  it('constructs without onscroll and does not throw on scroll', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({ parent: host, doc: 'test', onChange: vi.fn() });
+    const scroller = host.querySelector('.cm-scroller') as HTMLElement | null;
+    expect(() => {
+      if (scroller !== null) scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    }).not.toThrow();
+    editor.destroy();
+    host.remove();
+  });
 });

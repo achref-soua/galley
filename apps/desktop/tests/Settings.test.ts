@@ -9,11 +9,13 @@ const base = {
   soundOnSuccess: false,
   keymapMode: 'default' as const,
   spellCheck: false,
+  syncScroll: false,
   onthemechange: () => {},
   onautocompilechange: () => {},
   onsoundchange: () => {},
   onkeymapchange: () => {},
   onspellcheckchange: () => {},
+  onsyncscrollchange: () => {},
   onclose: () => {}
 };
 
@@ -44,6 +46,8 @@ describe('Settings', () => {
     render(Settings, { props: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Compilation' }));
     expect(screen.getByText('Compile as you type')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText('Sync scroll')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'About' }));
     expect(screen.getByText(/local-first LaTeX studio/)).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Appearance' }));
@@ -130,5 +134,32 @@ describe('Settings — Editor section', () => {
     expect(screen.getByRole('switch', { name: 'Spell-check' }).getAttribute('aria-checked')).toBe(
       'true'
     );
+  });
+});
+
+describe('Settings — Preview section', () => {
+  it('shows the sync scroll toggle defaulting to off', async () => {
+    render(Settings, { props: base });
+    await fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText('Sync scroll')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Sync scroll' }).getAttribute('aria-checked')).toBe(
+      'false'
+    );
+  });
+
+  it('reflects syncScroll: true', async () => {
+    render(Settings, { props: { ...base, syncScroll: true } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByRole('switch', { name: 'Sync scroll' }).getAttribute('aria-checked')).toBe(
+      'true'
+    );
+  });
+
+  it('emits onsyncscrollchange when the toggle is clicked', async () => {
+    const onsyncscrollchange = vi.fn();
+    render(Settings, { props: { ...base, onsyncscrollchange } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Sync scroll' }));
+    expect(onsyncscrollchange).toHaveBeenCalledWith(true);
   });
 });

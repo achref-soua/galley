@@ -565,6 +565,8 @@ export interface LatexEditorOptions {
   keymapMode?: KeymapMode;
   /** Initial spell checker, or `null` to disable spell-check. */
   spellChecker?: SpellChecker | null;
+  /** Called with the scroll fraction (0–1) whenever the editor is scrolled. */
+  onscroll?: (fraction: number) => void;
 }
 
 /** A request to reveal a source line, stamped so the same line can re-fire. */
@@ -603,22 +605,30 @@ export const createLatexEditor: EditorFactory = ({
   onChange,
   language,
   keymapMode = 'default',
-  spellChecker = null
+  spellChecker = null,
+  onscroll
 }) => {
   const keymapCompartment = new Compartment();
   const spellCompartment = new Compartment();
+  const scrollExtension =
+    onscroll !== undefined
+      ? [
+          EditorView.domEventHandlers({
+            scroll(_e, view) {
+              const el = view.scrollDOM;
+              onscroll(el.scrollTop / Math.max(el.scrollHeight - el.clientHeight, 1));
+            }
+          })
+        ]
+      : ([] as Extension[]);
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc,
-      extensions: latexExtensions(
-        onChange,
-        language,
-        keymapMode,
-        spellChecker,
-        keymapCompartment,
-        spellCompartment
-      )
+      extensions: [
+        latexExtensions(onChange, language, keymapMode, spellChecker, keymapCompartment, spellCompartment),
+        ...scrollExtension
+      ]
     })
   });
   return {
