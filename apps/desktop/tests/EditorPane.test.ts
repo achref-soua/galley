@@ -6,13 +6,19 @@ import { fakeEditorFactory } from './setup';
 
 /** An editor factory that records the calls the pane makes against it. */
 function spyEditor() {
-  const calls = { setDoc: [] as string[], setDiagnostics: 0, gotoLine: [] as number[] };
+  const calls = {
+    setDoc: [] as string[],
+    setDiagnostics: 0,
+    gotoLine: [] as number[],
+    setKeymapMode: [] as string[],
+    setSpellChecker: [] as unknown[]
+  };
   const factory: EditorFactory = () => ({
     setDoc: (value) => calls.setDoc.push(value),
-    setDiagnostics: () => {
-      calls.setDiagnostics += 1;
-    },
+    setDiagnostics: () => { calls.setDiagnostics += 1; },
     gotoLine: (line) => calls.gotoLine.push(line),
+    setKeymapMode: (mode) => calls.setKeymapMode.push(mode),
+    setSpellChecker: (checker) => calls.setSpellChecker.push(checker),
     destroy: () => {}
   });
   return { factory, calls };
@@ -72,7 +78,6 @@ describe('EditorPane', () => {
     });
     expect((screen.getByLabelText('Source') as HTMLTextAreaElement).value).toBe('first');
 
-    // A new document content syncs into the surface (the action's update path).
     await rerender({
       documentName: 'main.tex',
       content: 'second',
@@ -98,17 +103,35 @@ describe('EditorPane', () => {
     };
     const { rerender } = render(EditorPane, { props: { ...base, reveal: null } });
 
-    // Mounting set the diagnostics once; with no reveal there is no jump.
     expect(calls.setDiagnostics).toBe(1);
     expect(calls.gotoLine).toEqual([]);
 
-    // A reveal request with a new nonce jumps to its line.
     await rerender({ ...base, reveal: { line: 2, nonce: 1 } });
     expect(calls.gotoLine).toEqual([2]);
 
-    // The same nonce does not jump again, even as other props change.
     await rerender({ ...base, content: 'a\nb\nc\nd', reveal: { line: 2, nonce: 1 } });
     expect(calls.gotoLine).toEqual([2]);
     expect(calls.setDoc).toContain('a\nb\nc\nd');
+  });
+
+  it('passes keymapMode and spellChecker to the editor on mount and updates on change', async () => {
+    const { factory, calls } = spyEditor();
+    const fakeChecker = { correct: () => true };
+    const base = {
+      documentName: 'main.tex',
+      content: 'x',
+      dirty: false,
+      keymapMode: 'default' as const,
+      spellChecker: null as { correct(w: string): boolean } | null,
+      onedit: () => {},
+      createEditor: factory
+    };
+    const { rerender } = render(EditorPane, { props: base });
+
+    await rerender({ ...base, keymapMode: 'vim' as const });
+    expect(calls.setKeymapMode).toContain('vim');
+
+    await rerender({ ...base, keymapMode: 'vim' as const, spellChecker: fakeChecker });
+    expect(calls.setSpellChecker).toContain(fakeChecker);
   });
 });

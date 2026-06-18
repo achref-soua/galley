@@ -8,37 +8,52 @@
     THEME_LABELS,
     type ThemePreference
   } from '@galley/ui-kit';
+  import { type KeymapMode } from './keymap-prefs';
 
   let {
     themePreference,
     reduceMotion,
     autoCompile,
     soundOnSuccess,
+    keymapMode,
+    spellCheck,
     onthemechange,
     onautocompilechange,
     onsoundchange,
+    onkeymapchange,
+    onspellcheckchange,
     onclose
   }: {
     themePreference: ThemePreference;
     reduceMotion: boolean;
     autoCompile: boolean;
     soundOnSuccess: boolean;
+    keymapMode: KeymapMode;
+    spellCheck: boolean;
     onthemechange: (pref: ThemePreference) => void;
     onautocompilechange: (enabled: boolean) => void;
     onsoundchange: (enabled: boolean) => void;
+    onkeymapchange: (mode: KeymapMode) => void;
+    onspellcheckchange: (enabled: boolean) => void;
     onclose: () => void;
   } = $props();
 
-  type Section = 'appearance' | 'compilation' | 'about';
+  type Section = 'appearance' | 'editor' | 'compilation' | 'about';
   let active = $state<Section>('appearance');
 
   const sections: { id: Section; label: string }[] = [
     { id: 'appearance', label: 'Appearance' },
+    { id: 'editor', label: 'Editor' },
     { id: 'compilation', label: 'Compilation' },
     { id: 'about', label: 'About' }
   ];
 
   const themeOptions = THEME_PREFERENCES.map((value) => ({ value, label: THEME_LABELS[value] }));
+
+  const keymapOptions: { value: KeymapMode; label: string }[] = [
+    { value: 'default', label: 'Default' },
+    { value: 'vim', label: 'Vim' }
+  ];
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
@@ -88,6 +103,25 @@
           <p class="row">
             <span class="label">Reduced motion</span>
             <span class="value">{reduceMotion ? 'On (following your system)' : 'Off'}</span>
+          </p>
+        {:else if active === 'editor'}
+          <h2>Editor</h2>
+          <p class="row">
+            <span class="label">Key-map mode</span>
+            <SegmentedControl
+              options={keymapOptions}
+              value={keymapMode}
+              ariaLabel="Key-map mode"
+              onchange={(value) => onkeymapchange(value as KeymapMode)}
+            />
+          </p>
+          <p class="row">
+            <span class="label">Spell-check</span>
+            <Toggle
+              label="Spell-check"
+              checked={spellCheck}
+              onchange={(checked) => onspellcheckchange(checked)}
+            />
           </p>
         {:else if active === 'compilation'}
           <h2>Compilation</h2>

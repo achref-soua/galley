@@ -15,3 +15,4 @@ codebase stays legible.
 | 0008 | Compile diagnostics from the TeX log                    | Accepted |
 | 0009 | Language intelligence via TexLab (LSP)                  | Accepted |
 | 0010 | Include graph, root-document compile, structure sidebar | Accepted |
+| 0011 | Power editing: keymap modes, spell-check, command palette, project search | Accepted |

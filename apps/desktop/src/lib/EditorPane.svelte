@@ -12,6 +12,8 @@
     type RevealRequest
   } from './editor';
   import { type Diagnostic } from './diagnostics';
+  import { type KeymapMode } from './keymap-prefs';
+  import { type SpellChecker } from './spell-check';
 
   let {
     documentName,
@@ -20,6 +22,8 @@
     diagnostics = [],
     reveal = null,
     language = undefined,
+    keymapMode = 'default',
+    spellChecker = null,
     onedit,
     createEditor = createLatexEditor
   }: {
@@ -29,6 +33,8 @@
     diagnostics?: Diagnostic[];
     reveal?: RevealRequest | null;
     language?: LanguageContext;
+    keymapMode?: KeymapMode;
+    spellChecker?: SpellChecker | null;
     onedit: (content: string) => void;
     createEditor?: EditorFactory;
   } = $props();
@@ -38,6 +44,8 @@
     content: string;
     diagnostics: Diagnostic[];
     reveal: RevealRequest | null;
+    keymapMode: KeymapMode;
+    spellChecker: SpellChecker | null;
   }
 
   // Jump to a freshly-requested line, returning the nonce now acted on so a
@@ -54,16 +62,18 @@
     return lastNonce;
   }
 
-  const input = $derived<EditorInput>({ content, diagnostics, reveal });
+  const input = $derived<EditorInput>({ content, diagnostics, reveal, keymapMode, spellChecker });
 
   // A Svelte action: build the editor when the surface mounts, push external
-  // content, diagnostics, and jump requests in, and tear it down on unmount.
+  // content, diagnostics, jump requests, and mode changes in, then tear down.
   function mountEditor(node: HTMLElement, value: EditorInput) {
     const editor: LatexEditor = createEditor({
       parent: node,
       doc: value.content,
       onChange: (next) => onedit(next),
-      language
+      language,
+      keymapMode: value.keymapMode,
+      spellChecker: value.spellChecker
     });
     editor.setDiagnostics(value.diagnostics);
     let lastNonce = applyReveal(editor, value.reveal, null);
@@ -72,6 +82,8 @@
         editor.setDoc(next.content);
         editor.setDiagnostics(next.diagnostics);
         lastNonce = applyReveal(editor, next.reveal, lastNonce);
+        editor.setKeymapMode(next.keymapMode);
+        editor.setSpellChecker(next.spellChecker);
       },
       destroy() {
         editor.destroy();

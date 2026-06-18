@@ -11,6 +11,7 @@
  */
 
 import {
+  Compartment,
   EditorState,
   StateEffect,
   StateField,
@@ -30,6 +31,7 @@ import {
 } from '@codemirror/view';
 import {
   autocompletion,
+  snippetCompletion,
   type Completion,
   type CompletionContext,
   type CompletionResult
@@ -46,6 +48,7 @@ import {
   indentOnInput,
   syntaxHighlighting
 } from '@codemirror/language';
+import { vim } from '@replit/codemirror-vim';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { tags } from '@lezer/highlight';
 import { type Diagnostic, type Severity, severityRank } from './diagnostics';
@@ -55,6 +58,8 @@ import {
   type DefinitionLocation,
   type LanguageBackend
 } from './language-backend';
+import { type KeymapMode } from './keymap-prefs';
+import { type SpellChecker, makeSpellLinter } from './spell-check';
 
 /**
  * Find the fold range for a LaTeX environment that opens on the line spanning
@@ -442,14 +447,85 @@ export function goToDefinitionCommand(context: LanguageContext): (view: EditorVi
 /** The language-server extensions: completion, hovers, and go-to-definition. */
 function languageExtensions(context: LanguageContext): Extension {
   return [
-    autocompletion({ override: [latexCompletionSource(context)] }),
+    autocompletion({ override: [latexCompletionSource(context), latexSnippetSource] }),
     hoverTooltip(latexHoverSource(context)),
     keymap.of([{ key: 'F12', run: goToDefinitionCommand(context) }])
   ];
 }
 
+/**
+ * Built-in LaTeX snippets — common structural patterns triggered via Tab after
+ * the prefix. These supplement the language-server completions and are always
+ * available (no LSP required). Exported for direct testing.
+ */
+export const LATEX_SNIPPETS: Completion[] = [
+  snippetCompletion('\\begin{${env}}\n\t${}\n\\end{${env}}', {
+    label: '\\begin{}…\\end{}',
+    type: 'keyword',
+    boost: 5
+  }),
+  snippetCompletion('\\frac{${num}}{${den}}', {
+    label: '\\frac{}{}',
+    type: 'function',
+    boost: 5
+  }),
+  snippetCompletion('\\sqrt{${expr}}', { label: '\\sqrt{}', type: 'function', boost: 4 }),
+  snippetCompletion('\\textbf{${text}}', { label: '\\textbf{}', type: 'keyword', boost: 4 }),
+  snippetCompletion('\\textit{${text}}', { label: '\\textit{}', type: 'keyword', boost: 4 }),
+  snippetCompletion('\\emph{${text}}', { label: '\\emph{}', type: 'keyword', boost: 4 }),
+  snippetCompletion(
+    '\\begin{equation}\n\t${}\n\\end{equation}',
+    { label: '\\begin{equation}', type: 'keyword', boost: 3 }
+  ),
+  snippetCompletion(
+    '\\begin{figure}[${htbp}]\n\t\\centering\n\t\\includegraphics[width=\\linewidth]{${file}}\n\t\\caption{${caption}}\n\t\\label{fig:${label}}\n\\end{figure}',
+    { label: '\\begin{figure}', type: 'keyword', boost: 3 }
+  ),
+  snippetCompletion(
+    '\\begin{table}[${htbp}]\n\t\\centering\n\t\\begin{tabular}{${cols}}\n\t\t${}\n\t\\end{tabular}\n\t\\caption{${caption}}\n\t\\label{tab:${label}}\n\\end{table}',
+    { label: '\\begin{table}', type: 'keyword', boost: 3 }
+  ),
+  snippetCompletion('\\section{${title}}', { label: '\\section{}', type: 'function', boost: 4 }),
+  snippetCompletion('\\subsection{${title}}', {
+    label: '\\subsection{}',
+    type: 'function',
+    boost: 3
+  }),
+  snippetCompletion('\\cite{${key}}', { label: '\\cite{}', type: 'variable', boost: 4 }),
+  snippetCompletion('\\ref{${label}}', { label: '\\ref{}', type: 'variable', boost: 4 }),
+  snippetCompletion('\\label{${name}}', { label: '\\label{}', type: 'variable', boost: 3 })
+];
+
+/** Snippet-only completion source (used when no language context is available). */
+export function latexSnippetSource(cc: CompletionContext): CompletionResult | null {
+  const source = cc.state.doc.toString();
+  const from = completionStart(source, cc.pos);
+  if (from === cc.pos && !cc.explicit) {
+    return null;
+  }
+  return { from, options: LATEX_SNIPPETS };
+}
+
+/**
+ * Return the CM6 keymap extension for `mode`.
+ * Exported so mode-selection logic can be tested without an editor.
+ */
+export function keymapExtension(mode: KeymapMode): Extension {
+  if (mode === 'vim') {
+    return vim();
+  }
+  return keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]);
+}
+
 /** The full extension set for a Galley LaTeX editor, reporting edits to `onChange`. */
-function latexExtensions(onChange: (value: string) => void, language?: LanguageContext): Extension {
+function latexExtensions(
+  onChange: (value: string) => void,
+  language: LanguageContext | undefined,
+  keymapMode: KeymapMode,
+  spellChecker: SpellChecker | null,
+  keymapCompartment: Compartment,
+  spellCompartment: Compartment
+): Extension {
   return [
     lineNumbers(),
     history(),
@@ -464,8 +540,11 @@ function latexExtensions(onChange: (value: string) => void, language?: LanguageC
     StreamLanguage.define(stex),
     syntaxHighlighting(highlightStyle),
     editorTheme,
-    ...(language ? [languageExtensions(language)] : []),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+    ...(language
+      ? [languageExtensions(language)]
+      : [autocompletion({ override: [latexSnippetSource] })]),
+    keymapCompartment.of(keymapExtension(keymapMode)),
+    spellCompartment.of(spellChecker !== null ? makeSpellLinter(() => spellChecker) : []),
     EditorView.contentAttributes.of({ 'aria-label': 'LaTeX source' }),
     EditorView.updateListener.of((update) => reportDocChange(update, onChange))
   ];
@@ -481,6 +560,10 @@ export interface LatexEditorOptions {
   onChange: (value: string) => void;
   /** Language-server bridge for completion/hover/go-to-definition, if available. */
   language?: LanguageContext;
+  /** The key-map mode (default, vim). */
+  keymapMode?: KeymapMode;
+  /** Initial spell checker, or `null` to disable spell-check. */
+  spellChecker?: SpellChecker | null;
 }
 
 /** A request to reveal a source line, stamped so the same line can re-fire. */
@@ -499,6 +582,10 @@ export interface LatexEditor {
   setDiagnostics(diagnostics: Diagnostic[]): void;
   /** Move the cursor to a 1-based line (clamped) and scroll it into view. */
   gotoLine(line: number): void;
+  /** Switch the active key-map mode at runtime. */
+  setKeymapMode(mode: KeymapMode): void;
+  /** Swap the spell checker; pass `null` to disable spell-check. */
+  setSpellChecker(checker: SpellChecker | null): void;
   /** Tear the editor down and release its DOM. */
   destroy(): void;
 }
@@ -507,10 +594,29 @@ export interface LatexEditor {
 export type EditorFactory = (options: LatexEditorOptions) => LatexEditor;
 
 /** The real CodeMirror 6 editor factory. */
-export const createLatexEditor: EditorFactory = ({ parent, doc, onChange, language }) => {
+export const createLatexEditor: EditorFactory = ({
+  parent,
+  doc,
+  onChange,
+  language,
+  keymapMode = 'default',
+  spellChecker = null
+}) => {
+  const keymapCompartment = new Compartment();
+  const spellCompartment = new Compartment();
   const view = new EditorView({
     parent,
-    state: EditorState.create({ doc, extensions: latexExtensions(onChange, language) })
+    state: EditorState.create({
+      doc,
+      extensions: latexExtensions(
+        onChange,
+        language,
+        keymapMode,
+        spellChecker,
+        keymapCompartment,
+        spellCompartment
+      )
+    })
   });
   return {
     setDoc(value) {
@@ -524,6 +630,13 @@ export const createLatexEditor: EditorFactory = ({ parent, doc, onChange, langua
     },
     gotoLine(line) {
       revealLine(view, line);
+    },
+    setKeymapMode(mode) {
+      view.dispatch({ effects: keymapCompartment.reconfigure(keymapExtension(mode)) });
+    },
+    setSpellChecker(checker) {
+      const ext = checker !== null ? makeSpellLinter(() => checker) : [];
+      view.dispatch({ effects: spellCompartment.reconfigure(ext) });
     },
     destroy() {
       view.destroy();

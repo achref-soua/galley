@@ -7,6 +7,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [svelte()],
   clearScreen: false,
+  assetsInclude: ['**/*.aff', '**/*.dic'],
   server: {
     port: 1420,
     strictPort: true,
