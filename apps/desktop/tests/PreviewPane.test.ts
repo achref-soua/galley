@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import PreviewPane from '../src/lib/PreviewPane.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
@@ -123,5 +123,106 @@ describe('PreviewPane', () => {
       createRenderer: create
     });
     await waitFor(() => expect(sizes).toEqual([1, 3]));
+  });
+
+  it('shows an SVG highlight when highlightBox is set', async () => {
+    const box = { page: 1, h: 65781, v: 131563, w: 65781, d: 6578, page_height: 200000 };
+    // Give the canvas real pixel dimensions so canvasWidth/canvasHeight are non-zero
+    // when the renderProof .then callback fires, exercising the viewBox update branch.
+    Object.defineProperty(HTMLCanvasElement.prototype, 'width', {
+      get() { return 800; }, configurable: true
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'height', {
+      get() { return 1100; }, configurable: true
+    });
+    const { rerender } = render(PreviewPane, {
+      props: {
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        highlightBox: null,
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
+    // Restore canvas prototype to avoid affecting other tests.
+    delete (HTMLCanvasElement.prototype as { width?: unknown }).width;
+    delete (HTMLCanvasElement.prototype as { height?: unknown }).height;
+  });
+
+  it('calls oninversesearch when the canvas is clicked', async () => {
+    const calls: [number, number, number][] = [];
+    render(PreviewPane, {
+      props: {
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        oninversesearch: (page: number, x: number, y: number) => { calls.push([page, x, y]); },
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+    const canvas = screen.getByLabelText('Proof') as HTMLCanvasElement;
+    // Provide real CSS dimensions so the rect.width > 0 branch in handleCanvasClick is taken.
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      width: 100, height: 150, left: 10, top: 20, right: 110, bottom: 170, x: 10, y: 20,
+      toJSON: () => ({})
+    } as DOMRect);
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 80 }));
+    expect(calls.length).toBe(1);
+    expect(calls[0][0]).toBe(1);
+  });
+
+  it('does nothing when the canvas is clicked without an oninversesearch handler', async () => {
+    render(PreviewPane, {
+      props: {
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
+    const canvas = screen.getByLabelText('Proof') as HTMLCanvasElement;
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+
+  it('hides the highlight after the 2 s fade', async () => {
+    vi.useFakeTimers();
+    const box = { page: 1, h: 65781, v: 131563, w: 65781, d: 6578, page_height: 200000 };
+    const { rerender } = render(PreviewPane, {
+      props: {
+        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        highlightBox: null,
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
+    vi.advanceTimersByTime(2001);
+    await waitFor(() => expect(document.querySelector('.synctex-highlight')).toBeNull());
+    vi.useRealTimers();
+  });
+
+  it('clears the previous timer when a second highlight arrives', async () => {
+    vi.useFakeTimers();
+    const box1 = { page: 1, h: 65781, v: 131563, w: 65781, d: 6578, page_height: 200000 };
+    const box2 = { page: 1, h: 131563, v: 262000, w: 65781, d: 6578, page_height: 200000 };
+    const { rerender } = render(PreviewPane, {
+      props: {
+        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        highlightBox: box1,
+        createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+      }
+    });
+    await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
+    // A second highlight arrives while the first timer is still pending.
+    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box2,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
+    vi.useRealTimers();
   });
 });

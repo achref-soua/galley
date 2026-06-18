@@ -147,7 +147,7 @@ mod tests {
     impl Compiler for CountingCompiler {
         fn compile(&self, _request: &CompileRequest, source: &str) -> CompileResult {
             self.runs.set(self.runs.get() + 1);
-            CompileResult::succeeded(vec![source.len() as u8], "ok")
+            CompileResult::succeeded(vec![source.len() as u8], None, "ok")
         }
     }
 
@@ -199,7 +199,7 @@ mod tests {
         let key_a = CacheKey::new(&request(), "a");
         assert!(cache.lookup(&key_a).is_none());
 
-        cache.store(key_a.clone(), CompileResult::succeeded(vec![1], "a"));
+        cache.store(key_a.clone(), CompileResult::succeeded(vec![1], None, "a"));
         // A stored entry whose key differs is still a miss (exercises the guard).
         let key_b = CacheKey::new(&request(), "b");
         assert!(cache.lookup(&key_b).is_none());
@@ -226,13 +226,13 @@ mod tests {
         assert!(format!("{key:?}").contains("CacheKey"));
 
         let cached = CachedCompile {
-            result: CompileResult::succeeded(vec![1], "ok"),
+            result: CompileResult::succeeded(vec![1], None, "ok"),
             cached: true,
         };
         assert_eq!(cached.clone(), cached);
         assert!(format!("{cached:?}").contains("CachedCompile"));
         let miss = CachedCompile {
-            result: CompileResult::succeeded(vec![1], "ok"),
+            result: CompileResult::succeeded(vec![1], None, "ok"),
             cached: false,
         };
         assert_ne!(cached, miss);

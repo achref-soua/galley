@@ -12,10 +12,10 @@ use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
     CompileRequest, CompletionItem, DocumentKind, DocumentSymbol, Engine, LanguageIntelligence,
-    Location, Position, TextDocument, VERSION,
+    Location, Position, SyncTexMapper, TextDocument, VERSION,
 };
 use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
-use galley_intel::TexLabClient;
+use galley_intel::{SyncTexParser, TexLabClient};
 use galley_security::SafeRoot;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -133,6 +133,8 @@ struct CompileDto {
     ok: bool,
     log: String,
     pdf: Option<Vec<u8>>,
+    /// Whether SyncTeX data is available for forward/inverse navigation.
+    has_synctex: bool,
     cached: bool,
     diagnostics: Vec<DiagnosticDto>,
 }
@@ -147,6 +149,13 @@ struct CompileDto {
 type WarmCompiler = CachingCompiler<EmbeddedCompiler<TectonicEngine>>;
 struct CompilerState(Mutex<WarmCompiler>);
 
+/// The most recent `.synctex.gz` bytes, cached after each successful compile.
+///
+/// The bytes are stored in process — not sent to the frontend — so forward and
+/// inverse search commands can query them without a round-trip that would double
+/// the transfer cost of potentially large binary data.
+struct SyncTexState(Mutex<Option<Vec<u8>>>);
+
 impl CompilerState {
     fn new() -> Self {
         Self(Mutex::new(CachingCompiler::new(EmbeddedCompiler::new(
@@ -155,15 +164,27 @@ impl CompilerState {
     }
 }
 
+impl SyncTexState {
+    fn new() -> Self {
+        Self(Mutex::new(None))
+    }
+}
+
 #[tauri::command]
 fn compile_document(
-    state: State<'_, CompilerState>,
+    compiler_state: State<'_, CompilerState>,
+    synctex_state: State<'_, SyncTexState>,
     source: String,
     root_document: String,
 ) -> CompileDto {
     let request = CompileRequest::new(root_document, Engine::Tectonic);
-    let mut compiler = state.0.lock().expect("the compiler mutex was poisoned");
+    let mut compiler = compiler_state.0.lock().expect("the compiler mutex was poisoned");
     let outcome = compiler.compile(&request, &source);
+    let has_synctex = outcome.result.synctex.is_some();
+    if let Some(bytes) = outcome.result.synctex.clone() {
+        let mut sx = synctex_state.0.lock().expect("the synctex mutex was poisoned");
+        *sx = Some(bytes);
+    }
     let diagnostics = parse_log(&outcome.result.report.log)
         .into_iter()
         .map(DiagnosticDto::from_diagnostic)
@@ -172,6 +193,7 @@ fn compile_document(
         ok: outcome.result.report.is_ok(),
         log: outcome.result.report.log,
         pdf: outcome.result.pdf,
+        has_synctex,
         cached: outcome.cached,
         diagnostics,
     }
@@ -449,12 +471,64 @@ fn lsp_diagnostics(
     })
 }
 
+/// The PDF rectangle returned by forward search, in scaled points.
+#[derive(Serialize)]
+struct SyncTexBoxDto {
+    page: u32,
+    h: i64,
+    v: i64,
+    w: i64,
+    d: i64,
+    page_height: i64,
+}
+
+/// The source location returned by inverse search.
+#[derive(Serialize)]
+struct SyncTexLocationDto {
+    file: String,
+    line: u32,
+}
+
+#[tauri::command]
+fn synctex_forward(
+    state: State<'_, SyncTexState>,
+    file: String,
+    line: u32,
+) -> Option<SyncTexBoxDto> {
+    let guard = state.0.lock().expect("the synctex mutex was poisoned");
+    let data = guard.as_deref()?;
+    SyncTexParser.forward(data, &file, line).map(|b| SyncTexBoxDto {
+        page: b.page,
+        h: b.h,
+        v: b.v,
+        w: b.w,
+        d: b.d,
+        page_height: b.page_height,
+    })
+}
+
+#[tauri::command]
+fn synctex_inverse(
+    state: State<'_, SyncTexState>,
+    page: u32,
+    x: f64,
+    y: f64,
+) -> Option<SyncTexLocationDto> {
+    let guard = state.0.lock().expect("the synctex mutex was poisoned");
+    let data = guard.as_deref()?;
+    SyncTexParser.inverse(data, page, x, y).map(|loc| SyncTexLocationDto {
+        file: loc.file,
+        line: loc.line,
+    })
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(CompilerState::new())
         .manage(IntelState::new())
+        .manage(SyncTexState::new())
         .setup(|app| {
             let title = format!("{} {}", galley_core::NAME, VERSION);
             if let Some(window) = app.get_webview_window("main") {
@@ -473,7 +547,9 @@ pub fn run() {
             lsp_hover,
             lsp_definition,
             lsp_symbols,
-            lsp_diagnostics
+            lsp_diagnostics,
+            synctex_forward,
+            synctex_inverse
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

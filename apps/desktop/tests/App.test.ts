@@ -510,3 +510,171 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await waitFor(() => expect(gotoLine).toHaveBeenCalledWith(1));
   });
 });
+
+describe('App — SyncTeX forward and inverse search', () => {
+  let timer: { pending: (() => void) | null; set: (cb: () => void) => void; clear: () => void };
+  let clock: { times: number[]; now: () => number };
+  let bell: { ding: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    timer = { pending: null, set(cb) { this.pending = cb; }, clear() { this.pending = null; } };
+    clock = { times: [], now() { return 0; } };
+    bell = { ding: vi.fn() };
+  });
+
+  it('Ctrl+Enter triggers forward search via the injected backend', async () => {
+    let forwardArgs: [string, number] | null = null;
+    const fakeSynctex = {
+      async forward(file: string, line: number) { forwardArgs = [file, line]; return null; },
+      async inverse() { return null; }
+    };
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        synctex: fakeSynctex
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+
+    // Ctrl+Enter fires forward search. No project file → activePath is set.
+    await fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => expect(forwardArgs).not.toBeNull());
+    expect(forwardArgs![1]).toBe(1); // fake editor always returns line 1
+  });
+
+  it('Ctrl+Enter is a no-op when no document is open', async () => {
+    let called = false;
+    const fakeSynctex = {
+      async forward() { called = true; return null; },
+      async inverse() { return null; }
+    };
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        synctex: fakeSynctex
+      }
+    });
+    await fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    expect(called).toBe(false);
+  });
+
+  it('Cmd+Enter (metaKey) also triggers forward search', async () => {
+    let forwardCalled = false;
+    const fakeSynctex = {
+      async forward() { forwardCalled = true; return null; },
+      async inverse() { return null; }
+    };
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        synctex: fakeSynctex
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    await fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
+    await waitFor(() => expect(forwardCalled).toBe(true));
+  });
+
+  it('inverse search is a no-op when synctex returns null', async () => {
+    const gotoLineCalls: number[] = [];
+    const capturingFactory = (({ parent, doc, onChange }: { parent: HTMLElement; doc: string; onChange: (v: string) => void }) => {
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      return {
+        setDoc: (v: string) => { if (v !== area.value) area.value = v; },
+        setDiagnostics: () => {},
+        gotoLine: (line: number) => gotoLineCalls.push(line),
+        currentLine: () => 1,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
+        destroy: () => area.remove()
+      };
+    }) as unknown as EditorFactory;
+
+    const fakeSynctex = {
+      async forward() { return null; },
+      async inverse() { return null; }
+    };
+
+    render(App, {
+      props: {
+        editor: capturingFactory,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        synctex: fakeSynctex
+      }
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    const canvas = await screen.findByLabelText('Proof');
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // inverse returns null → handleInverseSearch returns early → gotoLine never called
+    await new Promise((r) => setTimeout(r, 50));
+    expect(gotoLineCalls).toHaveLength(0);
+  });
+
+  it('inverse search calls jumpToLine when synctex returns a location', async () => {
+    const gotoLineCalls: number[] = [];
+    const capturingFactory = (({ parent, doc, onChange }: { parent: HTMLElement; doc: string; onChange: (v: string) => void }) => {
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      return {
+        setDoc: (v: string) => { if (v !== area.value) area.value = v; },
+        setDiagnostics: () => {},
+        gotoLine: (line: number) => gotoLineCalls.push(line),
+        currentLine: () => 1,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
+        destroy: () => area.remove()
+      };
+    }) as unknown as EditorFactory;
+
+    const fakeSynctex = {
+      async forward() { return null; },
+      async inverse() { return { file: 'main.tex', line: 7 }; }
+    };
+
+    render(App, {
+      props: {
+        editor: capturingFactory,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        synctex: fakeSynctex
+      }
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    const canvas = await screen.findByLabelText('Proof');
+
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await waitFor(() => expect(gotoLineCalls).toContain(7));
+  });
+});

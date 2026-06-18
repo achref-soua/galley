@@ -4,6 +4,48 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-19
+
+SyncTeX bidirectional navigation — forward search (Ctrl+Enter: cursor → PDF highlight) and inverse search (PDF click → source jump).
+
+### Added
+
+- **SyncTeX engine integration** (`tectonic_engine.rs`): passes `.synctex(true)` to the
+  Tectonic `ProcessingSessionBuilder` and extracts the resulting `.synctex.gz` bytes from
+  the output bundle into `EngineArtifacts::synctex`.
+- **`CompileResult::synctex`** field (`galley-core`) carries `Option<Vec<u8>>` alongside `pdf`
+  and `log`; all call-sites (including `CachedCompiler`) updated.
+- **`galley-intel::synctex`** — a pure-Rust SyncTeX parser implementing the `SyncTexMapper`
+  trait from `galley-core`. Parses the gzip-compressed SyncTeX text format, resolves input
+  file indices, and provides `forward(file, line) → Option<SyncTexBox>` and
+  `inverse(page, x, y) → Option<SyncTexLocation>`.
+- **`SyncTexState`** Tauri managed state (`Mutex<Option<Vec<u8>>>`) caches the raw synctex
+  bytes after each compile; two new Tauri commands (`synctex_forward`, `synctex_inverse`)
+  parse on demand and return lightweight DTOs.
+- **`synctex-backend.ts`** — a `SyncTexBackend` interface with a Tauri implementation
+  (invokes the two commands) and a browser stub (returns `null`) selected via
+  `selectSyncTexBackend`. Injectable in tests.
+- **`pdf.ts` additions** — `SP_PER_PT` constant, `syncTexToCanvas` (sp → canvas pixels,
+  accounts for SCALE), `canvasToPdfPoint` (canvas pixels → PDF user-space with y-flip).
+- **`PreviewPane.svelte`** — SVG overlay (`class="synctex-highlight"`) positioned over the
+  canvas; 2 s CSS fade-out animation; `highlightBox` prop drives it; `oninversesearch`
+  callback fires on canvas click with the PDF coordinates. `handleCanvasClick` scales from
+  CSS to buffer pixels via `getBoundingClientRect`.
+- **`App.svelte`** — wires `handleForwardSearch` (Ctrl+Enter / Cmd+Enter) and
+  `handleInverseSearch` (from PreviewPane callback) using an injected `SyncTexBackend`.
+  Editor reference captured via new `EditorPane.oncreate` callback.
+- **`EditorPane.svelte`** — `oncreate?: (editor: LatexEditor) => void` prop fires after
+  the CodeMirror editor is mounted.
+- **`LatexEditor.currentLine()`** — returns the one-based line of the primary cursor.
+- **`PreviewPrefsStore`** (`settings-store.ts`) — `syncScroll: boolean` preference (default
+  `false`, reserved for v0.3.1 synced scroll).
+- **ADR-0012** (SyncTeX design decisions).
+
+### Coverage
+
+- Rust: 100% region coverage (6 026 regions, 0 missed) across the workspace.
+- TypeScript: 100% lines / branches / functions / statements (484 tests).
+
 ## [0.2.2] - 2026-06-18
 
 Power editing — Vim/Emacs keymaps, spell-check, command palette, project-wide find & replace, and a status bar.

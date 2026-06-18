@@ -155,6 +155,19 @@ describe('createLatexEditor', () => {
     editor.destroy();
     host.remove();
   });
+
+  it('currentLine returns the one-based line number of the cursor position', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({ parent: host, doc: 'line one\nline two\nline three', onChange: vi.fn() });
+    // Default cursor is at the start → line 1.
+    expect(editor.currentLine()).toBe(1);
+    // After gotoLine(2) the cursor moves to line 2.
+    editor.gotoLine(2);
+    expect(editor.currentLine()).toBe(2);
+    editor.destroy();
+    host.remove();
+  });
 });
 
 describe('clampLine', () => {

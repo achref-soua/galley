@@ -178,15 +178,19 @@ pub struct CompileResult {
     pub report: CompileReport,
     /// The produced PDF, or `None` when the build failed.
     pub pdf: Option<Vec<u8>>,
+    /// The `.synctex.gz` bytes, present when the engine produced them alongside
+    /// the PDF. Used for forward/inverse source↔PDF navigation.
+    pub synctex: Option<Vec<u8>>,
 }
 
 impl CompileResult {
-    /// A successful result with `pdf` bytes and `log`.
+    /// A successful result with `pdf` bytes, optional `synctex` bytes, and `log`.
     #[must_use]
-    pub fn succeeded(pdf: Vec<u8>, log: impl Into<String>) -> Self {
+    pub fn succeeded(pdf: Vec<u8>, synctex: Option<Vec<u8>>, log: impl Into<String>) -> Self {
         Self {
             report: CompileReport::succeeded(log),
             pdf: Some(pdf),
+            synctex,
         }
     }
 
@@ -196,6 +200,7 @@ impl CompileResult {
         Self {
             report: CompileReport::failed(log),
             pdf: None,
+            synctex: None,
         }
     }
 }
@@ -288,13 +293,18 @@ mod tests {
 
     #[test]
     fn results_carry_bytes_only_on_success() {
-        let ok = CompileResult::succeeded(vec![1, 2, 3], "done");
+        let ok = CompileResult::succeeded(vec![1, 2, 3], None, "done");
         assert!(ok.report.is_ok());
         assert_eq!(ok.pdf, Some(vec![1, 2, 3]));
+        assert_eq!(ok.synctex, None);
+
+        let with_synctex = CompileResult::succeeded(vec![1], Some(vec![0x1f, 0x8b]), "done");
+        assert_eq!(with_synctex.synctex, Some(vec![0x1f, 0x8b]));
 
         let bad = CompileResult::failed("boom");
         assert!(!bad.report.is_ok());
         assert_eq!(bad.pdf, None);
+        assert_eq!(bad.synctex, None);
     }
 
     #[test]
@@ -331,8 +341,10 @@ mod tests {
         assert_eq!(report.clone(), report);
         assert!(format!("{report:?}").contains("CompileReport"));
 
-        let result = CompileResult::failed("no");
+        let result = CompileResult::succeeded(vec![1], None, "ok");
         assert_eq!(result.clone(), result);
         assert!(format!("{result:?}").contains("CompileResult"));
+        let failed_result = CompileResult::failed("no");
+        assert_ne!(result, failed_result);
     }
 }
