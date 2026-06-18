@@ -476,6 +476,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setDoc: (v) => void (area.value = v),
         setDiagnostics: () => {},
         gotoLine,
+        currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         destroy: () => area.remove()

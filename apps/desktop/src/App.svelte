@@ -9,7 +9,7 @@
   import { selectLanguageBackend, type LanguageBackend } from './lib/language-backend';
   import { mergeDiagnostics } from './lib/diagnostics';
   import { RecentProjectsStore } from './lib/recent-projects';
-  import { CompilePrefsStore, PreviewPrefsStore } from './lib/settings-store';
+  import { CompilePrefsStore } from './lib/settings-store';
   import { EditorPrefsStore, type EditorPrefs, type KeymapMode } from './lib/keymap-prefs';
   import { type SpellChecker, buildSpellChecker } from './lib/spell-check';
   import {
@@ -71,7 +71,6 @@
   const theme = new ThemeController(browserThemeEnv());
   const layoutController = new LayoutController(window.localStorage);
   const prefsStore = new CompilePrefsStore(window.localStorage);
-  const previewPrefsStore = new PreviewPrefsStore(window.localStorage);
   const editorPrefsStore = new EditorPrefsStore(window.localStorage);
   const backend = selectBackend();
   // The injected timer/clock/bell are construction-time configuration, not
