@@ -12,6 +12,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { type DocumentKind, basename, classifyKind } from './file-tree';
 import { type Diagnostic } from './diagnostics';
+import { type SearchQuery, type FileMatches, searchInContent } from './search-content';
 
 /** A project file as the UI holds it. */
 export interface ProjectFile {
@@ -61,7 +62,11 @@ export interface ProjectBackend {
   compile(source: string, rootDocument: string): Promise<CompileOutcome>;
   /** Ask the user to pick a folder, returning its path or `null` if cancelled. */
   pickFolder(title: string): Promise<string | null>;
+  /** Search all `.tex` files in the project for `query`. */
+  searchProject(root: string, query: SearchQuery): Promise<FileMatches[]>;
 }
+
+export type { SearchQuery, FileMatches } from './search-content';
 
 /** The shape of the project as serialized by the Rust command layer. */
 interface RawProject {
@@ -117,6 +122,15 @@ export function tauriProjectBackend(): ProjectBackend {
     async pickFolder(title) {
       const selected = await open({ directory: true, multiple: false, title });
       return typeof selected === 'string' ? selected : null;
+    },
+    async searchProject(root, query) {
+      return invoke<FileMatches[]>('search_project', {
+        root,
+        pattern: query.pattern,
+        caseSensitive: query.caseSensitive,
+        wholeWord: query.wholeWord,
+        useRegex: query.useRegex
+      });
     }
   };
 }
@@ -223,6 +237,19 @@ export function browserProjectBackend(): ProjectBackend {
     },
     async pickFolder() {
       return '/demo/galley-project';
+    },
+    async searchProject(_root, query) {
+      const results: FileMatches[] = [];
+      for (const [path, content] of files.entries()) {
+        if (!path.endsWith('.tex')) {
+          continue;
+        }
+        const matches = searchInContent(content, query);
+        if (matches.length > 0) {
+          results.push({ file: path, matches });
+        }
+      }
+      return results;
     }
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/svelte';
 import App from '../src/App.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
 import type { EditorFactory, LanguageContext } from '../src/lib/editor';
@@ -332,6 +332,134 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     );
   });
 
+  it('opens the command palette with Ctrl+Shift+P and toggles it closed again', async () => {
+    renderApp();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull();
+  });
+
+  it('opens the search panel with Ctrl+Shift+F and toggles it closed again', async () => {
+    renderApp();
+    await fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true });
+    expect(screen.getByLabelText('Search pattern')).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByLabelText('Search pattern')).toBeNull();
+  });
+
+  it('Ctrl+Shift+F closes the palette, and Ctrl+Shift+P closes the search panel', async () => {
+    renderApp();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull();
+    expect(screen.getByLabelText('Search pattern')).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByLabelText('Search pattern')).toBeNull();
+    // Close the palette so no open state leaks into subsequent tests.
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull();
+  });
+
+  it('executes all palette actions', async () => {
+    renderApp();
+
+    async function openPalette() {
+      await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+      return screen.findByRole('dialog', { name: 'Command palette' });
+    }
+
+    // find-in-project opens the search panel
+    await fireEvent.click(within(await openPalette()).getByText('Find in Project'));
+    expect(screen.getByLabelText('Search pattern')).toBeTruthy();
+    await fireEvent.click(screen.getByLabelText('Close search'));
+
+    // toggle-sidebar collapses the sidebar
+    await fireEvent.click(within(await openPalette()).getByText('Toggle Sidebar'));
+    expect(screen.queryByText('No project open yet.')).toBeNull();
+
+    // toggle-preview hides the preview
+    await fireEvent.click(within(await openPalette()).getByText('Toggle Preview'));
+    expect(screen.queryByLabelText('Preview')).toBeNull();
+
+    // open-settings opens the settings dialog
+    await fireEvent.click(within(await openPalette()).getByText('Open Settings'));
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    // save and compile are no-ops without an open project but must not throw
+    await fireEvent.click(within(await openPalette()).getByText('Save'));
+    await fireEvent.click(within(await openPalette()).getByText('Compile'));
+  });
+
+  it('changes the keymap mode via Settings > Editor section', async () => {
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('radio', { name: 'Vim' }));
+    const prefs = JSON.parse(window.localStorage.getItem('galley:editor-prefs')!);
+    expect(prefs.keymapMode).toBe('vim');
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('toggles spell-check via Settings > Editor section', async () => {
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Spell-check' }));
+    const prefs = JSON.parse(window.localStorage.getItem('galley:editor-prefs')!);
+    expect(prefs.spellCheck).toBe(true);
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('returns null from fetchSpellChecker when the aff response is not ok', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: false, text: async () => '' }));
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Spell-check' }));
+    await waitFor(() => {}); // let the $effect and fetch promise settle
+    vi.unstubAllGlobals();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('returns null from fetchSpellChecker when only the dic response is not ok', async () => {
+    let callCount = 0;
+    vi.stubGlobal('fetch', async () => ({ ok: callCount++ === 0, text: async () => '' }));
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Spell-check' }));
+    await waitFor(() => {}); // let the $effect and fetch promise settle
+    vi.unstubAllGlobals();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('builds the spell checker when fetchSpellChecker succeeds', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, text: async () => '' }));
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Spell-check' }));
+    await waitFor(() => {}); // let the $effect and fetch promise settle
+    vi.unstubAllGlobals();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('applies replacements to the active file through the search panel', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true });
+    const patternInput = screen.getByLabelText('Search pattern');
+    await fireEvent.input(patternInput, { target: { value: 'demo' } });
+    await fireEvent.click(screen.getByText('Search'));
+    await screen.findByLabelText('Search results');
+    const replInput = screen.getByLabelText('Replacement text');
+    await fireEvent.input(replInput, { target: { value: 'test' } });
+    await fireEvent.click(screen.getByText('Replace all'));
+    await waitFor(() => expect(textarea.value).toContain('test'));
+  });
+
   it('wires the editor to the language server and the outline', async () => {
     let captured: LanguageContext | undefined;
     const gotoLine = vi.fn();
@@ -348,6 +476,8 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setDoc: (v) => void (area.value = v),
         setDiagnostics: () => {},
         gotoLine,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
         destroy: () => area.remove()
       };
     };
