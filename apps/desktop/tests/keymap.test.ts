@@ -55,23 +55,23 @@ describe('isCommandPaletteShortcut', () => {
 
 describe('isSearchShortcut', () => {
   it('matches Ctrl+Shift+F and ⌘⇧F, case-insensitively', () => {
-    expect(
-      isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: true, key: 'f' })
-    ).toBe(true);
-    expect(
-      isSearchShortcut({ ctrlKey: false, metaKey: true, shiftKey: true, key: 'F' })
-    ).toBe(true);
+    expect(isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: true, key: 'f' })).toBe(
+      true
+    );
+    expect(isSearchShortcut({ ctrlKey: false, metaKey: true, shiftKey: true, key: 'F' })).toBe(
+      true
+    );
   });
 
   it('requires Shift to be held', () => {
-    expect(
-      isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: false, key: 'f' })
-    ).toBe(false);
+    expect(isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: false, key: 'f' })).toBe(
+      false
+    );
   });
 
   it('ignores wrong keys', () => {
-    expect(
-      isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: true, key: 'g' })
-    ).toBe(false);
+    expect(isSearchShortcut({ ctrlKey: true, metaKey: false, shiftKey: true, key: 'g' })).toBe(
+      false
+    );
   });
 });

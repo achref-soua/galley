@@ -55,7 +55,9 @@ describe('EditorPrefsStore', () => {
     const store = new Map<string, string>(Object.entries(initial));
     return {
       getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => { store.set(key, value); },
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
       store
     };
   }

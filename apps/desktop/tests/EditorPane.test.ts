@@ -15,7 +15,9 @@ function spyEditor() {
   };
   const factory: EditorFactory = () => ({
     setDoc: (value) => calls.setDoc.push(value),
-    setDiagnostics: () => { calls.setDiagnostics += 1; },
+    setDiagnostics: () => {
+      calls.setDiagnostics += 1;
+    },
     gotoLine: (line) => calls.gotoLine.push(line),
     setKeymapMode: (mode) => calls.setKeymapMode.push(mode),
     setSpellChecker: (checker) => calls.setSpellChecker.push(checker),

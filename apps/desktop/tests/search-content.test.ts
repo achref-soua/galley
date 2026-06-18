@@ -111,9 +111,9 @@ describe('searchInContent', () => {
   });
 
   it('returns empty for an invalid regex pattern', () => {
-    expect(
-      searchInContent('text', { ...baseQuery, pattern: '[bad', useRegex: true })
-    ).toHaveLength(0);
+    expect(searchInContent('text', { ...baseQuery, pattern: '[bad', useRegex: true })).toHaveLength(
+      0
+    );
   });
 
   it('finds multiple matches on the same line', () => {
@@ -137,15 +137,15 @@ describe('replaceInContent', () => {
 
   it('returns original content for invalid regex', () => {
     const content = 'hello';
-    expect(
-      replaceInContent(content, { ...baseQuery, pattern: '[bad', useRegex: true }, 'x')
-    ).toBe(content);
+    expect(replaceInContent(content, { ...baseQuery, pattern: '[bad', useRegex: true }, 'x')).toBe(
+      content
+    );
   });
 
   it('replaces all occurrences of a literal pattern', () => {
-    expect(
-      replaceInContent('foo foo foo', { ...baseQuery, pattern: 'foo' }, 'bar')
-    ).toBe('bar bar bar');
+    expect(replaceInContent('foo foo foo', { ...baseQuery, pattern: 'foo' }, 'bar')).toBe(
+      'bar bar bar'
+    );
   });
 
   it('replaces using regex back-references when useRegex is true', () => {

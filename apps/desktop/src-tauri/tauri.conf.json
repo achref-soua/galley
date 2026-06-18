@@ -27,10 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb",
-      "appimage"
-    ],
+    "targets": ["deb", "appimage"],
     "category": "DeveloperTool",
     "shortDescription": "A local-first LaTeX studio.",
     "longDescription": "Galley \u2014 a local-first, blazing-fast LaTeX studio with a dual code/visual editor, live preview, and a provider-agnostic AI layer.",

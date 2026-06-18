@@ -473,10 +473,11 @@ export const LATEX_SNIPPETS: Completion[] = [
   snippetCompletion('\\textbf{${text}}', { label: '\\textbf{}', type: 'keyword', boost: 4 }),
   snippetCompletion('\\textit{${text}}', { label: '\\textit{}', type: 'keyword', boost: 4 }),
   snippetCompletion('\\emph{${text}}', { label: '\\emph{}', type: 'keyword', boost: 4 }),
-  snippetCompletion(
-    '\\begin{equation}\n\t${}\n\\end{equation}',
-    { label: '\\begin{equation}', type: 'keyword', boost: 3 }
-  ),
+  snippetCompletion('\\begin{equation}\n\t${}\n\\end{equation}', {
+    label: '\\begin{equation}',
+    type: 'keyword',
+    boost: 3
+  }),
   snippetCompletion(
     '\\begin{figure}[${htbp}]\n\t\\centering\n\t\\includegraphics[width=\\linewidth]{${file}}\n\t\\caption{${caption}}\n\t\\label{fig:${label}}\n\\end{figure}',
     { label: '\\begin{figure}', type: 'keyword', boost: 3 }

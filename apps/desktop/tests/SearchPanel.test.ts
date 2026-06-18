@@ -125,7 +125,9 @@ describe('SearchPanel', () => {
   it('shows an error message when searchProject throws an Error', async () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
-      searchProject: async () => { throw new Error('network error'); }
+      searchProject: async () => {
+        throw new Error('network error');
+      }
     };
     render(SearchPanel, { props: baseProps({ backend }) });
     await fireEvent.input(screen.getByLabelText('Search pattern'), { target: { value: 'foo' } });
@@ -136,7 +138,9 @@ describe('SearchPanel', () => {
   it('stringifies a non-Error thrown by searchProject', async () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
-      searchProject: async () => { throw 'raw string error'; }
+      searchProject: async () => {
+        throw 'raw string error';
+      }
     };
     render(SearchPanel, { props: baseProps({ backend }) });
     await fireEvent.input(screen.getByLabelText('Search pattern'), { target: { value: 'foo' } });
@@ -149,7 +153,10 @@ describe('SearchPanel', () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
       searchProject: async () => [
-        { file: 'other.tex', matches: [{ line: 1, column: 1, lineText: 'hello world', matchStart: 0, matchEnd: 5 }] }
+        {
+          file: 'other.tex',
+          matches: [{ line: 1, column: 1, lineText: 'hello world', matchStart: 0, matchEnd: 5 }]
+        }
       ],
       readDocument: async () => 'hello world',
       saveDocument: async () => {}
@@ -160,7 +167,9 @@ describe('SearchPanel', () => {
     await fireEvent.input(screen.getByLabelText('Search pattern'), { target: { value: 'hello' } });
     await fireEvent.click(screen.getByText('Search'));
     await screen.findByLabelText('Search results');
-    await fireEvent.input(screen.getByLabelText('Replacement text'), { target: { value: 'goodbye' } });
+    await fireEvent.input(screen.getByLabelText('Replacement text'), {
+      target: { value: 'goodbye' }
+    });
     await fireEvent.click(screen.getByText('Replace all'));
     await waitFor(() => expect(onreplace).toHaveBeenCalledWith('other.tex', 'goodbye world'));
   });
@@ -169,9 +178,14 @@ describe('SearchPanel', () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
       searchProject: async () => [
-        { file: 'other.tex', matches: [{ line: 1, column: 1, lineText: 'hello world', matchStart: 0, matchEnd: 5 }] }
+        {
+          file: 'other.tex',
+          matches: [{ line: 1, column: 1, lineText: 'hello world', matchStart: 0, matchEnd: 5 }]
+        }
       ],
-      readDocument: async () => { throw new Error('read failed'); }
+      readDocument: async () => {
+        throw new Error('read failed');
+      }
     };
     render(SearchPanel, {
       props: baseProps({ backend, activePath: 'main.tex', activeContent: 'hello world' })
@@ -187,9 +201,14 @@ describe('SearchPanel', () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
       searchProject: async () => [
-        { file: 'other.tex', matches: [{ line: 1, column: 1, lineText: 'hello', matchStart: 0, matchEnd: 5 }] }
+        {
+          file: 'other.tex',
+          matches: [{ line: 1, column: 1, lineText: 'hello', matchStart: 0, matchEnd: 5 }]
+        }
       ],
-      readDocument: async () => { throw 'raw read error'; }
+      readDocument: async () => {
+        throw 'raw read error';
+      }
     };
     render(SearchPanel, {
       props: baseProps({ backend, activePath: 'main.tex', activeContent: 'hello' })
@@ -206,8 +225,14 @@ describe('SearchPanel', () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
       searchProject: async () => [
-        { file: 'a.tex', matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }] },
-        { file: 'b.tex', matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }] }
+        {
+          file: 'a.tex',
+          matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }]
+        },
+        {
+          file: 'b.tex',
+          matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }]
+        }
       ]
     };
     render(SearchPanel, { props: baseProps({ backend }) });
@@ -220,7 +245,10 @@ describe('SearchPanel', () => {
     const backend: ProjectBackend = {
       ...browserProjectBackend(),
       searchProject: async () => [
-        { file: 'a.tex', matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }] }
+        {
+          file: 'a.tex',
+          matches: [{ line: 1, column: 1, lineText: 'x', matchStart: 0, matchEnd: 1 }]
+        }
       ]
     };
     render(SearchPanel, { props: baseProps({ backend }) });

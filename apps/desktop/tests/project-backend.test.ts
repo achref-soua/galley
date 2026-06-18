@@ -160,7 +160,12 @@ describe('backend selection', () => {
 
 describe('searchProject', () => {
   it('tauriProjectBackend delegates to the search_project Tauri command', async () => {
-    const raw = [{ file: 'main.tex', matches: [{ line: 1, column: 1, lineText: 'hello', matchStart: 0, matchEnd: 5 }] }];
+    const raw = [
+      {
+        file: 'main.tex',
+        matches: [{ line: 1, column: 1, lineText: 'hello', matchStart: 0, matchEnd: 5 }]
+      }
+    ];
     invoke.mockResolvedValueOnce(raw);
     const result = await tauriProjectBackend().searchProject('/p', {
       pattern: 'hello',
@@ -168,7 +173,10 @@ describe('searchProject', () => {
       wholeWord: false,
       useRegex: false
     });
-    expect(invoke).toHaveBeenCalledWith('search_project', expect.objectContaining({ root: '/p', pattern: 'hello' }));
+    expect(invoke).toHaveBeenCalledWith(
+      'search_project',
+      expect.objectContaining({ root: '/p', pattern: 'hello' })
+    );
     expect(result).toEqual(raw);
   });
 
