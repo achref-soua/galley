@@ -11,6 +11,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { type DocumentKind, basename, classifyKind } from './file-tree';
+import { type Diagnostic } from './diagnostics';
 
 /** A project file as the UI holds it. */
 export interface ProjectFile {
@@ -42,6 +43,8 @@ export interface CompileOutcome {
   pdf: Uint8Array | null;
   /** Whether the result was served from the incremental cache (no engine run). */
   cached: boolean;
+  /** Structured diagnostics parsed from the log (errors, warnings, bad boxes). */
+  diagnostics: Diagnostic[];
 }
 
 /** The operations the UI needs to work with projects on disk. */
@@ -74,6 +77,7 @@ interface RawCompile {
   log: string;
   pdf: number[] | null;
   cached: boolean;
+  diagnostics: Diagnostic[];
 }
 
 function fromRaw(raw: RawProject): ProjectSnapshot {
@@ -106,7 +110,8 @@ export function tauriProjectBackend(): ProjectBackend {
         ok: raw.ok,
         log: raw.log,
         pdf: raw.pdf === null ? null : new Uint8Array(raw.pdf),
-        cached: raw.cached
+        cached: raw.cached,
+        diagnostics: raw.diagnostics
       };
     },
     async pickFolder(title) {
@@ -184,13 +189,37 @@ export function browserProjectBackend(): ProjectBackend {
     },
     async compile(source) {
       // A deterministic local proof: a document that closes compiles to the demo
-      // PDF; otherwise it "fails" with a message, so both states can be exercised.
+      // PDF; otherwise it "fails" with a parsed diagnostic, so both states (and
+      // the problems panel) can be exercised without a TeX engine.
       const cached = source === lastSource;
       lastSource = source;
       if (source.includes('\\end{document}')) {
-        return { ok: true, log: 'Compiled locally (demo).', pdf: demoPdfBytes(), cached };
+        return {
+          ok: true,
+          log: 'Compiled locally (demo).',
+          pdf: demoPdfBytes(),
+          cached,
+          diagnostics: []
+        };
       }
-      return { ok: false, log: 'Missing \\end{document}.', pdf: null, cached };
+      const line = source.split('\n').length;
+      const diagnostics: Diagnostic[] = [
+        {
+          severity: 'error',
+          kind: 'latex-error',
+          message: 'Missing \\end{document}',
+          file: null,
+          line,
+          explanation: 'The document never closes. Add \\end{document} at the very end.'
+        }
+      ];
+      return {
+        ok: false,
+        log: '! Emergency stop.\nMissing \\end{document}.',
+        pdf: null,
+        cached,
+        diagnostics
+      };
     },
     async pickFolder() {
       return '/demo/galley-project';

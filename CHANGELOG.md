@@ -4,6 +4,30 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-18
+
+Errors, warnings, and friendly tips — never just a raw log.
+
+### Added
+
+- A **TeX-log parser** in `galley-core` (`diagnostics`) that turns the raw compile log into
+  structured **diagnostics** — errors, warnings, and bad boxes — each with a cleaned message, a
+  severity, a source line where the log gives one, and a **plain-language explanation and fix
+  tip** in Galley's voice. It recognises the common offenders: undefined control sequences,
+  `Missing $`, runaway arguments (an unclosed brace), mismatched environments, missing files,
+  package errors, undefined references and citations, and overfull/underfull boxes.
+- **Inline gutter markers** in the editor — a dot beside each line that has a problem, coloured
+  by the worst severity on that line.
+- A **problems panel** beneath the editor that lists the diagnostics worst-first by line, with a
+  one-line explanation and the raw message, and a **jump-to-source** click that moves the cursor
+  to the offending line.
+- ADR-0008 (compile diagnostics).
+
+### Changed
+
+- The compile result now carries its parsed `diagnostics` alongside the log, so the editor and
+  the problems panel show the structured view while the raw log stays available in the preview.
+
 ## [0.1.1] - 2026-06-17
 
 Fast, incremental compilation — recompiles that feel instant.

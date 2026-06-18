@@ -8,7 +8,10 @@ export type IconName =
   | 'file'
   | 'folder'
   | 'folder-open'
-  | 'compile';
+  | 'compile'
+  | 'diagnostic-error'
+  | 'diagnostic-warning'
+  | 'diagnostic-badbox';
 
 /** Path data for each icon, drawn with `fill: none; stroke: currentColor`. */
 export const ICON_PATHS: Record<IconName, string> = {
@@ -20,5 +23,8 @@ export const ICON_PATHS: Record<IconName, string> = {
   file: 'M7 3h7l4 4v14H7z M14 3v4h4',
   folder: 'M3 6h6l2 2h10v11H3z',
   'folder-open': 'M3 6h6l2 2h10 M3 8h18l-2 11H3z',
-  compile: 'M8 5l11 7-11 7z'
+  compile: 'M8 5l11 7-11 7z',
+  'diagnostic-error': 'M12 3a9 9 0 100 18 9 9 0 000-18 M12 8v5 M12 16h.01',
+  'diagnostic-warning': 'M12 4L2 20h20z M12 10v4 M12 17h.01',
+  'diagnostic-badbox': 'M5 8h14v8H5z M5 12h14'
 };

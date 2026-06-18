@@ -1,5 +1,30 @@
 import { describe, it, expect, vi } from 'vitest';
-import { latexFold, latexFoldService, reportDocChange, createLatexEditor } from '../src/lib/editor';
+import { EditorState, StateEffect, RangeSet } from '@codemirror/state';
+import { GutterMarker } from '@codemirror/view';
+import {
+  latexFold,
+  latexFoldService,
+  reportDocChange,
+  createLatexEditor,
+  clampLine,
+  markerSpecs,
+  diagnosticMarker,
+  diagnosticsField,
+  setDiagnosticsEffect
+} from '../src/lib/editor';
+import type { Diagnostic } from '../src/lib/diagnostics';
+
+function diag(over: Partial<Diagnostic> = {}): Diagnostic {
+  return {
+    severity: 'error',
+    kind: 'latex-error',
+    message: 'boom',
+    file: null,
+    line: 1,
+    explanation: 'why',
+    ...over
+  };
+}
 
 const DOC = `\\documentclass{article}
 \\begin{document}
@@ -100,5 +125,92 @@ describe('createLatexEditor', () => {
     editor.destroy();
     expect(host.querySelector('.cm-editor')).toBeNull();
     host.remove();
+  });
+
+  it('renders diagnostics in the gutter and jumps the cursor to a line', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({ parent: host, doc: 'a\nb\nc\nd', onChange: vi.fn() });
+
+    editor.setDiagnostics([
+      diag({ severity: 'warning', line: 2 }),
+      diag({ severity: 'error', line: 2 }),
+      diag({ severity: 'badbox', line: 99 }),
+      diag({ line: null })
+    ]);
+    // A marker dot is rendered in the diagnostics gutter; line 2's worst
+    // severity is the error, so it carries the error class.
+    const markers = host.querySelectorAll('.cm-diag-marker');
+    expect(markers.length).toBeGreaterThan(0);
+    expect(host.querySelector('.cm-diag-error')).not.toBeNull();
+
+    // Jumping moves the cursor to (the clamped) line start.
+    editor.gotoLine(3);
+    editor.gotoLine(500); // clamped to the last line — must not throw
+
+    editor.destroy();
+    host.remove();
+  });
+});
+
+describe('clampLine', () => {
+  it('clamps a line into the document range', () => {
+    expect(clampLine(5, 10)).toBe(5);
+    expect(clampLine(0, 10)).toBe(1);
+    expect(clampLine(99, 10)).toBe(10);
+  });
+});
+
+describe('markerSpecs', () => {
+  it('keeps the worst severity per line, clamps, drops unlocated, and sorts', () => {
+    const specs = markerSpecs(
+      [
+        diag({ severity: 'warning', line: 3 }),
+        diag({ severity: 'error', line: 3 }), // worse — replaces the warning
+        diag({ severity: 'warning', line: 3 }), // not worse — kept as error
+        diag({ severity: 'badbox', line: 1 }),
+        diag({ severity: 'error', line: 50 }), // clamped to the last line (5)
+        diag({ line: null }) // no line — dropped
+      ],
+      5
+    );
+    expect(specs).toEqual([
+      { line: 1, severity: 'badbox' },
+      { line: 3, severity: 'error' },
+      { line: 5, severity: 'error' }
+    ]);
+  });
+});
+
+describe('diagnosticMarker', () => {
+  it('compares equal only to another marker of the same severity', () => {
+    const error = diagnosticMarker('error');
+    const otherError = diagnosticMarker('error');
+    const warning = diagnosticMarker('warning');
+    // A bare gutter marker of a different type is never equal.
+    const foreign = new (class extends GutterMarker {})();
+
+    expect(error.eq(otherError)).toBe(true);
+    expect(error.eq(warning)).toBe(false);
+    expect(error.eq(foreign)).toBe(false);
+  });
+});
+
+describe('diagnosticsField', () => {
+  it('replaces its markers on the effect, ignores others, and maps across edits', () => {
+    const foreign = StateEffect.define<number>();
+    let state = EditorState.create({ doc: 'one\ntwo', extensions: [diagnosticsField] });
+
+    // A foreign effect leaves the (empty) marker set alone.
+    state = state.update({ effects: foreign.of(1) }).state;
+    expect(state.field(diagnosticsField).size).toBe(0);
+
+    // Our effect replaces the marker set.
+    state = state.update({ effects: setDiagnosticsEffect.of(RangeSet.empty) }).state;
+    expect(state.field(diagnosticsField).size).toBe(0);
+
+    // A plain edit maps the marker set across the change without an effect.
+    state = state.update({ changes: { from: 0, insert: 'x' } }).state;
+    expect(state.field(diagnosticsField).size).toBe(0);
   });
 });

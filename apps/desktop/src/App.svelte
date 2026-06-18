@@ -8,7 +8,7 @@
   import { selectBackend } from './lib/project-backend';
   import { RecentProjectsStore } from './lib/recent-projects';
   import { CompilePrefsStore } from './lib/settings-store';
-  import { createLatexEditor, type EditorFactory } from './lib/editor';
+  import { createLatexEditor, type EditorFactory, type RevealRequest } from './lib/editor';
   import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
   import { windowTimer, type Timer } from './lib/debounce';
   import { systemClock, type Clock } from './lib/timing';
@@ -17,6 +17,7 @@
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import EditorPane from './lib/EditorPane.svelte';
+  import ProblemsPanel from './lib/ProblemsPanel.svelte';
   import PreviewPane from './lib/PreviewPane.svelte';
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
@@ -62,10 +63,18 @@
   let settingsOpen = $state(false);
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
+  let revealTarget = $state<RevealRequest | null>(null);
   projectController.subscribe((state) => (project = state));
   const reduceMotion = prefersReducedMotion();
 
   let resizeBaseline = 0;
+  // A monotonic stamp so clicking the same problem twice still re-jumps.
+  let revealNonce = 0;
+
+  function jumpToLine(line: number) {
+    revealNonce += 1;
+    revealTarget = { line, nonce: revealNonce };
+  }
 
   const sidebarStyle = $derived(`width: ${layout.sidebarWidth}px`);
   const previewStyle = $derived(`width: ${layout.previewWidth}px`);
@@ -183,13 +192,20 @@
     {/if}
 
     <div class="pane editor">
-      <EditorPane
-        documentName={project.activePath}
-        content={project.content}
-        {dirty}
-        onedit={(content) => projectController.edit(content)}
-        createEditor={editor}
-      />
+      <div class="editor-stack">
+        <div class="editor-area">
+          <EditorPane
+            documentName={project.activePath}
+            content={project.content}
+            {dirty}
+            diagnostics={project.compile.diagnostics}
+            reveal={revealTarget}
+            onedit={(content) => projectController.edit(content)}
+            createEditor={editor}
+          />
+        </div>
+        <ProblemsPanel diagnostics={project.compile.diagnostics} onjump={jumpToLine} />
+      </div>
     </div>
 
     {#if !layout.previewCollapsed}
@@ -264,5 +280,17 @@
   .pane.editor {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .editor-stack {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .editor-area {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 </style>

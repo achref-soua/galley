@@ -17,6 +17,8 @@ export function fakeEditorFactory(): EditorFactory {
           area.value = value;
         }
       },
+      setDiagnostics() {},
+      gotoLine() {},
       destroy() {
         area.remove();
       }
