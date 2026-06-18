@@ -302,6 +302,36 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     expect(timer.pending).toBeNull();
   });
 
+  it('shows include paths from the editor content and opens them via the structure panel', async () => {
+    const editor = await openDemoFolder();
+    // Inject an \input directive so the derived includes list populates.
+    await fireEvent.input(editor, {
+      target: {
+        value:
+          '\\documentclass{article}\n\\begin{document}\n' +
+          '\\input{sections/introduction}\n\\end{document}\n'
+      }
+    });
+    // The structure panel resolves the extensionless path and shows the include.
+    const includeBtn = await screen.findByRole('button', { name: 'sections/introduction.tex' });
+    expect(includeBtn).toBeTruthy();
+
+    // Save first to clear the dirty flag — otherwise requestOpenFile raises the
+    // unsaved-changes guard instead of opening the file.
+    await fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    );
+
+    // Now clicking the include opens the file through the project controller.
+    await fireEvent.click(screen.getByRole('button', { name: 'sections/introduction.tex' }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Source') as HTMLTextAreaElement).value).toContain(
+        'Introduction'
+      )
+    );
+  });
+
   it('wires the editor to the language server and the outline', async () => {
     let captured: LanguageContext | undefined;
     const gotoLine = vi.fn();
