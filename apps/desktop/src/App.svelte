@@ -10,6 +10,8 @@
   import { mergeDiagnostics } from './lib/diagnostics';
   import { RecentProjectsStore } from './lib/recent-projects';
   import { CompilePrefsStore } from './lib/settings-store';
+  import { EditorPrefsStore, type EditorPrefs, type KeymapMode } from './lib/keymap-prefs';
+  import { type SpellChecker, buildSpellChecker } from './lib/spell-check';
   import {
     createLatexEditor,
     type EditorFactory,
@@ -20,7 +22,13 @@
   import { windowTimer, type Timer } from './lib/debounce';
   import { systemClock, type Clock } from './lib/timing';
   import { webAudioBell, type Bell } from './lib/bell';
-  import { isCompileShortcut, isSaveShortcut } from './lib/keymap';
+  import {
+    isCompileShortcut,
+    isSaveShortcut,
+    isCommandPaletteShortcut,
+    isSearchShortcut
+  } from './lib/keymap';
+  import { type PaletteAction } from './lib/palette';
   import { parseIncludes, resolveIncludePath } from './lib/include-graph';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
@@ -31,6 +39,9 @@
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
   import UnsavedGuard from './lib/UnsavedGuard.svelte';
+  import CommandPalette from './lib/CommandPalette.svelte';
+  import SearchPanel from './lib/SearchPanel.svelte';
+  import StatusBar from './lib/StatusBar.svelte';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -56,11 +67,13 @@
   const theme = new ThemeController(browserThemeEnv());
   const layoutController = new LayoutController(window.localStorage);
   const prefsStore = new CompilePrefsStore(window.localStorage);
+  const editorPrefsStore = new EditorPrefsStore(window.localStorage);
+  const backend = selectBackend();
   // The injected timer/clock/bell are construction-time configuration, not
   // reactive inputs, so read their initial values untracked.
   const projectController = untrack(
     () =>
-      new ProjectController(selectBackend(), new RecentProjectsStore(window.localStorage), {
+      new ProjectController(backend, new RecentProjectsStore(window.localStorage), {
         timer: compileTimer,
         clock: compileClock,
         bell,
@@ -73,15 +86,53 @@
   let preference = $state<ThemePreference>(theme.preference);
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
+  let paletteOpen = $state(false);
+  let searchOpen = $state(false);
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
+  let editorPrefs = $state<EditorPrefs>(editorPrefsStore.prefs);
+  let spellChecker = $state<SpellChecker | null>(null);
   let revealTarget = $state<RevealRequest | null>(null);
   projectController.subscribe((state) => (project = state));
+  editorPrefsStore.subscribe((prefs) => {
+    editorPrefs = prefs;
+  });
   const reduceMotion = prefersReducedMotion();
+  let searchRoot = $state<string | null>(null);
+  $effect(() => {
+    searchRoot = project.project == null ? null : project.project.root;
+  });
 
   let resizeBaseline = 0;
   // A monotonic stamp so clicking the same problem twice still re-jumps.
   let revealNonce = 0;
+
+  // Load the English dictionary when spell-check is toggled on; release on off.
+  $effect(() => {
+    if (editorPrefs.spellCheck) {
+      void fetchSpellChecker().then((c) => {
+        spellChecker = c;
+      });
+    } else {
+      spellChecker = null;
+    }
+  });
+
+  async function fetchSpellChecker(): Promise<SpellChecker | null> {
+    try {
+      const [affRes, dicRes] = await Promise.all([
+        fetch('/dict/index.aff'),
+        fetch('/dict/index.dic')
+      ]);
+      if (!affRes.ok || !dicRes.ok) {
+        return null;
+      }
+      const [aff, dic] = await Promise.all([affRes.text(), dicRes.text()]);
+      return buildSpellChecker(aff, dic);
+    } catch {
+      return null;
+    }
+  }
 
   function jumpToLine(line: number) {
     revealNonce += 1;
@@ -98,6 +149,55 @@
     document: () => projectController.currentDocument(),
     onDefinition: (location) => void projectController.goToDefinition(location, jumpToLine)
   }));
+
+  // The palette actions: static list of commands the user can fuzzy-search.
+  const paletteActions: PaletteAction[] = [
+    {
+      id: 'save',
+      label: 'Save',
+      shortcut: 'Ctrl+S',
+      run() {
+        void projectController.save();
+      }
+    },
+    {
+      id: 'compile',
+      label: 'Compile',
+      shortcut: 'Ctrl+B',
+      run() {
+        void projectController.compile();
+      }
+    },
+    {
+      id: 'find-in-project',
+      label: 'Find in Project',
+      shortcut: 'Ctrl+Shift+F',
+      run() {
+        searchOpen = true;
+      }
+    },
+    {
+      id: 'toggle-sidebar',
+      label: 'Toggle Sidebar',
+      run() {
+        toggleSidebar();
+      }
+    },
+    {
+      id: 'toggle-preview',
+      label: 'Toggle Preview',
+      run() {
+        togglePreview();
+      }
+    },
+    {
+      id: 'open-settings',
+      label: 'Open Settings',
+      run() {
+        settingsOpen = true;
+      }
+    }
+  ];
 
   const sidebarStyle = $derived(`width: ${layout.sidebarWidth}px`);
   const previewStyle = $derived(`width: ${layout.previewWidth}px`);
@@ -130,6 +230,14 @@
     compilePrefs = prefsStore.prefs;
   }
 
+  function changeKeymapMode(mode: KeymapMode) {
+    editorPrefsStore.setKeymapMode(mode);
+  }
+
+  function changeSpellCheck(enabled: boolean) {
+    editorPrefsStore.setSpellCheck(enabled);
+  }
+
   function onWindowKeydown(event: KeyboardEvent) {
     if (isSaveShortcut(event)) {
       event.preventDefault();
@@ -137,6 +245,14 @@
     } else if (isCompileShortcut(event)) {
       event.preventDefault();
       void projectController.compile();
+    } else if (isCommandPaletteShortcut(event)) {
+      event.preventDefault();
+      paletteOpen = !paletteOpen;
+      searchOpen = false;
+    } else if (isSearchShortcut(event)) {
+      event.preventDefault();
+      searchOpen = !searchOpen;
+      paletteOpen = false;
     }
   }
 
@@ -179,6 +295,12 @@
   }
 
   function endResize() {}
+
+  function handleReplace(path: string, newContent: string) {
+    if (path === project.activePath) {
+      projectController.edit(newContent);
+    }
+  }
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
@@ -231,6 +353,8 @@
             {diagnostics}
             reveal={revealTarget}
             language={editorLanguage}
+            keymapMode={editorPrefs.keymapMode}
+            {spellChecker}
             onedit={(content) => projectController.edit(content)}
             createEditor={editor}
           />
@@ -242,6 +366,17 @@
           onjump={(line) => jumpToLine(line + 1)}
           onopenfile={(path) => void projectController.requestOpenFile(path)}
         />
+        {#if searchOpen}
+          <SearchPanel
+            root={searchRoot}
+            {backend}
+            activeContent={project.content}
+            activePath={project.activePath}
+            onclose={() => (searchOpen = false)}
+            onreplace={handleReplace}
+          />
+        {/if}
+        <StatusBar content={project.content} />
       </div>
     </div>
 
@@ -266,15 +401,23 @@
     {/if}
   </main>
 
+  {#if paletteOpen}
+    <CommandPalette actions={paletteActions} onclose={() => (paletteOpen = false)} />
+  {/if}
+
   {#if settingsOpen}
     <Settings
       themePreference={preference}
       {reduceMotion}
       autoCompile={compilePrefs.autoCompile}
       soundOnSuccess={compilePrefs.soundOnSuccess}
+      keymapMode={editorPrefs.keymapMode}
+      spellCheck={editorPrefs.spellCheck}
       onthemechange={changeTheme}
       onautocompilechange={changeAutoCompile}
       onsoundchange={changeSound}
+      onkeymapchange={changeKeymapMode}
+      onspellcheckchange={changeSpellCheck}
       onclose={() => (settingsOpen = false)}
     />
   {/if}

@@ -9,6 +9,7 @@
 
 use galley_compile::{CachingCompiler, EmbeddedCompiler, TectonicEngine};
 use galley_core::diagnostics::{parse_log, Diagnostic};
+use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
     CompileRequest, CompletionItem, DocumentKind, DocumentSymbol, Engine, LanguageIntelligence,
     Location, Position, TextDocument, VERSION,
@@ -365,6 +366,72 @@ fn lsp_symbols(
     })
 }
 
+/// A single match within a file, as sent to the UI.
+#[derive(Serialize)]
+struct SearchMatchDto {
+    line: u32,
+    column: u32,
+    line_text: String,
+    match_start: usize,
+    match_end: usize,
+}
+
+/// All matches within a single file.
+#[derive(Serialize)]
+struct FileMatchesDto {
+    file: String,
+    matches: Vec<SearchMatchDto>,
+}
+
+/// Search all `.tex` files in the project for `pattern`.
+#[tauri::command]
+fn search_project(
+    root: String,
+    pattern: String,
+    case_sensitive: bool,
+    whole_word: bool,
+    use_regex: bool,
+) -> Vec<FileMatchesDto> {
+    let store = match SafeRoot::open(Path::new(&root)) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let files = match store.list() {
+        Ok(f) => f,
+        Err(_) => return Vec::new(),
+    };
+    let query = SearchQuery {
+        pattern,
+        case_sensitive,
+        whole_word,
+        use_regex,
+    };
+    let mut results = Vec::new();
+    for file in files {
+        if !file.ends_with(".tex") {
+            continue;
+        }
+        let content = match store.read(&file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let matches: Vec<SearchMatchDto> = search_in_content(&content, &query)
+            .into_iter()
+            .map(|m| SearchMatchDto {
+                line: m.line,
+                column: m.column,
+                line_text: m.line_text,
+                match_start: m.match_start,
+                match_end: m.match_end,
+            })
+            .collect();
+        if !matches.is_empty() {
+            results.push(FileMatchesDto { file, matches });
+        }
+    }
+    results
+}
+
 #[tauri::command]
 fn lsp_diagnostics(
     state: State<'_, IntelState>,
@@ -401,6 +468,7 @@ pub fn run() {
             read_document,
             save_document,
             compile_document,
+            search_project,
             lsp_completion,
             lsp_hover,
             lsp_definition,

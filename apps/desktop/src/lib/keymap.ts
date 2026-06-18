@@ -16,3 +16,13 @@ export function isSaveShortcut(event: KeyChord): boolean {
 export function isCompileShortcut(event: KeyChord): boolean {
   return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b';
 }
+
+/** Whether an event is the "command palette" shortcut (Ctrl+Shift+P or ⌘⇧P). */
+export function isCommandPaletteShortcut(event: KeyChord & { shiftKey: boolean }): boolean {
+  return (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p';
+}
+
+/** Whether an event is the "find in project" shortcut (Ctrl+Shift+F or ⌘⇧F). */
+export function isSearchShortcut(event: KeyChord & { shiftKey: boolean }): boolean {
+  return (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f';
+}

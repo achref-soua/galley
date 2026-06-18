@@ -4,6 +4,33 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-06-18
+
+Power editing — Vim/Emacs keymaps, spell-check, command palette, project-wide find & replace, and a status bar.
+
+### Added
+
+- **Vim and Emacs keymaps** via two CodeMirror 6 `Compartment` instances that reconfigure the
+  keymap extension at runtime without rebuilding the editor view. The active mode is persisted
+  in `localStorage` through `EditorPrefsStore` and toggled in Settings → Editor.
+- **Spell-check linter** (`spell-check.ts`) using nspell against a bundled Hunspell English
+  dictionary (`public/dict/`). Three filtering layers suppress false positives on LaTeX source:
+  `maskLatexRegions` blanks commands/arguments/comments; `extractSpellWords` strips punctuation;
+  `isSkippableToken` discards commands, digit-containing tokens, and single characters. The
+  dictionary is fetched lazily and wired into the editor via `setSpellChecker` on the
+  `spellCompartment`.
+- **Command palette** (`CommandPalette.svelte`, Ctrl+Shift+P) — a fuzzy-searchable overlay of
+  all app actions (`palette.ts`), mutually exclusive with the search panel.
+- **Project-wide find and replace** (`SearchPanel.svelte`, Ctrl+Shift+F) — literal, regex,
+  case-sensitive, and whole-word modes; results grouped by file; replace-all patches each file
+  via the backend and keeps the active buffer in sync through `onreplace`. Pure search helpers
+  in `search-content.ts` (`buildRegex`, `searchInContent`, `replaceInContent`).
+- **`galley_core::search`** — Rust full-text search function backing `searchProject` in the
+  browser backend, fully unit-tested.
+- **Status bar** (`StatusBar.svelte`, `count.ts`) — live word and character counts derived from
+  the editor content, displayed below the editor area.
+- ADR-0011 (power editing decisions).
+
 ## [0.2.1] - 2026-06-18
 
 Outline & multi-file navigation — the structure sidebar and root-document compile awareness.

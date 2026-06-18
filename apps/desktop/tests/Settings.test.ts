@@ -7,9 +7,13 @@ const base = {
   reduceMotion: false,
   autoCompile: true,
   soundOnSuccess: false,
+  keymapMode: 'default' as const,
+  spellCheck: false,
   onthemechange: () => {},
   onautocompilechange: () => {},
   onsoundchange: () => {},
+  onkeymapchange: () => {},
+  onspellcheckchange: () => {},
   onclose: () => {}
 };
 
@@ -86,5 +90,43 @@ describe('Settings', () => {
     expect(onclose).not.toHaveBeenCalled();
     await fireEvent.keyDown(window, { key: 'Escape' });
     expect(onclose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Settings — Editor section', () => {
+  it('shows the Editor section with keymap and spell-check controls', async () => {
+    render(Settings, { props: base });
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    expect(screen.getByText('Key-map mode')).toBeTruthy();
+    expect(screen.getByText('Spell-check')).toBeTruthy();
+  });
+
+  it('reflects the current keymapMode', async () => {
+    render(Settings, { props: { ...base, keymapMode: 'vim' as const } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    expect(screen.getByRole('radio', { name: 'Vim' }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('emits onkeymapchange when the keymap mode is changed', async () => {
+    const onkeymapchange = vi.fn();
+    render(Settings, { props: { ...base, onkeymapchange } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    await fireEvent.click(screen.getByRole('radio', { name: 'Vim' }));
+    expect(onkeymapchange).toHaveBeenCalledWith('vim');
+  });
+
+  it('emits onspellcheckchange when the spell-check toggle is clicked', async () => {
+    const onspellcheckchange = vi.fn();
+    render(Settings, { props: { ...base, onspellcheckchange } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    const toggle = screen.getByRole('switch', { name: 'Spell-check' });
+    await fireEvent.click(toggle);
+    expect(onspellcheckchange).toHaveBeenCalledWith(true);
+  });
+
+  it('reflects spellCheck: true in the toggle', async () => {
+    render(Settings, { props: { ...base, spellCheck: true } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
+    expect(screen.getByRole('switch', { name: 'Spell-check' }).getAttribute('aria-checked')).toBe('true');
   });
 });
