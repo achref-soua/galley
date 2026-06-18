@@ -11,6 +11,11 @@
 
   let query = $state('');
   let selectedIndex = $state(0);
+  let inputEl = $state<HTMLInputElement | null>(null);
+
+  $effect(() => {
+    inputEl?.focus();
+  });
 
   const filtered = $derived(filterActions(query, actions));
 
@@ -54,24 +59,25 @@
         placeholder="Type a command…"
         aria-label="Command search"
         bind:value={query}
+        bind:this={inputEl}
         onkeydown={onKeyDown}
-        autofocus
       />
     </div>
     {#if filtered.length > 0}
       <ul class="list" role="listbox">
         {#each filtered as action, i (action.id)}
-          <li
-            class="item"
-            class:selected={i === selectedIndex}
-            role="option"
-            aria-selected={i === selectedIndex}
-            onclick={() => execute(action)}
-          >
-            <span class="label">{action.label}</span>
-            {#if action.shortcut !== undefined}
-              <kbd class="shortcut">{action.shortcut}</kbd>
-            {/if}
+          <li role="option" aria-selected={i === selectedIndex}>
+            <button
+              type="button"
+              class="item"
+              class:selected={i === selectedIndex}
+              onclick={() => execute(action)}
+            >
+              <span class="label">{action.label}</span>
+              {#if action.shortcut !== undefined}
+                <kbd class="shortcut">{action.shortcut}</kbd>
+              {/if}
+            </button>
           </li>
         {/each}
       </ul>
