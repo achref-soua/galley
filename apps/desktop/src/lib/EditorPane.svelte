@@ -7,6 +7,7 @@
   import {
     createLatexEditor,
     type EditorFactory,
+    type LanguageContext,
     type LatexEditor,
     type RevealRequest
   } from './editor';
@@ -18,6 +19,7 @@
     dirty,
     diagnostics = [],
     reveal = null,
+    language = undefined,
     onedit,
     createEditor = createLatexEditor
   }: {
@@ -26,6 +28,7 @@
     dirty: boolean;
     diagnostics?: Diagnostic[];
     reveal?: RevealRequest | null;
+    language?: LanguageContext;
     onedit: (content: string) => void;
     createEditor?: EditorFactory;
   } = $props();
@@ -59,7 +62,8 @@
     const editor: LatexEditor = createEditor({
       parent: node,
       doc: value.content,
-      onChange: (next) => onedit(next)
+      onChange: (next) => onedit(next),
+      language
     });
     editor.setDiagnostics(value.diagnostics);
     let lastNonce = applyReveal(editor, value.reveal, null);

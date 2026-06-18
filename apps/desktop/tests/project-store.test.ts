@@ -9,6 +9,8 @@ import { RecentProjectsStore } from '../src/lib/recent-projects';
 import type { Timer } from '../src/lib/debounce';
 import type { Clock } from '../src/lib/timing';
 import type { Bell } from '../src/lib/bell';
+import type { DocumentSymbol, LanguageBackend } from '../src/lib/language-backend';
+import type { Diagnostic } from '../src/lib/diagnostics';
 
 function snapshot(over: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
   return {
@@ -547,5 +549,133 @@ describe('ProjectController — auto-compile and the bell', () => {
     // Exercises the default timer/clock/bell/preferences in the constructor.
     const plain = new ProjectController(backend, makeRecent());
     expect(plain.state.compile.status).toBe('idle');
+  });
+});
+
+describe('ProjectController — language features', () => {
+  const styleDiag: Diagnostic = {
+    severity: 'warning',
+    kind: 'style',
+    message: 'Command terminated with space.',
+    file: null,
+    line: 2,
+    explanation: 'A style note from ChkTeX.'
+  };
+  const symbol: DocumentSymbol = {
+    name: 'Intro',
+    detail: 'sec:intro',
+    kind: 'section',
+    line: 0,
+    children: []
+  };
+
+  function fakeLanguage(over: Partial<LanguageBackend> = {}): LanguageBackend {
+    return {
+      completion: async () => [],
+      hover: async () => null,
+      definition: async () => null,
+      symbols: async () => [],
+      diagnostics: async () => [],
+      ...over
+    };
+  }
+
+  it('does no language work when no backend is configured', async () => {
+    await controller.openFolder('/p');
+    await controller.compile();
+    expect(controller.state.lspDiagnostics).toEqual([]);
+    expect(controller.state.symbols).toEqual([]);
+  });
+
+  it('refreshes diagnostics and the outline after a compile', async () => {
+    const language = fakeLanguage({
+      diagnostics: async () => [styleDiag],
+      symbols: async () => [symbol]
+    });
+    controller = makeController({ language });
+    await controller.openFolder('/p');
+    await controller.compile();
+    expect(controller.state.lspDiagnostics).toEqual([styleDiag]);
+    expect(controller.state.symbols).toEqual([symbol]);
+  });
+
+  it('treats language failures as best-effort, surfacing no error', async () => {
+    const language = fakeLanguage({
+      diagnostics: async () => {
+        throw new Error('lsp down');
+      }
+    });
+    controller = makeController({ language });
+    await controller.openFolder('/p');
+    await controller.compile();
+    expect(controller.state.lspDiagnostics).toEqual([]);
+    expect(controller.state.error).toBeNull();
+  });
+
+  it('drops a stale language refresh superseded by a newer compile', async () => {
+    const diagA: Diagnostic = { ...styleDiag, message: 'stale A' };
+    const diagB: Diagnostic = { ...styleDiag, message: 'fresh B' };
+    const results = [[diagA], [diagB]];
+    let call = 0;
+    let reentered = false;
+    const language = fakeLanguage({
+      diagnostics: async () => {
+        const mine = results[call] ?? [];
+        call += 1;
+        if (!reentered) {
+          reentered = true;
+          // A newer compile lands while this refresh is in flight.
+          await controller.compile();
+        }
+        return mine;
+      }
+    });
+    controller = makeController({ language });
+    await controller.openFolder('/p');
+    await controller.compile();
+    expect(call).toBe(2);
+    // The first (stale) refresh was dropped; the newer one's result stands.
+    expect(controller.state.lspDiagnostics).toEqual([diagB]);
+  });
+
+  it('clears language results when a new project loads', async () => {
+    const language = fakeLanguage({
+      diagnostics: async () => [styleDiag],
+      symbols: async () => [symbol]
+    });
+    controller = makeController({ language });
+    await controller.openFolder('/p');
+    await controller.compile();
+    expect(controller.state.lspDiagnostics).toHaveLength(1);
+    await controller.openFolder('/q');
+    expect(controller.state.lspDiagnostics).toEqual([]);
+    expect(controller.state.symbols).toEqual([]);
+  });
+
+  it('reports the open document, or null when none is open', async () => {
+    expect(controller.currentDocument()).toBeNull();
+    await controller.openFolder('/p');
+    expect(controller.currentDocument()).toEqual({ root: '/p', rel: 'main.tex' });
+  });
+
+  it('navigates to a definition, opening another file when it differs', async () => {
+    controller = makeController({ language: fakeLanguage() });
+    await controller.openFolder('/p');
+    const reveal = vi.fn();
+    // Same file: reveals the one-based line, stays put.
+    await controller.goToDefinition({ file: 'main.tex', line: 4, character: 0 }, reveal);
+    expect(reveal).toHaveBeenLastCalledWith(5);
+    expect(controller.state.activePath).toBe('main.tex');
+    // Cross-file: resolves the URI to a project path and opens it.
+    await controller.goToDefinition({ file: '/p/intro.tex', line: 2, character: 0 }, reveal);
+    expect(reveal).toHaveBeenLastCalledWith(3);
+    expect(controller.state.activePath).toBe('intro.tex');
+  });
+
+  it('does not reveal when no project is open', async () => {
+    const plain = new ProjectController(backend, makeRecent(), { language: fakeLanguage() });
+    const reveal = vi.fn();
+    await plain.goToDefinition({ file: 'x', line: 0, character: 0 }, reveal);
+    expect(reveal).not.toHaveBeenCalled();
   });
 });

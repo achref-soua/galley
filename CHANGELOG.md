@@ -4,6 +4,36 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-18
+
+Language intelligence — the editor now understands LaTeX, powered by the TexLab language server.
+
+### Added
+
+- A **`LanguageIntelligence` port** in `galley-core` with pure domain types (completion, hover,
+  definition, document symbols), and a **`galley-intel`** crate that implements it over LSP:
+  `Content-Length` framing, JSON-RPC, and result mapping — all pure and fully tested against
+  fixtures captured from a live TexLab.
+- **Completion** as you type — commands, environments, packages, document classes, `\ref` labels,
+  `\cite` keys, and file paths — with kind-aware icons and the right insertion text.
+- **Hovers** with signature/help for the symbol under the cursor.
+- **Go-to-definition** (`F12`) that resolves a `\ref`/`\cite` to its `\label`/bibliography entry,
+  **across files** in a multi-file project, opening the target file when needed.
+- A **document outline** panel listing the structural symbols (sections, environments), with
+  click-to-jump.
+- **Live diagnostics** from the language server (ChkTeX style notes and TexLab's own analysis),
+  **merged** with the compile log's diagnostics into the same gutter and problems panel.
+
+### Notes
+
+- The live `texlab` process sits behind a `real-lsp` Cargo feature (off in the build and coverage
+  gates, mirroring `real-compiler`) and is exercised by `#[ignore]`d integration tests
+  (`just lsp-itest`). `texlab` is a host requirement for the packaged app and the itests; the
+  editor degrades gracefully to no language features when it is absent.
+- The compile build root remains single-file; the language server indexes the whole project, so
+  completion and navigation already work across files. Multi-file **compile** root awareness and
+  the richer structure sidebar are `v0.2.1`. See ADR-0009.
+
 ## [0.1.2] - 2026-06-18
 
 Errors, warnings, and friendly tips — never just a raw log.

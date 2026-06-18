@@ -121,6 +121,32 @@ export function locationLabel(diagnostic: Diagnostic): string {
   return '';
 }
 
+/** The de-duplication key for a diagnostic: severity, line, and message. */
+function diagnosticKey(diagnostic: Diagnostic): string {
+  return `${diagnostic.severity}|${diagnostic.line ?? ''}|${diagnostic.message}`;
+}
+
+/**
+ * Merge the compile log's diagnostics with the language server's (ChkTeX and its
+ * own analysis) into a single list for the gutter and the problems panel. The log
+ * diagnostics come first; a server diagnostic that exactly repeats a log one
+ * (same severity, line, and message) is dropped, so the two sources never
+ * double-report the same problem.
+ */
+export function mergeDiagnostics(log: Diagnostic[], lsp: Diagnostic[]): Diagnostic[] {
+  const seen = new Set<string>();
+  const merged: Diagnostic[] = [];
+  for (const diagnostic of [...log, ...lsp]) {
+    const key = diagnosticKey(diagnostic);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(diagnostic);
+  }
+  return merged;
+}
+
 /** A line value that sorts unlocated diagnostics last. */
 function lineOrder(line: number | null): number {
   return line === null ? Number.MAX_SAFE_INTEGER : line;
