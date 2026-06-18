@@ -25,6 +25,7 @@
     keymapMode = 'default',
     spellChecker = null,
     onedit,
+    oncreate = undefined,
     createEditor = createLatexEditor
   }: {
     documentName: string | null;
@@ -36,6 +37,7 @@
     keymapMode?: KeymapMode;
     spellChecker?: SpellChecker | null;
     onedit: (content: string) => void;
+    oncreate?: (editor: LatexEditor) => void;
     createEditor?: EditorFactory;
   } = $props();
 
@@ -75,6 +77,7 @@
       keymapMode: value.keymapMode,
       spellChecker: value.spellChecker
     });
+    oncreate?.(editor);
     editor.setDiagnostics(value.diagnostics);
     let lastNonce = applyReveal(editor, value.reveal, null);
     return {

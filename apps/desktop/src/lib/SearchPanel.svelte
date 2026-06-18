@@ -1,6 +1,6 @@
 <script lang="ts">
   import { type ProjectBackend, type SearchQuery, type FileMatches } from './project-backend';
-  import { searchInContent, replaceInContent } from './search-content';
+  import { replaceInContent } from './search-content';
 
   let {
     root,

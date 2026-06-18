@@ -14,6 +14,7 @@ pub mod intel;
 pub mod manifest;
 pub mod project;
 pub mod search;
+pub mod synctex;
 pub mod time;
 
 pub use compile::{
@@ -34,6 +35,7 @@ pub use intel::{
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
 pub use project::{project_name_from_path, Project};
 pub use search::{search_in_content, SearchMatch, SearchQuery};
+pub use synctex::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 pub use time::iso8601_utc;
 
 /// Product name, as shown in the UI and the window title.

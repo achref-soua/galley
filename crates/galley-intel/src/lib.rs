@@ -16,10 +16,12 @@
 //! integration tests in `tests/` (run like the Tectonic ones — see docs/adr/0009).
 
 pub mod framing;
+pub mod synctex;
 pub mod mapping;
 pub mod protocol;
 
 pub use framing::{encode, FrameBuffer};
+pub use synctex::SyncTexParser;
 pub use mapping::{map_completion, map_definition, map_diagnostics, map_hover, map_symbols};
 pub use protocol::{notification, parse_incoming, request, response, Correlator, Incoming};
 

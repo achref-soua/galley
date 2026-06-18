@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Logo } from '@galley/ui-kit';
-  import { pdfjsRenderer, type PdfRenderer } from './pdf';
+  import { pdfjsRenderer, syncTexToCanvas, canvasToPdfPoint, type PdfRenderer } from './pdf';
+  import type { SyncTexBox } from './synctex-backend';
   import type { CompileStatus } from './project-store';
   import { compileTiming } from './timing';
 
@@ -13,6 +14,8 @@
     pdf,
     durationMs = null,
     cached = false,
+    highlightBox = null,
+    oninversesearch = undefined,
     createRenderer = pdfjsRenderer
   }: {
     status: CompileStatus;
@@ -20,6 +23,10 @@
     pdf: Uint8Array | null;
     durationMs?: number | null;
     cached?: boolean;
+    /** The SyncTeX rectangle to highlight, set by forward search. */
+    highlightBox?: SyncTexBox | null;
+    /** Called when the user clicks the PDF canvas for inverse search. */
+    oninversesearch?: (page: number, x: number, y: number) => void;
     createRenderer?: () => PdfRenderer;
   } = $props();
 
@@ -33,10 +40,35 @@
 
   let pageCount = $state(0);
   let renderError = $state<string | null>(null);
+  // Canvas buffer dimensions, kept in sync after each render for the SVG viewBox.
+  let canvasWidth = $state(0);
+  let canvasHeight = $state(0);
+  // Whether the highlight is visible (fades out after 2 s).
+  let highlightVisible = $state(false);
+  let fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const statusLabel = $derived(STATUS_LABELS[status]);
   const timingLabel = $derived(compileTiming(durationMs, cached));
   const pageLabel = $derived(pageCount > 0 ? `1 / ${pageCount}` : '— / —');
+
+  // Show the highlight for 2 s whenever `highlightBox` changes.
+  $effect(() => {
+    if (highlightBox !== null) {
+      highlightVisible = true;
+      if (fadeTimer !== null) clearTimeout(fadeTimer);
+      fadeTimer = setTimeout(() => {
+        highlightVisible = false;
+        fadeTimer = null;
+      }, 2000);
+    }
+  });
+
+  // Derive the SVG rect position from the highlight box (in buffer pixels).
+  const svgRect = $derived(
+    highlightBox !== null && highlightVisible
+      ? syncTexToCanvas(highlightBox, SCALE)
+      : null
+  );
 
   // A Svelte action: (re)render the proof whenever the canvas mounts or the PDF
   // bytes change. The renderer is built here (not in the component body) so it
@@ -49,6 +81,8 @@
         .render(data, node, 1, SCALE)
         .then((result) => {
           pageCount = result.pageCount;
+          canvasWidth = node.width;
+          canvasHeight = node.height;
         })
         .catch((error) => {
           const reason = error instanceof Error ? error.message : String(error);
@@ -62,6 +96,20 @@
       }
     };
   }
+
+  function handleCanvasClick(event: MouseEvent) {
+    if (oninversesearch === undefined) return;
+    const canvas = event.currentTarget as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    // Scale from CSS pixels to buffer pixels.
+    const displayScale = rect.width > 0 ? canvas.width / rect.width : 1;
+    const canvasX = (event.clientX - rect.left) * displayScale;
+    const canvasY = (event.clientY - rect.top) * displayScale;
+    const { x, y } = canvasToPdfPoint(canvasX, canvasY, canvas.height, SCALE);
+    oninversesearch(1, x, y);
+  }
+
+
 </script>
 
 <section class="preview" aria-label="Preview">
@@ -73,7 +121,30 @@
   </header>
   <div class="proof">
     {#if pdf !== null}
-      <canvas class="page" use:renderProof={pdf} aria-label="Proof"></canvas>
+      <div class="page-wrap">
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <canvas
+          class="page"
+          use:renderProof={pdf}
+          aria-label="Proof"
+          onclick={handleCanvasClick}
+        ></canvas>
+        {#if svgRect !== null}
+          <svg
+            class="synctex-overlay"
+            viewBox="0 0 {canvasWidth} {canvasHeight}"
+            aria-hidden="true"
+          >
+            <rect
+              x={svgRect.x}
+              y={svgRect.y}
+              width={svgRect.width}
+              height={svgRect.height}
+              class="synctex-highlight"
+            />
+          </svg>
+        {/if}
+      </div>
       <p class="render-error" role="alert">{renderError}</p>
       {#if status === 'failed'}
         <div class="stale" role="status">
@@ -152,11 +223,39 @@
     background: var(--bg-sunken);
   }
 
+  .page-wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+  }
+
   .page {
     max-width: 100%;
     height: auto;
     background: var(--galley-paper);
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+    cursor: crosshair;
+    display: block;
+  }
+
+  .synctex-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .synctex-highlight {
+    fill: var(--ribbon, #a8362b);
+    opacity: 0.35;
+    animation: synctex-fade 2s ease-out forwards;
+  }
+
+  @keyframes synctex-fade {
+    0% { opacity: 0.35; }
+    70% { opacity: 0.35; }
+    100% { opacity: 0; }
   }
 
   .render-error,

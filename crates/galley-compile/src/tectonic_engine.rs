@@ -74,6 +74,7 @@ impl LatexEngine for TectonicEngine {
         let input_name = format!("{}.tex", plan.job_name);
         let pdf_name = format!("{}.pdf", plan.job_name);
         let log_name = format!("{}.log", plan.job_name);
+        let synctex_name = format!("{}.synctex.gz", plan.job_name);
 
         let mut builder = ProcessingSessionBuilder::default();
         builder
@@ -85,6 +86,7 @@ impl LatexEngine for TectonicEngine {
             .keep_logs(true)
             .keep_intermediates(false)
             .print_stdout(false)
+            .synctex(true)
             .output_format(OutputFormat::Pdf)
             .do_not_write_output_files();
 
@@ -99,10 +101,13 @@ impl LatexEngine for TectonicEngine {
             .map(|file| String::from_utf8_lossy(&file.data).into_owned())
             .unwrap_or_default();
 
+        let synctex = files.remove(&synctex_name).map(|f| f.data);
+
         match run {
             Ok(()) => match files.remove(&pdf_name) {
                 Some(file) => Ok(EngineArtifacts {
                     pdf: file.data,
+                    synctex,
                     log,
                 }),
                 None => Err(EngineFailure::new(fallback(

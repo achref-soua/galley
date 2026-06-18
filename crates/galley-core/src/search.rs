@@ -87,13 +87,17 @@ pub fn search_in_content(content: &str, query: &SearchQuery) -> Vec<SearchMatch>
     for m in re.find_iter(content) {
         let offset = m.start();
         // Binary search for the line containing `offset`.
-        let line_idx = line_starts.partition_point(|&s| s <= offset).saturating_sub(1);
+        let line_idx = line_starts
+            .partition_point(|&s| s <= offset)
+            .saturating_sub(1);
         let line_start = line_starts[line_idx];
         let line_end = line_starts
             .get(line_idx + 1)
             .map(|&s| s.saturating_sub(1)) // strip the '\n'
             .unwrap_or(content.len());
-        let line_text = content[line_start..line_end].trim_end_matches('\r').to_owned();
+        let line_text = content[line_start..line_end]
+            .trim_end_matches('\r')
+            .to_owned();
         results.push(SearchMatch {
             line: (line_idx + 1) as u32,
             column: (offset - line_start + 1) as u32,
