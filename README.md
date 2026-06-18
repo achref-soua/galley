@@ -22,12 +22,12 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.1.1`: fast, incremental compilation. On top of
-> the CodeMirror 6 editor, embedded **Tectonic** engine, and **PDF.js** preview, recompiles
-> now feel instant — a warm engine, an in-memory build cache that skips unchanged builds, and
-> a debounced **compile-as-you-type** that keeps the last proof on screen while the next one
-> builds. Friendly error messages, the visual editor, and the AI layer arrive in subsequent
-> versioned releases.
+> **Status — early development.** This is `v0.1.2`: errors, warnings, and friendly tips. On top
+> of the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core, a failed build is no
+> longer a raw log — Galley parses it into structured diagnostics, marks the offending lines in
+> the gutter, and lists them in a problems panel with plain-language explanations and a click
+> that jumps to the source. The visual editor and the AI layer arrive in subsequent versioned
+> releases.
 
 ## Editing & compiling
 
@@ -42,6 +42,18 @@ proof on screen rather than flickering, shows the build time, and can ring a bel
 (off by default — Settings → Compilation). Saving stays a separate, explicit action. Tectonic
 fetches its package bundle once and caches it, so after a single `just prewarm` (or first
 online compile) every later compile works **fully offline**.
+
+## Errors & guidance
+
+When a build fails you get help, not a transcript. Galley parses the TeX log into structured
+**diagnostics** — errors, warnings, and bad boxes — and surfaces them three ways: a coloured
+**dot in the editor gutter** beside each affected line, a **problems panel** under the editor
+that lists them worst-first, and a **click that jumps** the cursor to the offending line. Each
+entry pairs the raw message with a **plain-language explanation and fix tip** in Galley's
+voice — _"A brace was opened and never closed…"_ rather than _"Paragraph ended before…"_. It
+knows the common offenders: undefined commands, `Missing $`, unclosed braces and environments,
+missing files, package errors, undefined references and citations, and overfull/underfull
+boxes. The raw log is still there in the preview when you want it.
 
 ## Projects
 
@@ -82,7 +94,7 @@ native WebView — no bundled browser, no Node runtime in the shipped app.
 galley/
 ├─ apps/desktop/        # Tauri 2 + Svelte 5 app (UI in src/, shell in src-tauri/)
 ├─ crates/
-│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile
+│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile, diagnostics
 │  ├─ galley-compile/   # embedded Tectonic behind the Compiler port
 │  ├─ galley-intel/     # TexLab (LSP) + SyncTeX             (placeholder)
 │  ├─ galley-vcs/       # git2 history / snapshots / revert  (placeholder)

@@ -33,7 +33,14 @@ function deferred<T>() {
 }
 
 function ok(over: Partial<CompileOutcome> = {}): CompileOutcome {
-  return { ok: true, log: 'Output written.', pdf: new Uint8Array([1, 2]), cached: false, ...over };
+  return {
+    ok: true,
+    log: 'Output written.',
+    pdf: new Uint8Array([1, 2]),
+    cached: false,
+    diagnostics: [],
+    ...over
+  };
 }
 
 class FakeBackend implements ProjectBackend {
@@ -368,23 +375,55 @@ describe('ProjectController — compiling', () => {
     expect(controller.state.compile.cached).toBe(true);
   });
 
+  it('carries diagnostics from a successful build (e.g. warnings)', async () => {
+    backend.compileResult = ok({
+      diagnostics: [
+        {
+          severity: 'warning',
+          kind: 'undefined-reference',
+          message: 'Reference undefined',
+          file: null,
+          line: 9,
+          explanation: 'That \\ref points at a missing label.'
+        }
+      ]
+    });
+    await controller.compile();
+    expect(controller.state.compile.status).toBe('ok');
+    expect(controller.state.compile.diagnostics).toHaveLength(1);
+    expect(controller.state.compile.diagnostics[0].severity).toBe('warning');
+  });
+
   it('records a failed compile and, on the first build, shows no proof', async () => {
     backend.compileResult = {
       ok: false,
       log: '! Undefined control sequence.',
       pdf: null,
-      cached: false
+      cached: false,
+      diagnostics: [
+        {
+          severity: 'error',
+          kind: 'undefined-control-sequence',
+          message: 'Undefined control sequence \\foo',
+          file: null,
+          line: 6,
+          explanation: 'That command is not one LaTeX knows.'
+        }
+      ]
     };
     await controller.compile();
     expect(controller.state.compile.status).toBe('failed');
     expect(controller.state.compile.log).toContain('Undefined control sequence');
     expect(controller.state.compile.pdf).toBeNull();
+    // The parsed diagnostics ride along on the compile slice.
+    expect(controller.state.compile.diagnostics).toHaveLength(1);
+    expect(controller.state.compile.diagnostics[0].line).toBe(6);
   });
 
   it('keeps the last good proof on screen when a later build fails', async () => {
     await controller.compile(); // succeeds, proof shown
     expect(controller.state.compile.pdf).toEqual(new Uint8Array([1, 2]));
-    backend.compileResult = { ok: false, log: 'broken', pdf: null, cached: false };
+    backend.compileResult = { ok: false, log: 'broken', pdf: null, cached: false, diagnostics: [] };
     await controller.compile();
     expect(controller.state.compile.status).toBe('failed');
     expect(controller.state.compile.log).toBe('broken');
@@ -499,7 +538,7 @@ describe('ProjectController — auto-compile and the bell', () => {
 
   it('does not ring on a failed build even with sound enabled', async () => {
     controller.setSoundOnSuccess(true);
-    backend.compileResult = { ok: false, log: 'no', pdf: null, cached: false };
+    backend.compileResult = { ok: false, log: 'no', pdf: null, cached: false, diagnostics: [] };
     await controller.compile();
     expect(bell.ding).not.toHaveBeenCalled();
   });

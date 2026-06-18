@@ -6,6 +6,7 @@
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
 pub mod compile;
+pub mod diagnostics;
 pub mod document;
 pub mod hash;
 pub mod manifest;
@@ -16,6 +17,7 @@ pub use compile::{
     tex_job_name, BuildPlan, CompileReport, CompileRequest, CompileResult, CompileStatus, Compiler,
     Engine, PlanError,
 };
+pub use diagnostics::{parse_log, Diagnostic, DiagnosticKind, Severity};
 pub use document::{
     basename, classify, is_main_named, looks_like_root, select_root_document, Document,
     DocumentKind, RootCandidate,

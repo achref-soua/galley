@@ -1,7 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import EditorPane from '../src/lib/EditorPane.svelte';
+import type { EditorFactory } from '../src/lib/editor';
 import { fakeEditorFactory } from './setup';
+
+/** An editor factory that records the calls the pane makes against it. */
+function spyEditor() {
+  const calls = { setDoc: [] as string[], setDiagnostics: 0, gotoLine: [] as number[] };
+  const factory: EditorFactory = () => ({
+    setDoc: (value) => calls.setDoc.push(value),
+    setDiagnostics: () => {
+      calls.setDiagnostics += 1;
+    },
+    gotoLine: (line) => calls.gotoLine.push(line),
+    destroy: () => {}
+  });
+  return { factory, calls };
+}
 
 describe('EditorPane', () => {
   it('shows the empty state when no document is open', () => {
@@ -69,5 +84,31 @@ describe('EditorPane', () => {
 
     unmount();
     expect(screen.queryByLabelText('Source')).toBeNull();
+  });
+
+  it('pushes diagnostics into the editor and jumps to a freshly-requested line', async () => {
+    const { factory, calls } = spyEditor();
+    const base = {
+      documentName: 'main.tex',
+      content: 'a\nb\nc',
+      dirty: false,
+      diagnostics: [],
+      onedit: () => {},
+      createEditor: factory
+    };
+    const { rerender } = render(EditorPane, { props: { ...base, reveal: null } });
+
+    // Mounting set the diagnostics once; with no reveal there is no jump.
+    expect(calls.setDiagnostics).toBe(1);
+    expect(calls.gotoLine).toEqual([]);
+
+    // A reveal request with a new nonce jumps to its line.
+    await rerender({ ...base, reveal: { line: 2, nonce: 1 } });
+    expect(calls.gotoLine).toEqual([2]);
+
+    // The same nonce does not jump again, even as other props change.
+    await rerender({ ...base, content: 'a\nb\nc\nd', reveal: { line: 2, nonce: 1 } });
+    expect(calls.gotoLine).toEqual([2]);
+    expect(calls.setDoc).toContain('a\nb\nc\nd');
   });
 });
