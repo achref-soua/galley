@@ -8,6 +8,7 @@
 //! logic and is excluded from coverage (see `docs/adr/0002`).
 
 use galley_compile::{CachingCompiler, EmbeddedCompiler, TectonicEngine};
+use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::{CompileRequest, DocumentKind, Engine, VERSION};
 use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
 use galley_security::SafeRoot;
@@ -97,6 +98,30 @@ fn save_document(root: String, rel: String, contents: String) -> Result<(), Stri
     store.write(&rel, &contents).map_err(|err| err.to_string())
 }
 
+/// A structured diagnostic as sent to the UI.
+#[derive(Serialize)]
+struct DiagnosticDto {
+    severity: &'static str,
+    kind: &'static str,
+    message: String,
+    file: Option<String>,
+    line: Option<u32>,
+    explanation: String,
+}
+
+impl DiagnosticDto {
+    fn from_diagnostic(diagnostic: Diagnostic) -> Self {
+        Self {
+            severity: diagnostic.severity.label(),
+            kind: diagnostic.kind.label(),
+            message: diagnostic.message,
+            file: diagnostic.file,
+            line: diagnostic.line,
+            explanation: diagnostic.explanation,
+        }
+    }
+}
+
 /// The outcome of a compile as sent to the UI.
 #[derive(Serialize)]
 struct CompileDto {
@@ -104,6 +129,7 @@ struct CompileDto {
     log: String,
     pdf: Option<Vec<u8>>,
     cached: bool,
+    diagnostics: Vec<DiagnosticDto>,
 }
 
 /// The app's one warm, long-lived compiler.
@@ -133,11 +159,16 @@ fn compile_document(
     let request = CompileRequest::new(root_document, Engine::Tectonic);
     let mut compiler = state.0.lock().expect("the compiler mutex was poisoned");
     let outcome = compiler.compile(&request, &source);
+    let diagnostics = parse_log(&outcome.result.report.log)
+        .into_iter()
+        .map(DiagnosticDto::from_diagnostic)
+        .collect();
     CompileDto {
         ok: outcome.result.report.is_ok(),
         log: outcome.result.report.log,
         pdf: outcome.result.pdf,
         cached: outcome.cached,
+        diagnostics,
     }
 }
 

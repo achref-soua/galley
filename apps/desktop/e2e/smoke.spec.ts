@@ -60,6 +60,27 @@ test('compile the open document and see the proof in the preview', async ({ page
   await expect(page.getByText('1 / 1')).toBeVisible();
 });
 
+test('a failed build lists a friendly problem you can jump to', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a folder…' }).click();
+
+  // Replace the document with one that never closes, so the build fails.
+  const editor = page.getByLabel('LaTeX source');
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('\\documentclass{article}\\begin{document}oops');
+  await page.getByRole('button', { name: 'Compile' }).click();
+
+  // The problems panel surfaces a plain-language diagnostic, not a raw log.
+  const problem = page.getByRole('button', { name: /document never closes/ });
+  await expect(problem).toBeVisible();
+  await expect(page.getByText('1 error')).toBeVisible();
+
+  // Jumping to the problem keeps the editor in view (the cursor moves there).
+  await problem.click();
+  await expect(editor).toBeVisible();
+});
+
 test('editing auto-compiles and shows a fresh proof', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open a folder…' }).click();

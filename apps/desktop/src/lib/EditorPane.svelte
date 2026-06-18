@@ -4,33 +4,70 @@
   // mounted over the canonical `.tex` source — the single source of truth. The
   // editor is built through an injectable factory so the component can be driven
   // with a fake in tests; the real factory is covered in `editor.test.ts`.
-  import { createLatexEditor, type EditorFactory, type LatexEditor } from './editor';
+  import {
+    createLatexEditor,
+    type EditorFactory,
+    type LatexEditor,
+    type RevealRequest
+  } from './editor';
+  import { type Diagnostic } from './diagnostics';
 
   let {
     documentName,
     content,
     dirty,
+    diagnostics = [],
+    reveal = null,
     onedit,
     createEditor = createLatexEditor
   }: {
     documentName: string | null;
     content: string;
     dirty: boolean;
+    diagnostics?: Diagnostic[];
+    reveal?: RevealRequest | null;
     onedit: (content: string) => void;
     createEditor?: EditorFactory;
   } = $props();
 
+  /** Everything the editor surface reacts to, bundled for the mount action. */
+  interface EditorInput {
+    content: string;
+    diagnostics: Diagnostic[];
+    reveal: RevealRequest | null;
+  }
+
+  // Jump to a freshly-requested line, returning the nonce now acted on so a
+  // repeat with the same nonce does not jump again.
+  function applyReveal(
+    editor: LatexEditor,
+    request: RevealRequest | null,
+    lastNonce: number | null
+  ): number | null {
+    if (request !== null && request.nonce !== lastNonce) {
+      editor.gotoLine(request.line);
+      return request.nonce;
+    }
+    return lastNonce;
+  }
+
+  const input = $derived<EditorInput>({ content, diagnostics, reveal });
+
   // A Svelte action: build the editor when the surface mounts, push external
-  // content changes in, and tear it down on unmount.
-  function mountEditor(node: HTMLElement, value: string) {
+  // content, diagnostics, and jump requests in, and tear it down on unmount.
+  function mountEditor(node: HTMLElement, value: EditorInput) {
     const editor: LatexEditor = createEditor({
       parent: node,
-      doc: value,
+      doc: value.content,
       onChange: (next) => onedit(next)
     });
+    editor.setDiagnostics(value.diagnostics);
+    let lastNonce = applyReveal(editor, value.reveal, null);
     return {
-      update(next: string) {
-        editor.setDoc(next);
+      update(next: EditorInput) {
+        editor.setDoc(next.content);
+        editor.setDiagnostics(next.diagnostics);
+        lastNonce = applyReveal(editor, next.reveal, lastNonce);
       },
       destroy() {
         editor.destroy();
@@ -51,7 +88,7 @@
         {documentName}{#if dirty}<span class="dot" aria-label="unsaved changes">•</span>{/if}
       </span>
     </header>
-    <div class="surface" use:mountEditor={content}></div>
+    <div class="surface" use:mountEditor={input}></div>
   {/if}
 </section>
 

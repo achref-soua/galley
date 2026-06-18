@@ -8,6 +8,7 @@
  */
 
 import { type ProjectBackend, type ProjectSnapshot } from './project-backend';
+import { type Diagnostic } from './diagnostics';
 import { type RecentProject, RecentProjectsStore } from './recent-projects';
 import { basename } from './file-tree';
 import { type Timer, windowTimer } from './debounce';
@@ -63,6 +64,8 @@ export interface CompileState {
   durationMs: number | null;
   /** Whether the last completed build was served from the cache. */
   cached: boolean;
+  /** Structured diagnostics from the last completed build. */
+  diagnostics: Diagnostic[];
 }
 
 /** The starting compile state — nothing proofed yet. */
@@ -71,7 +74,8 @@ const IDLE_COMPILE: CompileState = {
   log: '',
   pdf: null,
   durationMs: null,
-  cached: false
+  cached: false,
+  diagnostics: []
 };
 
 /** How long to wait after the last edit before an auto-compile fires. */
@@ -314,10 +318,23 @@ export class ProjectController {
       const outcome = await this.#backend.compile(this.#state.content, path);
       const durationMs = this.#clock.now() - start;
       next = outcome.ok
-        ? { status: 'ok', log: outcome.log, pdf: outcome.pdf, durationMs, cached: outcome.cached }
-        : // A failed build keeps the last good proof on screen; only the status,
-          // log and timing change.
-          { status: 'failed', log: outcome.log, durationMs, cached: outcome.cached };
+        ? {
+            status: 'ok',
+            log: outcome.log,
+            pdf: outcome.pdf,
+            durationMs,
+            cached: outcome.cached,
+            diagnostics: outcome.diagnostics
+          }
+        : // A failed build keeps the last good proof on screen; the status, log,
+          // timing and diagnostics change.
+          {
+            status: 'failed',
+            log: outcome.log,
+            durationMs,
+            cached: outcome.cached,
+            diagnostics: outcome.diagnostics
+          };
     } catch (err) {
       next = { error: err instanceof Error ? err.message : String(err) };
     }
