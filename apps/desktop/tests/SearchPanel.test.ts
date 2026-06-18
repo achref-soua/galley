@@ -5,15 +5,6 @@ import { browserProjectBackend, type ProjectBackend } from '../src/lib/project-b
 
 const ROOT = '/project';
 
-function makeBackend(files: Record<string, string> = {}) {
-  const b = browserProjectBackend();
-  for (const [path, content] of Object.entries(files)) {
-    (b as ReturnType<typeof browserProjectBackend> & { _files: Map<string, string> })['_files']
-      ?.set(path, content);
-  }
-  return b;
-}
-
 /** Build a backend that has 'main.tex' with the given content, pre-seeded. */
 async function seedBackend(content: string) {
   const b = browserProjectBackend();
@@ -243,7 +234,7 @@ describe('SearchPanel', () => {
       props: baseProps({ activeContent: 'foo foo', activePath: 'main.tex', root: '/p' })
     });
     const backend = await seedBackend('foo foo');
-    const { rerender } = render(SearchPanel, {
+    render(SearchPanel, {
       props: baseProps({
         backend,
         activeContent: 'foo foo',

@@ -105,6 +105,10 @@ class FakeBackend implements ProjectBackend {
   async pickFolder(): Promise<string | null> {
     return this.pick;
   }
+
+  async searchProject(): Promise<import('../src/lib/project-backend').FileMatches[]> {
+    return [];
+  }
 }
 
 /** A debounce timer a test fires by hand. */
