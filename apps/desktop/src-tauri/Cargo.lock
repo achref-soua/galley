@@ -1373,7 +1373,7 @@ dependencies = [
 
 [[package]]
 name = "galley-compile"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "galley-core",
  "tectonic",
@@ -1381,15 +1381,16 @@ dependencies = [
 
 [[package]]
 name = "galley-core"
-version = "0.1.2"
+version = "0.2.0"
 
 [[package]]
 name = "galley-desktop"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "galley-compile",
  "galley-core",
  "galley-import",
+ "galley-intel",
  "galley-security",
  "serde",
  "tauri",
@@ -1399,15 +1400,23 @@ dependencies = [
 
 [[package]]
 name = "galley-import"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "galley-core",
  "galley-security",
 ]
 
 [[package]]
+name = "galley-intel"
+version = "0.2.0"
+dependencies = [
+ "galley-core",
+ "serde_json",
+]
+
+[[package]]
 name = "galley-security"
-version = "0.1.2"
+version = "0.2.0"
 
 [[package]]
 name = "gdk"

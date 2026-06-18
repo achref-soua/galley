@@ -13,3 +13,4 @@ codebase stays legible.
 | 0006 | Embedded Tectonic compilation and the PDF.js preview | Accepted |
 | 0007 | Fast, incremental compilation                        | Accepted |
 | 0008 | Compile diagnostics from the TeX log                 | Accepted |
+| 0009 | Language intelligence via TexLab (LSP)               | Accepted |
