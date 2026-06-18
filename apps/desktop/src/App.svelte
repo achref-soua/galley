@@ -95,10 +95,13 @@
   let searchOpen = $state(false);
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
+  let previewPrefs = $state(previewPrefsStore.prefs);
   let editorPrefs = $state<EditorPrefs>(editorPrefsStore.prefs);
   let spellChecker = $state<SpellChecker | null>(null);
   let revealTarget = $state<RevealRequest | null>(null);
+  let editorScrollFraction = $state<number | undefined>(undefined);
   projectController.subscribe((state) => (project = state));
+  previewPrefsStore.subscribe((p) => { previewPrefs = p; });
   editorPrefsStore.subscribe((prefs) => {
     editorPrefs = prefs;
   });
@@ -235,6 +238,15 @@
   );
   // Resolved include paths from the live editor content, shown in the structure panel.
   const includes = $derived(parseIncludes(project.content).map(resolveIncludePath));
+
+  function handleEditorScroll(frac: number) {
+    editorScrollFraction = frac;
+  }
+
+  function changeSyncScroll(enabled: boolean) {
+    previewPrefsStore.setSyncScroll(enabled);
+    previewPrefs = previewPrefsStore.prefs;
+  }
 
   function changeTheme(pref: ThemePreference) {
     theme.setPreference(pref);
@@ -383,6 +395,7 @@
             {spellChecker}
             onedit={(content) => projectController.edit(content)}
             oncreate={(e) => { editorRef = e; }}
+            oneditorscroll={handleEditorScroll}
             createEditor={editor}
           />
         </div>
@@ -423,6 +436,8 @@
           durationMs={project.compile.durationMs}
           cached={project.compile.cached}
           {highlightBox}
+          syncScroll={previewPrefs.syncScroll}
+          {editorScrollFraction}
           oninversesearch={handleInverseSearch}
           {createRenderer}
         />
@@ -442,11 +457,13 @@
       soundOnSuccess={compilePrefs.soundOnSuccess}
       keymapMode={editorPrefs.keymapMode}
       spellCheck={editorPrefs.spellCheck}
+      syncScroll={previewPrefs.syncScroll}
       onthemechange={changeTheme}
       onautocompilechange={changeAutoCompile}
       onsoundchange={changeSound}
       onkeymapchange={changeKeymapMode}
       onspellcheckchange={changeSpellCheck}
+      onsyncscrollchange={changeSyncScroll}
       onclose={() => (settingsOpen = false)}
     />
   {/if}

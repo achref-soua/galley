@@ -17,11 +17,13 @@
     soundOnSuccess,
     keymapMode,
     spellCheck,
+    syncScroll,
     onthemechange,
     onautocompilechange,
     onsoundchange,
     onkeymapchange,
     onspellcheckchange,
+    onsyncscrollchange,
     onclose
   }: {
     themePreference: ThemePreference;
@@ -30,21 +32,24 @@
     soundOnSuccess: boolean;
     keymapMode: KeymapMode;
     spellCheck: boolean;
+    syncScroll: boolean;
     onthemechange: (pref: ThemePreference) => void;
     onautocompilechange: (enabled: boolean) => void;
     onsoundchange: (enabled: boolean) => void;
     onkeymapchange: (mode: KeymapMode) => void;
     onspellcheckchange: (enabled: boolean) => void;
+    onsyncscrollchange: (enabled: boolean) => void;
     onclose: () => void;
   } = $props();
 
-  type Section = 'appearance' | 'editor' | 'compilation' | 'about';
+  type Section = 'appearance' | 'editor' | 'compilation' | 'preview' | 'about';
   let active = $state<Section>('appearance');
 
   const sections: { id: Section; label: string }[] = [
     { id: 'appearance', label: 'Appearance' },
     { id: 'editor', label: 'Editor' },
     { id: 'compilation', label: 'Compilation' },
+    { id: 'preview', label: 'Preview' },
     { id: 'about', label: 'About' }
   ];
 
@@ -139,6 +144,16 @@
               label="Bell on success"
               checked={soundOnSuccess}
               onchange={(checked) => onsoundchange(checked)}
+            />
+          </p>
+        {:else if active === 'preview'}
+          <h2>Preview</h2>
+          <p class="row">
+            <span class="label">Sync scroll</span>
+            <Toggle
+              label="Sync scroll"
+              checked={syncScroll}
+              onchange={(checked) => onsyncscrollchange(checked)}
             />
           </p>
         {:else}

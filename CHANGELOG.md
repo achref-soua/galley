@@ -4,6 +4,40 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-06-19
+
+Preview polish — page navigation, zoom selector, synced scroll, and scroll-fraction propagation from the editor.
+
+### Added
+
+- **Page navigation** in the viewer bar: Previous/Next buttons step through multi-page PDFs;
+  buttons are disabled at the first and last pages. `currentPage` resets to 1 whenever a new
+  PDF arrives (e.g., after a recompile).
+- **Zoom selector** in the viewer bar: a `<select>` offering 100% / 125% / 150% / 200%;
+  defaults to 150%. Changing zoom re-renders the current page at the new scale immediately.
+- **Synced scroll** — editor → PDF pane: an `onscroll` callback in `createLatexEditor`
+  (via `EditorView.domEventHandlers`) fires with a 0–1 scroll fraction on every CM6 scroll
+  event; `EditorPane` forwards it via the `oneditorscroll` prop; `App.svelte` stores
+  `editorScrollFraction`; `PreviewPane` uses a `syncScroller` Svelte action to set
+  `scrollTop` proportionally when `syncScroll` is enabled.
+- **Settings → Preview section** with a "Sync scroll" `Toggle`; preference persisted in
+  `galley:preview-prefs` via `PreviewPrefsStore` (defined in v0.3.0, now wired to the UI).
+- `PreviewPrefsStore` wired into `App.svelte` (`changeSyncScroll`, `previewPrefs` reactive
+  state, subscriber); `syncScroll` and `editorScrollFraction` threaded through to
+  `PreviewPane`; `syncScroll` threaded through to `Settings`.
+
+### Changed
+
+- `renderProof` Svelte action now accepts a `ProofInput { bytes, page, scale }` bundle
+  instead of raw bytes, so page and zoom changes trigger the action's `update` callback.
+- `handleCanvasClick` passes `currentPage` (not hardcoded `1`) to `oninversesearch`.
+- `pageLabel` derived now reflects `currentPage` instead of always showing `1`.
+
+### Internal
+
+- `SyncTexBox` highlight SVG overlay now uses `zoomScale` variable instead of the removed
+  `SCALE` constant.
+
 ## [0.3.0] - 2026-06-19
 
 SyncTeX bidirectional navigation — forward search (Ctrl+Enter: cursor → PDF highlight) and inverse search (PDF click → source jump).

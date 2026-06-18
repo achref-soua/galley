@@ -19,6 +19,7 @@ function spyEditor() {
       calls.setDiagnostics += 1;
     },
     gotoLine: (line) => calls.gotoLine.push(line),
+    currentLine: () => 1,
     setKeymapMode: (mode) => calls.setKeymapMode.push(mode),
     setSpellChecker: (checker) => calls.setSpellChecker.push(checker),
     destroy: () => {}
