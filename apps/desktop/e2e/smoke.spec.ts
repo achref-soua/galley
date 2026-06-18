@@ -92,3 +92,25 @@ test('editing auto-compiles and shows a fresh proof', async ({ page }) => {
   // No Compile click — the debounced auto-compile produces the proof on its own.
   await expect(page.getByLabel('Proof')).toBeVisible();
 });
+
+test('the language server drives completion and the document outline', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open a folder…' }).click();
+
+  const editor = page.getByLabel('LaTeX source');
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('\\se');
+
+  // The autocomplete popup offers context-aware command completions.
+  await expect(page.getByRole('option', { name: /section/ }).first()).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Compiling populates the outline from the language server; a symbol jumps.
+  await page.getByRole('button', { name: 'Compile' }).click();
+  const symbol = page.getByRole('button', { name: /Introduction/ });
+  await expect(symbol).toBeVisible();
+  await symbol.click();
+  await expect(editor).toBeVisible();
+});

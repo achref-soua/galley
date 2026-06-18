@@ -8,5 +8,20 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Links the live TexLab client (spawns the `texlab` process, talks LSP over its
+# stdio). Off by default so `cargo test`/`clippy`/`llvm-cov` over the workspace
+# never need a TeX language server; the desktop shell turns it on. The protocol,
+# framing and mapping are pure and always built — only the process lives here.
+# Mirrors `galley-compile`'s `real-compiler`. See docs/adr/0009.
+real-lsp = []
+
+[dependencies]
+galley-core = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [lints]
 workspace = true

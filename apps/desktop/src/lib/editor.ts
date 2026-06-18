@@ -10,15 +10,30 @@
  * fake in tests just like the project backend.
  */
 
-import { EditorState, StateEffect, StateField, RangeSet, type Extension } from '@codemirror/state';
+import {
+  EditorState,
+  StateEffect,
+  StateField,
+  RangeSet,
+  type Extension,
+  type Text
+} from '@codemirror/state';
 import {
   EditorView,
   GutterMarker,
   gutter,
+  hoverTooltip,
   keymap,
   lineNumbers,
-  highlightActiveLine
+  highlightActiveLine,
+  type Tooltip
 } from '@codemirror/view';
+import {
+  autocompletion,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult
+} from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
   HighlightStyle,
@@ -34,6 +49,12 @@ import {
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { tags } from '@lezer/highlight';
 import { type Diagnostic, type Severity, severityRank } from './diagnostics';
+import {
+  type CompletionItem,
+  type CompletionKind,
+  type DefinitionLocation,
+  type LanguageBackend
+} from './language-backend';
 
 /**
  * Find the fold range for a LaTeX environment that opens on the line spanning
@@ -250,8 +271,185 @@ function revealLine(view: EditorView, line: number): void {
   view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
 }
 
+/**
+ * The editor's bridge to the language server: which document is open, the backend
+ * to ask, and what to do when a definition resolves. The editor speaks LSP's
+ * zero-based positions; conversion to Galley's one-based lines happens in the UI.
+ */
+export interface LanguageContext {
+  /** The language server backend. */
+  backend: LanguageBackend;
+  /** The open document's project root and relative path, or `null` when none. */
+  document(): { root: string; rel: string } | null;
+  /** Called with a resolved definition target so the UI can navigate to it. */
+  onDefinition(location: DefinitionLocation): void;
+}
+
+/** Whether `char` is part of a LaTeX command name or reference/citation key. */
+function isWordChar(char: string): boolean {
+  return /[\w@:.\-!]/.test(char);
+}
+
+/**
+ * The offset where the token under completion begins: scan back over command/key
+ * characters from `pos`. This is where an accepted completion replaces from.
+ */
+export function completionStart(text: string, pos: number): number {
+  let from = pos;
+  while (from > 0 && isWordChar(text[from - 1])) {
+    from -= 1;
+  }
+  return from;
+}
+
+/** Convert a document offset to a zero-based LSP position. */
+export function offsetToPosition(doc: Text, offset: number): { line: number; character: number } {
+  const line = doc.lineAt(offset);
+  return { line: line.number - 1, character: offset - line.from };
+}
+
+/** The CodeMirror completion `type` (its icon) for a Galley completion kind. */
+export function completionType(kind: CompletionKind): string {
+  switch (kind) {
+    case 'command':
+      return 'function';
+    case 'environment':
+      return 'class';
+    case 'package':
+      return 'namespace';
+    case 'class':
+      return 'type';
+    case 'reference':
+      return 'variable';
+    case 'citation':
+      return 'variable';
+    case 'file':
+      return 'text';
+    case 'folder':
+      return 'text';
+    case 'snippet':
+      return 'keyword';
+    case 'other':
+      return 'text';
+  }
+}
+
+/** Map language-server completion items to CodeMirror completions. */
+export function toCmCompletions(items: CompletionItem[]): Completion[] {
+  return items.map((item) => ({
+    label: item.label,
+    detail: item.detail ?? undefined,
+    info: item.documentation ?? undefined,
+    type: completionType(item.kind),
+    apply: item.insertText ?? item.label
+  }));
+}
+
+/** A CodeMirror completion source backed by the language server. */
+export function latexCompletionSource(
+  context: LanguageContext
+): (cc: CompletionContext) => Promise<CompletionResult | null> {
+  return async (cc) => {
+    const target = context.document();
+    if (target === null) {
+      return null;
+    }
+    const source = cc.state.doc.toString();
+    const from = completionStart(source, cc.pos);
+    // With nothing typed and no explicit request, do not pop up unprompted.
+    if (from === cc.pos && !cc.explicit) {
+      return null;
+    }
+    const position = offsetToPosition(cc.state.doc, cc.pos);
+    const items = await context.backend.completion(
+      target.root,
+      target.rel,
+      source,
+      position.line,
+      position.character
+    );
+    if (items.length === 0) {
+      return null;
+    }
+    return { from, options: toCmCompletions(items) };
+  };
+}
+
+/** Build the DOM for a hover tooltip carrying `text`. */
+function hoverTooltipDom(text: string): HTMLElement {
+  const dom = document.createElement('div');
+  dom.className = 'cm-galley-hover';
+  dom.textContent = text;
+  return dom;
+}
+
+/** A CodeMirror hover source backed by the language server. */
+export function latexHoverSource(
+  context: LanguageContext
+): (view: EditorView, pos: number) => Promise<Tooltip | null> {
+  return async (view, pos) => {
+    const target = context.document();
+    if (target === null) {
+      return null;
+    }
+    const position = offsetToPosition(view.state.doc, pos);
+    const text = await context.backend.hover(
+      target.root,
+      target.rel,
+      view.state.doc.toString(),
+      position.line,
+      position.character
+    );
+    if (text === null || text === '') {
+      return null;
+    }
+    return { pos, above: true, create: () => ({ dom: hoverTooltipDom(text) }) };
+  };
+}
+
+/** Resolve and navigate to the definition at the cursor; returns whether it ran. */
+export async function goToDefinitionAt(
+  view: EditorView,
+  context: LanguageContext
+): Promise<boolean> {
+  const target = context.document();
+  if (target === null) {
+    return false;
+  }
+  const position = offsetToPosition(view.state.doc, view.state.selection.main.head);
+  const location = await context.backend.definition(
+    target.root,
+    target.rel,
+    view.state.doc.toString(),
+    position.line,
+    position.character
+  );
+  if (location === null) {
+    return false;
+  }
+  context.onDefinition(location);
+  return true;
+}
+
+/** A keymap command that triggers go-to-definition (fire-and-forget, always handled). */
+export function goToDefinitionCommand(context: LanguageContext): (view: EditorView) => boolean {
+  return (view) => {
+    void goToDefinitionAt(view, context);
+    return true;
+  };
+}
+
+/** The language-server extensions: completion, hovers, and go-to-definition. */
+function languageExtensions(context: LanguageContext): Extension {
+  return [
+    autocompletion({ override: [latexCompletionSource(context)] }),
+    hoverTooltip(latexHoverSource(context)),
+    keymap.of([{ key: 'F12', run: goToDefinitionCommand(context) }])
+  ];
+}
+
 /** The full extension set for a Galley LaTeX editor, reporting edits to `onChange`. */
-function latexExtensions(onChange: (value: string) => void): Extension {
+function latexExtensions(onChange: (value: string) => void, language?: LanguageContext): Extension {
   return [
     lineNumbers(),
     history(),
@@ -266,6 +464,7 @@ function latexExtensions(onChange: (value: string) => void): Extension {
     StreamLanguage.define(stex),
     syntaxHighlighting(highlightStyle),
     editorTheme,
+    ...(language ? [languageExtensions(language)] : []),
     keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
     EditorView.contentAttributes.of({ 'aria-label': 'LaTeX source' }),
     EditorView.updateListener.of((update) => reportDocChange(update, onChange))
@@ -280,6 +479,8 @@ export interface LatexEditorOptions {
   doc: string;
   /** Called with the full text whenever the document changes. */
   onChange: (value: string) => void;
+  /** Language-server bridge for completion/hover/go-to-definition, if available. */
+  language?: LanguageContext;
 }
 
 /** A request to reveal a source line, stamped so the same line can re-fire. */
@@ -306,10 +507,10 @@ export interface LatexEditor {
 export type EditorFactory = (options: LatexEditorOptions) => LatexEditor;
 
 /** The real CodeMirror 6 editor factory. */
-export const createLatexEditor: EditorFactory = ({ parent, doc, onChange }) => {
+export const createLatexEditor: EditorFactory = ({ parent, doc, onChange, language }) => {
   const view = new EditorView({
     parent,
-    state: EditorState.create({ doc, extensions: latexExtensions(onChange) })
+    state: EditorState.create({ doc, extensions: latexExtensions(onChange, language) })
   });
   return {
     setDoc(value) {

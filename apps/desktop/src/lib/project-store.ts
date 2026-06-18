@@ -9,6 +9,12 @@
 
 import { type ProjectBackend, type ProjectSnapshot } from './project-backend';
 import { type Diagnostic } from './diagnostics';
+import {
+  type DefinitionLocation,
+  type DocumentSymbol,
+  type LanguageBackend,
+  resolveDefinition
+} from './language-backend';
 import { type RecentProject, RecentProjectsStore } from './recent-projects';
 import { basename } from './file-tree';
 import { type Timer, windowTimer } from './debounce';
@@ -43,6 +49,10 @@ export interface ProjectState {
   recent: RecentProject[];
   /** The state of the most recent compile. */
   compile: CompileState;
+  /** Live diagnostics from the language server (ChkTeX/analysis). */
+  lspDiagnostics: Diagnostic[];
+  /** The document outline from the language server. */
+  symbols: DocumentSymbol[];
 }
 
 /** Where a compile currently stands. */
@@ -95,6 +105,8 @@ export interface CompileDeps {
   autoCompile?: boolean;
   /** Whether to ring the bell when a build succeeds. */
   soundOnSuccess?: boolean;
+  /** The language-server backend, for live diagnostics and the document outline. */
+  language?: LanguageBackend;
 }
 
 /** Owns project state and notifies subscribers on every change. */
@@ -109,6 +121,7 @@ export class ProjectController {
   #debounceMs: number;
   #autoCompile: boolean;
   #soundOnSuccess: boolean;
+  #language: LanguageBackend | null;
   // A monotonic id stamped on each compile so a stale build that finishes after
   // a newer one started can be dropped instead of overwriting the fresh proof.
   #compileGeneration = 0;
@@ -122,6 +135,7 @@ export class ProjectController {
     this.#debounceMs = deps.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     this.#autoCompile = deps.autoCompile ?? true;
     this.#soundOnSuccess = deps.soundOnSuccess ?? false;
+    this.#language = deps.language ?? null;
     this.#state = {
       project: null,
       activePath: null,
@@ -130,7 +144,9 @@ export class ProjectController {
       error: null,
       pending: null,
       recent: recent.list(),
-      compile: IDLE_COMPILE
+      compile: IDLE_COMPILE,
+      lspDiagnostics: [],
+      symbols: []
     };
   }
 
@@ -179,12 +195,15 @@ export class ProjectController {
     this.#timer.clear();
     this.#compileGeneration += 1;
     this.#recent.record({ root: snapshot.root, name: snapshot.name });
-    // A freshly loaded project starts with no proof on the galley.
+    // A freshly loaded project starts with no proof on the galley and no
+    // carried-over language results.
     this.#set({
       project: snapshot,
       pending: null,
       recent: this.#recent.list(),
-      compile: IDLE_COMPILE
+      compile: IDLE_COMPILE,
+      lspDiagnostics: [],
+      symbols: []
     });
     if (snapshot.rootDocument !== '') {
       await this.#openFile(snapshot.root, snapshot.rootDocument);
@@ -353,6 +372,67 @@ export class ProjectController {
     if (succeeded && this.#soundOnSuccess) {
       this.#bell.ding();
     }
+    await this.#refreshLanguage(generation);
+  }
+
+  /**
+   * Refresh the language server's diagnostics and the document outline for the
+   * current document. Best-effort: any failure (including no server configured)
+   * leaves the previous results untouched, and a result superseded by a newer
+   * compile is dropped, like the proof itself.
+   */
+  async #refreshLanguage(generation: number): Promise<void> {
+    const language = this.#language;
+    const project = this.#state.project;
+    const path = this.#state.activePath;
+    if (language === null || project === null || path === null) {
+      return;
+    }
+    const source = this.#state.content;
+    try {
+      const [lspDiagnostics, symbols] = await Promise.all([
+        language.diagnostics(project.root, path, source),
+        language.symbols(project.root, path, source)
+      ]);
+      if (generation !== this.#compileGeneration) {
+        return;
+      }
+      this.#set({ lspDiagnostics, symbols });
+    } catch {
+      // Language features are best-effort; the compile path already surfaced any
+      // hard error, so a server hiccup must not disturb the proof or the editor.
+    }
+  }
+
+  /** The open document's project root and relative path, or `null` when none. */
+  currentDocument(): { root: string; rel: string } | null {
+    const project = this.#state.project;
+    const path = this.#state.activePath;
+    if (project === null || path === null) {
+      return null;
+    }
+    return { root: project.root, rel: path };
+  }
+
+  /**
+   * Navigate to a definition: resolve the target to a project file, open it when
+   * it differs from the current document, and reveal the line via `reveal` (a
+   * one-based line, ready for the editor). Does nothing when there is no project
+   * to resolve against.
+   */
+  async goToDefinition(
+    location: DefinitionLocation,
+    reveal: (line: number) => void
+  ): Promise<void> {
+    const target = resolveDefinition(location, this.#state.project);
+    if (target === null) {
+      return;
+    }
+    if (target.rel !== this.#state.activePath) {
+      await this.requestOpenFile(target.rel);
+    }
+    // Definition lines are zero-based (LSP); the editor reveals one-based.
+    reveal(target.line + 1);
   }
 
   /** Resolve the guard by discarding edits and continuing the pending open. */

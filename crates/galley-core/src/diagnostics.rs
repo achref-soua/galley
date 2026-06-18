@@ -73,6 +73,12 @@ pub enum DiagnosticKind {
     OverfullBox,
     /// `Underfull \hbox/\vbox …` — content was stretched too loose.
     UnderfullBox,
+    /// A style note from the language server's linter (ChkTeX): not a build
+    /// failure, but a usage or typography nit worth tidying. Unlike the other
+    /// kinds — which the log parser classifies — these arrive from TexLab already
+    /// described, so the message carries the specifics and the severity comes from
+    /// the server rather than from [`DiagnosticKind::severity`].
+    Style,
 }
 
 impl DiagnosticKind {
@@ -93,6 +99,7 @@ impl DiagnosticKind {
             DiagnosticKind::PackageWarning => "package-warning",
             DiagnosticKind::OverfullBox => "overfull-box",
             DiagnosticKind::UnderfullBox => "underfull-box",
+            DiagnosticKind::Style => "style",
         }
     }
 
@@ -112,6 +119,9 @@ impl DiagnosticKind {
             | DiagnosticKind::LatexWarning
             | DiagnosticKind::PackageWarning => Severity::Warning,
             DiagnosticKind::OverfullBox | DiagnosticKind::UnderfullBox => Severity::BadBox,
+            // A style note is a warning by nature; a ChkTeX "error" still carries
+            // its own severity through [`Diagnostic::lint`], which overrides this.
+            DiagnosticKind::Style => Severity::Warning,
         }
     }
 
@@ -168,6 +178,10 @@ impl DiagnosticKind {
                 "A line came out looser than ideal. Usually harmless — TeX just couldn't space it \
                  neatly."
             }
+            DiagnosticKind::Style => {
+                "A style note from ChkTeX. Not an error — just a tidier way to write it, if you \
+                 like."
+            }
         }
     }
 }
@@ -190,6 +204,29 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    /// Build a diagnostic from the language server's linter (ChkTeX, via TexLab).
+    ///
+    /// Unlike [`Diagnostic::new`], the severity is supplied by the caller rather
+    /// than derived from the kind, because the server classifies each note itself
+    /// (most are warnings; a few are errors). The kind is always
+    /// [`DiagnosticKind::Style`], and the explanation is its standard note.
+    #[must_use]
+    pub fn lint(
+        severity: Severity,
+        message: String,
+        file: Option<String>,
+        line: Option<u32>,
+    ) -> Self {
+        Self {
+            severity,
+            kind: DiagnosticKind::Style,
+            message,
+            file,
+            line,
+            explanation: DiagnosticKind::Style.explanation().to_string(),
+        }
+    }
+
     /// Build a diagnostic for `kind`, deriving its severity and explanation.
     fn new(kind: DiagnosticKind, message: String, file: Option<String>, line: Option<u32>) -> Self {
         Self {
@@ -431,7 +468,7 @@ mod tests {
     use super::*;
 
     /// Every diagnostic kind, for exhaustive metadata checks.
-    const ALL_KINDS: [DiagnosticKind; 13] = [
+    const ALL_KINDS: [DiagnosticKind; 14] = [
         DiagnosticKind::UndefinedControlSequence,
         DiagnosticKind::MissingDollar,
         DiagnosticKind::RunawayArgument,
@@ -445,6 +482,7 @@ mod tests {
         DiagnosticKind::PackageWarning,
         DiagnosticKind::OverfullBox,
         DiagnosticKind::UnderfullBox,
+        DiagnosticKind::Style,
     ];
 
     /// The single diagnostic a one-problem log yields.
@@ -475,6 +513,40 @@ mod tests {
         assert_eq!(Severity::Error.label(), "error");
         assert_eq!(Severity::Warning.label(), "warning");
         assert_eq!(Severity::BadBox.label(), "badbox");
+    }
+
+    #[test]
+    fn lint_diagnostics_carry_their_own_severity() {
+        // A ChkTeX warning: kind is Style, severity is the supplied Warning, and
+        // the explanation is the standard style note.
+        let warn = Diagnostic::lint(
+            Severity::Warning,
+            "Command terminated with space.".to_string(),
+            None,
+            Some(7),
+        );
+        assert_eq!(warn.kind, DiagnosticKind::Style);
+        assert_eq!(warn.severity, Severity::Warning);
+        assert_eq!(warn.message, "Command terminated with space.");
+        assert_eq!(warn.line, Some(7));
+        assert_eq!(warn.file, None);
+        assert_eq!(warn.explanation, DiagnosticKind::Style.explanation());
+
+        // The caller's severity wins, so a ChkTeX error overrides the kind's
+        // default warning severity — and a file can be named.
+        let err = Diagnostic::lint(
+            Severity::Error,
+            "Wrong length of dash.".to_string(),
+            Some("main.tex".to_string()),
+            None,
+        );
+        assert_eq!(err.severity, Severity::Error);
+        assert_eq!(err.kind, DiagnosticKind::Style);
+        assert_eq!(err.file.as_deref(), Some("main.tex"));
+        assert_eq!(err.line, None);
+        // The default style severity is Warning regardless of an override.
+        assert_eq!(DiagnosticKind::Style.severity(), Severity::Warning);
+        assert_eq!(DiagnosticKind::Style.label(), "style");
     }
 
     #[test]

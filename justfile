@@ -69,6 +69,12 @@ prewarm:
 compile-itest:
     cargo test -p galley-compile --features real-compiler --test real_compile -- --ignored
 
+# Run the live TexLab language-server integration tests (needs the `real-lsp`
+# feature + a `texlab` on PATH: `cargo install --locked texlab`). Excluded from
+# `just ci` by design — the protocol/mapping are covered by the pure unit tests.
+lsp-itest:
+    cargo test -p galley-intel --features real-lsp --test real_lsp -- --ignored --test-threads=1
+
 # Sign & notarize artifacts — wired but a no-op until signing certs exist.
 sign:
     @echo "Signing is wired but disabled until certs are configured (see SECURITY.md)."
