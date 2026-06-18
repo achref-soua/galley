@@ -12,3 +12,4 @@ codebase stays legible.
 | 0005 | The project model and the sandboxed file store       | Accepted |
 | 0006 | Embedded Tectonic compilation and the PDF.js preview | Accepted |
 | 0007 | Fast, incremental compilation                        | Accepted |
+| 0008 | Compile diagnostics from the TeX log                 | Accepted |

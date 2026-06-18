@@ -249,6 +249,21 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
   });
 
+  it('surfaces compile problems in the panel and jumps to the source line', async () => {
+    const editor = await openDemoFolder();
+    // Break the document so the demo backend reports a located diagnostic.
+    await fireEvent.input(editor, {
+      target: { value: '\\documentclass{article}\\begin{document}oops' }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+
+    // The problems panel lists the parsed diagnostic with its summary.
+    const row = await screen.findByRole('button', { name: /document never closes/ });
+    expect(screen.getByText('1 error')).toBeTruthy();
+    // Clicking jumps to the source line (the fake editor's gotoLine is a no-op).
+    await fireEvent.click(row);
+  });
+
   it('shows the build timing in the preview', async () => {
     await openDemoFolder();
     clock.times = [0, 420];
