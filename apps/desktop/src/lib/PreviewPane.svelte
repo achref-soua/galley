@@ -15,6 +15,8 @@
     durationMs = null,
     cached = false,
     highlightBox = null,
+    syncScroll = false,
+    editorScrollFraction = undefined,
     oninversesearch = undefined,
     createRenderer = pdfjsRenderer
   }: {
@@ -25,12 +27,22 @@
     cached?: boolean;
     /** The SyncTeX rectangle to highlight, set by forward search. */
     highlightBox?: SyncTexBox | null;
+    /** Mirror the editor scroll position into the PDF pane when true. */
+    syncScroll?: boolean;
+    /** Scroll fraction (0–1) from the editor, used when syncScroll is true. */
+    editorScrollFraction?: number | undefined;
     /** Called when the user clicks the PDF canvas for inverse search. */
     oninversesearch?: (page: number, x: number, y: number) => void;
     createRenderer?: () => PdfRenderer;
   } = $props();
 
-  const SCALE = 1.5;
+  /** Bundled input for the renderProof action; changing any field triggers update. */
+  interface ProofInput {
+    bytes: Uint8Array;
+    page: number;
+    scale: number;
+  }
+
   const STATUS_LABELS: Record<CompileStatus, string> = {
     idle: 'No proof',
     running: 'Compiling…',
@@ -38,6 +50,8 @@
     failed: 'Failed'
   };
 
+  let currentPage = $state(1);
+  let zoomScale = $state(1.5);
   let pageCount = $state(0);
   let renderError = $state<string | null>(null);
   // Canvas buffer dimensions, kept in sync after each render for the SVG viewBox.
@@ -49,7 +63,16 @@
 
   const statusLabel = $derived(STATUS_LABELS[status]);
   const timingLabel = $derived(compileTiming(durationMs, cached));
-  const pageLabel = $derived(pageCount > 0 ? `1 / ${pageCount}` : '— / —');
+  const pageLabel = $derived(pageCount > 0 ? `${currentPage} / ${pageCount}` : '— / —');
+  const proofInput = $derived<ProofInput | null>(
+    pdf !== null ? { bytes: pdf, page: currentPage, scale: zoomScale } : null
+  );
+
+  // Reset to page 1 whenever the PDF bytes change (new compile result).
+  $effect(() => {
+    void pdf;
+    currentPage = 1;
+  });
 
   // Show the highlight for 2 s whenever `highlightBox` changes.
   $effect(() => {
@@ -66,19 +89,32 @@
   // Derive the SVG rect position from the highlight box (in buffer pixels).
   const svgRect = $derived(
     highlightBox !== null && highlightVisible
-      ? syncTexToCanvas(highlightBox, SCALE)
+      ? syncTexToCanvas(highlightBox, zoomScale)
       : null
   );
 
-  // A Svelte action: (re)render the proof whenever the canvas mounts or the PDF
-  // bytes change. The renderer is built here (not in the component body) so it
-  // reads the latest `createRenderer` without capturing only its initial value.
-  function renderProof(node: HTMLCanvasElement, bytes: Uint8Array) {
+  // Svelte action: scroll the proof container to mirror the editor when syncScroll is on.
+  function syncScroller(
+    node: HTMLDivElement,
+    params: { enabled: boolean; fraction: number | undefined }
+  ) {
+    function apply(p: typeof params) {
+      if (p.enabled && p.fraction !== undefined) {
+        node.scrollTop = p.fraction * (node.scrollHeight - node.clientHeight);
+      }
+    }
+    apply(params);
+    return { update: apply };
+  }
+
+  // A Svelte action: (re)render the proof whenever the canvas mounts or the
+  // proof input (bytes, page, scale) changes.
+  function renderProof(node: HTMLCanvasElement, input: ProofInput) {
     const renderer = createRenderer();
-    const draw = (data: Uint8Array) => {
+    const draw = (data: ProofInput) => {
       renderError = null;
       renderer
-        .render(data, node, 1, SCALE)
+        .render(data.bytes, node, data.page, data.scale)
         .then((result) => {
           pageCount = result.pageCount;
           canvasWidth = node.width;
@@ -89,9 +125,9 @@
           renderError = `Could not render the proof: ${reason}`;
         });
     };
-    draw(bytes);
+    draw(input);
     return {
-      update(next: Uint8Array) {
+      update(next: ProofInput) {
         draw(next);
       }
     };
@@ -105,27 +141,61 @@
     const displayScale = rect.width > 0 ? canvas.width / rect.width : 1;
     const canvasX = (event.clientX - rect.left) * displayScale;
     const canvasY = (event.clientY - rect.top) * displayScale;
-    const { x, y } = canvasToPdfPoint(canvasX, canvasY, canvas.height, SCALE);
-    oninversesearch(1, x, y);
+    const { x, y } = canvasToPdfPoint(canvasX, canvasY, canvas.height, zoomScale);
+    oninversesearch(currentPage, x, y);
   }
 
+  function prevPage() {
+    if (currentPage > 1) currentPage -= 1;
+  }
 
+  function nextPage() {
+    if (currentPage < pageCount) currentPage += 1;
+  }
 </script>
 
 <section class="preview" aria-label="Preview">
   <header class="viewer-bar">
     <span class="status">{statusLabel}</span>
     <span class="timing">{timingLabel}</span>
-    <span class="pages">{pageLabel}</span>
-    <span class="zoom">150%</span>
+    <div class="nav" aria-label="Page navigation">
+      <button
+        class="nav-btn"
+        type="button"
+        aria-label="Previous page"
+        disabled={currentPage <= 1}
+        onclick={prevPage}
+      >‹</button>
+      <span class="pages">{pageLabel}</span>
+      <button
+        class="nav-btn"
+        type="button"
+        aria-label="Next page"
+        disabled={currentPage >= pageCount}
+        onclick={nextPage}
+      >›</button>
+    </div>
+    <select
+      class="zoom-select"
+      aria-label="Zoom"
+      onchange={(e) => { zoomScale = Number((e.currentTarget as HTMLSelectElement).value); }}
+    >
+      <option value="1" selected={zoomScale === 1.0}>100%</option>
+      <option value="1.25" selected={zoomScale === 1.25}>125%</option>
+      <option value="1.5" selected={zoomScale === 1.5}>150%</option>
+      <option value="2" selected={zoomScale === 2.0}>200%</option>
+    </select>
   </header>
-  <div class="proof">
-    {#if pdf !== null}
+  <div
+    class="proof"
+    use:syncScroller={{ enabled: syncScroll, fraction: editorScrollFraction }}
+  >
+    {#if proofInput !== null}
       <div class="page-wrap">
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <canvas
           class="page"
-          use:renderProof={pdf}
+          use:renderProof={proofInput}
           aria-label="Proof"
           onclick={handleCanvasClick}
         ></canvas>
@@ -206,8 +276,50 @@
     display: none;
   }
 
-  .viewer-bar .pages {
+  .nav {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--galley-space-2);
+  }
+
+  .nav-btn {
+    border: none;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: var(--galley-text-sm);
+    cursor: pointer;
+    padding: 0 var(--galley-space-1);
+    line-height: 1;
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .nav-btn:not(:disabled):hover {
+    color: var(--fg);
+  }
+
+  .pages {
+    min-width: 4ch;
+    text-align: center;
+  }
+
+  .zoom-select {
+    border: none;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: var(--galley-text-xs);
+    font-family: var(--galley-font-mono);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .zoom-select:focus {
+    outline: 2px solid var(--accent);
+    border-radius: var(--galley-radius-sm);
   }
 
   .proof {

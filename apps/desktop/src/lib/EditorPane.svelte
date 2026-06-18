@@ -26,6 +26,7 @@
     spellChecker = null,
     onedit,
     oncreate = undefined,
+    oneditorscroll = undefined,
     createEditor = createLatexEditor
   }: {
     documentName: string | null;
@@ -38,6 +39,7 @@
     spellChecker?: SpellChecker | null;
     onedit: (content: string) => void;
     oncreate?: (editor: LatexEditor) => void;
+    oneditorscroll?: (fraction: number) => void;
     createEditor?: EditorFactory;
   } = $props();
 
@@ -75,7 +77,8 @@
       onChange: (next) => onedit(next),
       language,
       keymapMode: value.keymapMode,
-      spellChecker: value.spellChecker
+      spellChecker: value.spellChecker,
+      onscroll: oneditorscroll
     });
     oncreate?.(editor);
     editor.setDiagnostics(value.diagnostics);
