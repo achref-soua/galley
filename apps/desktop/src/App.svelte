@@ -6,9 +6,16 @@
   import { prefersReducedMotion } from './lib/motion';
   import { ProjectController } from './lib/project-store';
   import { selectBackend } from './lib/project-backend';
+  import { selectLanguageBackend, type LanguageBackend } from './lib/language-backend';
+  import { mergeDiagnostics } from './lib/diagnostics';
   import { RecentProjectsStore } from './lib/recent-projects';
   import { CompilePrefsStore } from './lib/settings-store';
-  import { createLatexEditor, type EditorFactory, type RevealRequest } from './lib/editor';
+  import {
+    createLatexEditor,
+    type EditorFactory,
+    type LanguageContext,
+    type RevealRequest
+  } from './lib/editor';
   import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
   import { windowTimer, type Timer } from './lib/debounce';
   import { systemClock, type Clock } from './lib/timing';
@@ -18,6 +25,7 @@
   import Sidebar from './lib/Sidebar.svelte';
   import EditorPane from './lib/EditorPane.svelte';
   import ProblemsPanel from './lib/ProblemsPanel.svelte';
+  import OutlinePanel from './lib/OutlinePanel.svelte';
   import PreviewPane from './lib/PreviewPane.svelte';
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
@@ -31,13 +39,15 @@
     createRenderer = pdfjsRenderer,
     compileTimer = windowTimer(),
     compileClock = systemClock(),
-    bell = webAudioBell()
+    bell = webAudioBell(),
+    language = selectLanguageBackend()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
     compileTimer?: Timer;
     compileClock?: Clock;
     bell?: Bell;
+    language?: LanguageBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -54,7 +64,8 @@
         clock: compileClock,
         bell,
         autoCompile: prefsStore.prefs.autoCompile,
-        soundOnSuccess: prefsStore.prefs.soundOnSuccess
+        soundOnSuccess: prefsStore.prefs.soundOnSuccess,
+        language
       })
   );
 
@@ -76,12 +87,28 @@
     revealTarget = { line, nonce: revealNonce };
   }
 
+  // The editor's bridge to the language server: it reads the live open document
+  // and routes go-to-definition back through the controller (which owns the
+  // resolve/open/reveal decisions). Built once with the injected backend
+  // (construction-time config, so read untracked); the delegates query the
+  // controller at call time.
+  const editorLanguage: LanguageContext = untrack(() => ({
+    backend: language,
+    document: () => projectController.currentDocument(),
+    onDefinition: (location) => void projectController.goToDefinition(location, jumpToLine)
+  }));
+
   const sidebarStyle = $derived(`width: ${layout.sidebarWidth}px`);
   const previewStyle = $derived(`width: ${layout.previewWidth}px`);
   const documentName = $derived(project.activePath ?? 'No document');
   const dirty = $derived(project.activePath !== null && project.content !== project.savedContent);
   const canCompile = $derived(project.activePath !== null);
   const compiling = $derived(project.compile.status === 'running');
+  // The gutter and problems panel show the union of the compile log's
+  // diagnostics and the language server's, de-duplicated.
+  const diagnostics = $derived(
+    mergeDiagnostics(project.compile.diagnostics, project.lspDiagnostics)
+  );
 
   function changeTheme(pref: ThemePreference) {
     theme.setPreference(pref);
@@ -198,13 +225,15 @@
             documentName={project.activePath}
             content={project.content}
             {dirty}
-            diagnostics={project.compile.diagnostics}
+            {diagnostics}
             reveal={revealTarget}
+            language={editorLanguage}
             onedit={(content) => projectController.edit(content)}
             createEditor={editor}
           />
         </div>
-        <ProblemsPanel diagnostics={project.compile.diagnostics} onjump={jumpToLine} />
+        <ProblemsPanel {diagnostics} onjump={jumpToLine} />
+        <OutlinePanel symbols={project.symbols} onjump={(line) => jumpToLine(line + 1)} />
       </div>
     </div>
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import App from '../src/App.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
+import type { EditorFactory, LanguageContext } from '../src/lib/editor';
 import { firePointer, fakeEditorFactory } from './setup';
 
 /** A fake PDF renderer that reports a one-page document. */
@@ -299,5 +300,53 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.input(editor, { target: { value: 'edited with auto-compile off' } });
     // No auto-compile was scheduled.
     expect(timer.pending).toBeNull();
+  });
+
+  it('wires the editor to the language server and the outline', async () => {
+    let captured: LanguageContext | undefined;
+    const gotoLine = vi.fn();
+    // A capturing editor factory: it stashes the language context the App injects
+    // and records reveal requests, so language features can be driven directly.
+    const capturingEditor: EditorFactory = ({ parent, doc, onChange, language }) => {
+      captured = language;
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      return {
+        setDoc: (v) => void (area.value = v),
+        setDiagnostics: () => {},
+        gotoLine,
+        destroy: () => area.remove()
+      };
+    };
+
+    render(App, {
+      props: {
+        editor: capturingEditor,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    await waitFor(() => expect(captured).toBeDefined());
+
+    // document() reports the open file through the controller.
+    expect(captured!.document()).toEqual({ root: '/demo/galley-project', rel: 'main.tex' });
+
+    // onDefinition resolves and reveals the one-based line in the same file.
+    captured!.onDefinition({ file: 'main.tex', line: 5, character: 0 });
+    await waitFor(() => expect(gotoLine).toHaveBeenCalledWith(6));
+
+    // Compiling populates the outline from the language server; clicking a symbol
+    // jumps to its (one-based) source line.
+    await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
+    await screen.findByRole('button', { name: /Introduction/ });
+    await fireEvent.click(screen.getByRole('button', { name: /Introduction/ }));
+    await waitFor(() => expect(gotoLine).toHaveBeenCalledWith(1));
   });
 });

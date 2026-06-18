@@ -22,12 +22,11 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.1.2`: errors, warnings, and friendly tips. On top
-> of the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core, a failed build is no
-> longer a raw log — Galley parses it into structured diagnostics, marks the offending lines in
-> the gutter, and lists them in a problems panel with plain-language explanations and a click
-> that jumps to the source. The visual editor and the AI layer arrive in subsequent versioned
-> releases.
+> **Status — early development.** This is `v0.2.0`: **language intelligence**. On top of the
+> warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core and its structured
+> diagnostics, the editor now understands LaTeX — completion, hovers, go-to-definition, a
+> document outline, and live ChkTeX diagnostics — powered by the **TexLab** language server.
+> The visual editor and the AI layer arrive in subsequent versioned releases.
 
 ## Editing & compiling
 
@@ -54,6 +53,19 @@ voice — _"A brace was opened and never closed…"_ rather than _"Paragraph end
 knows the common offenders: undefined commands, `Missing $`, unclosed braces and environments,
 missing files, package errors, undefined references and citations, and overfull/underfull
 boxes. The raw log is still there in the preview when you want it.
+
+## Language intelligence
+
+Galley speaks LaTeX through the **TexLab** language server, kept warm in process. As you type you
+get context-aware **completion** — commands, environments, packages, document classes, `\ref`
+labels, `\cite` keys, and file paths — each with the right icon and insertion. **Hover** a symbol
+for help, press `F12` to **jump to a definition** (a `\ref` to its `\label`, a `\cite` to its
+entry — **across files** in a multi-file project), and read the **document outline** in a panel
+that clicks through to any section. The server's **diagnostics** (ChkTeX style notes and TexLab's
+own analysis) are merged into the same gutter and problems panel as the compile-log ones. All of
+the protocol and mapping is pure, covered Rust; the live `texlab` process sits behind a feature
+seam (like the compile engine), and the editor degrades gracefully when it is absent. _(`texlab`
+is a host requirement for the packaged app — install it with `cargo install --locked texlab`.)_
 
 ## Projects
 
@@ -94,9 +106,9 @@ native WebView — no bundled browser, no Node runtime in the shipped app.
 galley/
 ├─ apps/desktop/        # Tauri 2 + Svelte 5 app (UI in src/, shell in src-tauri/)
 ├─ crates/
-│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile, diagnostics
+│  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile, diagnostics, intel
 │  ├─ galley-compile/   # embedded Tectonic behind the Compiler port
-│  ├─ galley-intel/     # TexLab (LSP) + SyncTeX             (placeholder)
+│  ├─ galley-intel/     # TexLab (LSP) client behind the LanguageIntelligence port
 │  ├─ galley-vcs/       # git2 history / snapshots / revert  (placeholder)
 │  ├─ galley-import/    # create/open projects; folder importer
 │  ├─ galley-ai/        # provider-agnostic AI + MCP host    (placeholder)

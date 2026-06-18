@@ -9,6 +9,7 @@ pub mod compile;
 pub mod diagnostics;
 pub mod document;
 pub mod hash;
+pub mod intel;
 pub mod manifest;
 pub mod project;
 pub mod time;
@@ -23,6 +24,10 @@ pub use document::{
     DocumentKind, RootCandidate,
 };
 pub use hash::content_hash;
+pub use intel::{
+    CompletionItem, CompletionKind, DocumentSymbol, Hover, LanguageIntelligence, Location,
+    Position, SymbolKind, TextDocument,
+};
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
 pub use project::{project_name_from_path, Project};
 pub use time::iso8601_utc;

@@ -4,6 +4,7 @@ import {
   type Severity,
   countBySeverity,
   locationLabel,
+  mergeDiagnostics,
   problemList,
   severityIcon,
   severityLabel,
@@ -22,6 +23,30 @@ function diag(over: Partial<Diagnostic> = {}): Diagnostic {
     ...over
   };
 }
+
+describe('mergeDiagnostics', () => {
+  it('combines log and server diagnostics, dropping exact repeats', () => {
+    const log = [diag({ message: 'undefined ref', line: 4 })];
+    const lsp = [
+      // An exact repeat of the log entry — dropped.
+      diag({ message: 'undefined ref', line: 4 }),
+      // A genuinely different server note — kept, after the log ones.
+      diag({ severity: 'warning', kind: 'style', message: 'space after command', line: 2 })
+    ];
+    const merged = mergeDiagnostics(log, lsp);
+    expect(merged).toHaveLength(2);
+    expect(merged[0].message).toBe('undefined ref');
+    expect(merged[1].message).toBe('space after command');
+  });
+
+  it('treats an unlocated and a located copy as distinct', () => {
+    const merged = mergeDiagnostics(
+      [diag({ message: 'x', line: null })],
+      [diag({ message: 'x', line: 3 })]
+    );
+    expect(merged).toHaveLength(2);
+  });
+});
 
 describe('severity helpers', () => {
   it('ranks errors above warnings above bad boxes', () => {
