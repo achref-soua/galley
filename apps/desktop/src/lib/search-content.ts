@@ -100,8 +100,7 @@ export function searchInContent(content: string, query: SearchQuery): SearchMatc
     }
     const lineIdx = lo;
     const lineStart = lineStarts[lineIdx];
-    const lineEnd =
-      lineIdx + 1 < lineStarts.length ? lineStarts[lineIdx + 1] - 1 : content.length;
+    const lineEnd = lineIdx + 1 < lineStarts.length ? lineStarts[lineIdx + 1] - 1 : content.length;
     const lineText = content.slice(lineStart, lineEnd).replace(/\r$/, '');
     results.push({
       line: lineIdx + 1,
@@ -124,11 +123,7 @@ export function searchInContent(content: string, query: SearchQuery): SearchMatc
  * `query.useRegex` is true. Returns the original content on an invalid
  * query.
  */
-export function replaceInContent(
-  content: string,
-  query: SearchQuery,
-  replacement: string
-): string {
+export function replaceInContent(content: string, query: SearchQuery, replacement: string): string {
   const re = buildRegex(query);
   if (re === null) {
     return content;

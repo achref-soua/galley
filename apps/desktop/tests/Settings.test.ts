@@ -127,6 +127,8 @@ describe('Settings — Editor section', () => {
   it('reflects spellCheck: true in the toggle', async () => {
     render(Settings, { props: { ...base, spellCheck: true } });
     await fireEvent.click(screen.getByRole('button', { name: 'Editor' }));
-    expect(screen.getByRole('switch', { name: 'Spell-check' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Spell-check' }).getAttribute('aria-checked')).toBe(
+      'true'
+    );
   });
 });

@@ -3,7 +3,7 @@
   "version": "0.2.2",
   "private": true,
   "type": "module",
-  "description": "Galley design system \u2014 tokens, themes, and shared Svelte components.",
+  "description": "Galley design system — tokens, themes, and shared Svelte components.",
   "license": "MIT",
   "svelte": "./src/index.ts",
   "exports": {

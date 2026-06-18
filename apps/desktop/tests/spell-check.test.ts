@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock nspell before importing spell-check so buildSpellChecker uses the fake.
 vi.mock('nspell', () => ({
-  default: (_aff: string, _dic: string) => ({
+  default: () => ({
     correct: (word: string) => word === 'hello' || word === 'world'
   })
 }));
