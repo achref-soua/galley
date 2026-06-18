@@ -824,11 +824,11 @@ dependencies = [
 
 [[package]]
 name = "galley-ai"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "galley-compile"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "galley-core",
  "tectonic",
@@ -836,11 +836,11 @@ dependencies = [
 
 [[package]]
 name = "galley-core"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "galley-import"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "galley-core",
  "galley-security",
@@ -849,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "galley-intel"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "galley-core",
  "serde_json",
@@ -858,14 +858,14 @@ dependencies = [
 
 [[package]]
 name = "galley-security"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "galley-vcs"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "generic-array"

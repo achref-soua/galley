@@ -21,6 +21,7 @@
   import { systemClock, type Clock } from './lib/timing';
   import { webAudioBell, type Bell } from './lib/bell';
   import { isCompileShortcut, isSaveShortcut } from './lib/keymap';
+  import { parseIncludes, resolveIncludePath } from './lib/include-graph';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import EditorPane from './lib/EditorPane.svelte';
@@ -109,6 +110,8 @@
   const diagnostics = $derived(
     mergeDiagnostics(project.compile.diagnostics, project.lspDiagnostics)
   );
+  // Resolved include paths from the live editor content, shown in the structure panel.
+  const includes = $derived(parseIncludes(project.content).map(resolveIncludePath));
 
   function changeTheme(pref: ThemePreference) {
     theme.setPreference(pref);
@@ -233,7 +236,12 @@
           />
         </div>
         <ProblemsPanel {diagnostics} onjump={jumpToLine} />
-        <OutlinePanel symbols={project.symbols} onjump={(line) => jumpToLine(line + 1)} />
+        <OutlinePanel
+          symbols={project.symbols}
+          {includes}
+          onjump={(line) => jumpToLine(line + 1)}
+          onopenfile={(path) => void projectController.requestOpenFile(path)}
+        />
       </div>
     </div>
 

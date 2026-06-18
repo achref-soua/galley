@@ -487,6 +487,52 @@ describe('ProjectController — compiling', () => {
     expect(controller.state.compile.log).toBe('fresh');
     expect(controller.state.compile.pdf).toEqual(new Uint8Array([7]));
   });
+
+  it('compiles using the active path when rootDocument is empty', async () => {
+    // rootDocument = '' → fall back to the active path (branch: '' !== '' is false).
+    backend.openResult = snapshot({ rootDocument: '' });
+    await controller.openFolder('/proj');
+    // The open falls back to the first tex file in documents (intro.tex, no rootDocument set).
+    // Manually request to open main.tex.
+    await controller.requestOpenFile('main.tex');
+    controller.edit('the source');
+    await controller.compile();
+    expect(backend.compileCalls.at(-1)).toEqual({ source: 'the source', rootDocument: 'main.tex' });
+  });
+
+  it('compiles the root document when active is the root (no extra read)', async () => {
+    // rootDocument = 'main.tex', activePath = 'main.tex' → rootDoc === path, use buffer.
+    controller.edit('root source');
+    await controller.compile();
+    expect(backend.compileCalls.at(-1)).toEqual({
+      source: 'root source',
+      rootDocument: 'main.tex'
+    });
+  });
+
+  it('reads the root document when editing a non-root included file', async () => {
+    // rootDocument = 'main.tex' but we are editing intro.tex.
+    backend.files.set('main.tex', 'root content');
+    backend.files.set('intro.tex', 'intro content');
+    await controller.requestOpenFile('intro.tex');
+    expect(controller.state.activePath).toBe('intro.tex');
+    // compile() should read main.tex from disk, not use the intro.tex buffer.
+    await controller.compile();
+    expect(backend.compileCalls.at(-1)).toEqual({
+      source: 'root content',
+      rootDocument: 'main.tex'
+    });
+  });
+
+  it('surfaces an error when the root document cannot be read for multi-file compile', async () => {
+    // rootDocument = 'main.tex', but we switch to editing intro.tex first,
+    // then delete main.tex so readDocument throws.
+    backend.files.delete('main.tex');
+    await controller.requestOpenFile('intro.tex');
+    await controller.compile();
+    expect(controller.state.error).not.toBeNull();
+    expect(controller.state.compile.status).toBe('failed');
+  });
 });
 
 describe('ProjectController — auto-compile and the bell', () => {
