@@ -8,12 +8,15 @@ import {
   completionType,
   toCmCompletions,
   latexCompletionSource,
+  latexCiteCompletionSource,
+  citeContext,
   latexHoverSource,
   goToDefinitionAt,
   goToDefinitionCommand,
   createLatexEditor,
   type LanguageContext
 } from '../src/lib/editor';
+import { type CiteCandidate } from '../src/lib/bibliography';
 import type {
   CompletionItem,
   CompletionKind,
@@ -175,6 +178,76 @@ describe('latexCompletionSource', () => {
 
   it('returns null when the backend offers nothing', async () => {
     const result = await ctxAt('\\sec', 4, false, context());
+    expect(result).toBeNull();
+  });
+
+  it('defers to the citation source inside a \\cite argument', async () => {
+    const backend = fakeBackend({
+      completion: vi.fn(async () => [completion('section', 'command')])
+    });
+    const doc = '\\cite{key';
+    const result = await ctxAt(doc, doc.length, true, context({ backend }));
+    expect(result).toBeNull();
+    // The language server was never queried for a citation key.
+    expect(backend.completion).not.toHaveBeenCalled();
+  });
+});
+
+describe('citeContext', () => {
+  it('detects the cite argument and the current key start', () => {
+    expect(citeContext('\\cite{', 6)).toEqual({ from: 6 });
+    expect(citeContext('\\cite{key', 9)).toEqual({ from: 6 });
+    // Multiple keys: the second key begins after the comma and space.
+    expect(citeContext('\\cite{a, bcd', 12)).toEqual({ from: 9 });
+    // biblatex commands and starred forms are recognised.
+    expect(citeContext('\\autocite{x', 11)).toEqual({ from: 10 });
+    expect(citeContext('\\nocite*{', 9)).toEqual({ from: 9 });
+  });
+
+  it('returns null outside a cite argument', () => {
+    expect(citeContext('plain text', 5)).toBeNull();
+    // A non-cite command's braces.
+    expect(citeContext('\\section{x', 10)).toBeNull();
+    // The group is already closed before the cursor.
+    expect(citeContext('\\cite{a} ', 9)).toBeNull();
+    // A newline breaks out of the group.
+    expect(citeContext('\\cite{\nkey', 10)).toBeNull();
+    // At the very start of the document.
+    expect(citeContext('', 0)).toBeNull();
+  });
+});
+
+describe('latexCiteCompletionSource', () => {
+  function run(doc: string, pos: number, candidates: CiteCandidate[]) {
+    const state = EditorState.create({ doc });
+    return latexCiteCompletionSource(() => candidates)(new CompletionContext(state, pos, true));
+  }
+
+  const candidates: CiteCandidate[] = [
+    { key: 'lovelace1843', summary: 'Lovelace (1843) — Notes' },
+    { key: 'turing1936', summary: 'Turing (1936) — Computability' }
+  ];
+
+  it('offers bibliography keys inside a cite argument', () => {
+    const result = run('\\cite{', 6, candidates);
+    expect(result).not.toBeNull();
+    expect(result!.from).toBe(6);
+    expect(result!.options.map((o) => o.label)).toEqual(['lovelace1843', 'turing1936']);
+    expect(result!.options[0].detail).toBe('Lovelace (1843) — Notes');
+    expect(result!.options[0].apply).toBe('lovelace1843');
+  });
+
+  it('returns null outside a cite argument', () => {
+    expect(run('plain', 5, candidates)).toBeNull();
+  });
+
+  it('returns null when there are no candidates', () => {
+    expect(run('\\cite{', 6, [])).toBeNull();
+  });
+
+  it('returns null when no citation provider is configured', () => {
+    const state = EditorState.create({ doc: '\\cite{' });
+    const result = latexCiteCompletionSource(undefined)(new CompletionContext(state, 6, true));
     expect(result).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "@galley/desktop",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "type": "module",
   "description": "Galley desktop app (Tauri 2 + Svelte 5).",

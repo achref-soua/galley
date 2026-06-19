@@ -6,6 +6,7 @@
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
 pub mod assets;
+pub mod bibliography;
 pub mod compile;
 pub mod diagnostics;
 pub mod document;
@@ -21,6 +22,10 @@ pub mod table;
 pub mod time;
 
 pub use assets::{figure_snippet, needs_graphicspath};
+pub use bibliography::{
+    arxiv_atom_to_entry, entry_summary, parse_bib, serialize_bib, serialize_entry,
+    suggest_cite_key, BibEntry, BibField,
+};
 pub use compile::{
     tex_job_name, BuildPlan, CompileReport, CompileRequest, CompileResult, CompileStatus, Compiler,
     Engine, PlanError,

@@ -556,6 +556,73 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     expect(insertedText).toBe('\\includegraphics[width=\\linewidth]{assets/figure.png}');
   });
 
+  it('bibliography panel lists entries, inserts cites, looks up, and imports', async () => {
+    let insertedText = '';
+    let citationsCalled = false;
+    const spyFactory: EditorFactory = ({ parent, doc, onChange, citations }) => {
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      if (citations !== undefined) {
+        citations(); // invoke the App's citation provider closure
+        citationsCalled = true;
+      }
+      return {
+        setDoc(v) {
+          if (v !== area.value) area.value = v;
+        },
+        setDiagnostics: () => {},
+        gotoLine: () => {},
+        currentLine: () => 1,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
+        insertAtCursor(text) {
+          insertedText = text;
+        },
+        destroy() {
+          area.remove();
+        }
+      };
+    };
+    const { container } = render(App, {
+      props: {
+        editor: spyFactory,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    expect(citationsCalled).toBe(true);
+
+    // The demo project's references.bib (@book{galley}) appears in the panel;
+    // clicking it inserts a \cite command via the editor.
+    const galley = await screen.findByText('galley');
+    await fireEvent.click(galley);
+    expect(insertedText).toBe('\\cite{galley}');
+
+    // Look up a DOI: the browser bib backend fabricates an entry and the panel
+    // reports the new key.
+    const input = screen.getByLabelText('DOI or arXiv id') as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: '10.1/x' } });
+    await fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(screen.getByText('Added 101x')).toBeTruthy());
+
+    // Import a `.bib` export: a fresh key is merged into the bibliography.
+    const fileInput = container.querySelector('input[accept=".bib"]') as HTMLInputElement;
+    const file = {
+      name: 'lib.bib',
+      text: async () => '@article{fresh, title = {New}}'
+    } as unknown as File;
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    await fireEvent.change(fileInput);
+    await waitFor(() => expect(screen.getByText('Imported 1 entry.')).toBeTruthy());
+  });
+
   it('graphicspath banner shows when content has \\includegraphics without \\graphicspath', async () => {
     const textarea = await openDemoFolder();
     expect(screen.queryByRole('button', { name: 'Add graphicspath' })).toBeNull();

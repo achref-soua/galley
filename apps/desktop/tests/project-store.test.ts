@@ -11,6 +11,8 @@ import type { Clock } from '../src/lib/timing';
 import type { Bell } from '../src/lib/bell';
 import type { DocumentSymbol, LanguageBackend } from '../src/lib/language-backend';
 import type { Diagnostic } from '../src/lib/diagnostics';
+import type { BibBackend, LookupKind } from '../src/lib/bib-backend';
+import { type BibEntry } from '../src/lib/bibliography';
 
 function snapshot(over: Partial<ProjectSnapshot> = {}): ProjectSnapshot {
   return {
@@ -727,5 +729,148 @@ describe('ProjectController — language features', () => {
     const reveal = vi.fn();
     await plain.goToDefinition({ file: 'x', line: 0, character: 0 }, reveal);
     expect(reveal).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProjectController — bibliography', () => {
+  const article = (key: string): BibEntry => ({
+    entryType: 'article',
+    key,
+    fields: [
+      { name: 'author', value: 'Ada Lovelace' },
+      { name: 'title', value: 'Notes' },
+      { name: 'year', value: '1843' }
+    ]
+  });
+
+  function fakeBib(entry: BibEntry): BibBackend & { calls: [string, LookupKind][] } {
+    const calls: [string, LookupKind][] = [];
+    return {
+      calls,
+      async lookupReference(query, kind) {
+        calls.push([query, kind]);
+        return entry;
+      }
+    };
+  }
+
+  /** A snapshot whose project includes a `.bib` file. */
+  function withBib(): ProjectSnapshot {
+    return snapshot({
+      documents: [
+        { path: 'main.tex', kind: 'tex' },
+        { path: 'references.bib', kind: 'bib' }
+      ]
+    });
+  }
+
+  it('parses the project bibliography on open', async () => {
+    backend.openResult = withBib();
+    backend.files.set('references.bib', '@book{galley2026, title = {Galley}, author = {A. Soua}}');
+    await controller.openFolder('/p');
+    expect(controller.state.bibEntries).toHaveLength(1);
+    expect(controller.citeCandidates()).toEqual([{ key: 'galley2026', summary: 'Soua — Galley' }]);
+  });
+
+  it('skips unreadable .bib files but loads the rest', async () => {
+    backend.openResult = snapshot({
+      documents: [
+        { path: 'good.bib', kind: 'bib' },
+        { path: 'missing.bib', kind: 'bib' }
+      ],
+      rootDocument: ''
+    });
+    backend.files.set('good.bib', '@misc{ok, title = {Ok}}');
+    // `missing.bib` is not in the file map → readDocument throws → skipped.
+    await controller.openFolder('/p');
+    expect(controller.citeCandidates().map((c) => c.key)).toEqual(['ok']);
+  });
+
+  it('adds a looked-up reference and reloads the bibliography', async () => {
+    backend.openResult = withBib();
+    backend.files.set('references.bib', '@book{old, title = {Old}}');
+    await controller.openFolder('/p');
+    const bib = fakeBib(article('lovelace1843'));
+    const controllerWithBib = makeController({ bib });
+    backend.openResult = withBib();
+    await controllerWithBib.openFolder('/p');
+
+    const key = await controllerWithBib.addReference('10.1/x', 'doi');
+    expect(key).toBe('lovelace1843');
+    expect(bib.calls).toEqual([['10.1/x', 'doi']]);
+    // The entry was appended to the existing file with a blank-line separator.
+    const written = backend.files.get('references.bib')!;
+    expect(written).toContain('@book{old,');
+    expect(written).toContain('@article{lovelace1843,');
+    expect(controllerWithBib.citeCandidates().map((c) => c.key)).toContain('lovelace1843');
+  });
+
+  it('creates references.bib and registers it when the project has none', async () => {
+    backend.openResult = snapshot({ documents: [{ path: 'main.tex', kind: 'tex' }] });
+    const bib = fakeBib(article('newkey'));
+    const c = makeController({ bib });
+    await c.openFolder('/p');
+    const key = await c.addReference('arXiv:1', 'arxiv');
+    expect(key).toBe('newkey');
+    // The new file holds exactly the serialized entry (no leading blank line).
+    expect(backend.files.get('references.bib')).toBe(
+      '@article{newkey,\n  author = {Ada Lovelace},\n  title = {Notes},\n  year = {1843},\n}\n'
+    );
+    // It now appears in the project documents so the file tree shows it.
+    expect(c.state.project!.documents.some((d) => d.path === 'references.bib')).toBe(true);
+  });
+
+  it('returns null when there is no bib backend or no project', async () => {
+    backend.openResult = withBib();
+    await controller.openFolder('/p'); // controller has no bib backend
+    expect(await controller.addReference('x', 'doi')).toBeNull();
+
+    const c = makeController({ bib: fakeBib(article('k')) });
+    expect(await c.addReference('x', 'doi')).toBeNull(); // no project open
+  });
+
+  it('surfaces a lookup error and adds nothing', async () => {
+    backend.openResult = withBib();
+    const bib: BibBackend = {
+      async lookupReference() {
+        throw new Error('not found');
+      }
+    };
+    const c = makeController({ bib });
+    await c.openFolder('/p');
+    const key = await c.addReference('bad', 'doi');
+    expect(key).toBeNull();
+    expect(c.state.error).toBe('not found');
+  });
+
+  it('imports a .bib export, skipping duplicate keys', async () => {
+    backend.openResult = withBib();
+    backend.files.set('references.bib', '@book{dup, title = {Dup}}');
+    const c = makeController();
+    await c.openFolder('/p');
+
+    const added = await c.importBibText(
+      '@book{dup, title = {Dup2}}\n@article{fresh, title = {New}}'
+    );
+    expect(added).toBe(1);
+    expect(
+      c
+        .citeCandidates()
+        .map((x) => x.key)
+        .sort()
+    ).toEqual(['dup', 'fresh']);
+    // The duplicate key kept the original entry.
+    expect(backend.files.get('references.bib')).toContain('title = {Dup}');
+  });
+
+  it('importBibText returns 0 when nothing is new or no project is open', async () => {
+    backend.openResult = withBib();
+    backend.files.set('references.bib', '@book{only, title = {Only}}');
+    const c = makeController();
+    await c.openFolder('/p');
+    expect(await c.importBibText('@book{only, title = {Again}}')).toBe(0);
+
+    const empty = makeController();
+    expect(await empty.importBibText('@misc{x}')).toBe(0);
   });
 });

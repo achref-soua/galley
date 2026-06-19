@@ -38,10 +38,13 @@
   import { parseIncludes, resolveIncludePath } from './lib/include-graph';
   import { needsGraphicspath, insertGraphicspath, assetSnippet } from './lib/assets';
   import { selectAssetBackend, type AssetBackend } from './lib/asset-backend';
+  import { selectBibBackend, type BibBackend } from './lib/bib-backend';
+  import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import AssetPanel from './lib/AssetPanel.svelte';
+  import BibPanel from './lib/BibPanel.svelte';
   import SymbolPalette from './lib/SymbolPalette.svelte';
   import MathEditor from './lib/MathEditor.svelte';
   import TableBuilder from './lib/TableBuilder.svelte';
@@ -68,6 +71,7 @@
     language = selectLanguageBackend(),
     synctex = selectSyncTexBackend(),
     assetBackend = selectAssetBackend(),
+    bibBackend = selectBibBackend(),
     mathFieldSetup = realMathFieldSetup
   }: {
     editor?: EditorFactory;
@@ -78,6 +82,7 @@
     language?: LanguageBackend;
     synctex?: SyncTexBackend;
     assetBackend?: AssetBackend;
+    bibBackend?: BibBackend;
     mathFieldSetup?: MathFieldSetup;
   } = $props();
 
@@ -99,7 +104,8 @@
         bell,
         autoCompile: prefsStore.prefs.autoCompile,
         soundOnSuccess: prefsStore.prefs.soundOnSuccess,
-        language
+        language,
+        bib: bibBackend
       })
   );
 
@@ -274,6 +280,8 @@
   );
   // Resolved include paths from the live editor content, shown in the structure panel.
   const includes = $derived(parseIncludes(project.content).map(resolveIncludePath));
+  // Citation candidates parsed from the project's `.bib` files, for the panel.
+  const bibCandidates = $derived(buildCiteCandidates(project.bibEntries));
   const showGraphicspathBanner = $derived(
     project.project !== null && !graphicspathBannerDismissed && needsGraphicspath(project.content)
   );
@@ -444,6 +452,12 @@
             backend={assetBackend}
             oninsert={(snippet) => editorRef!.insertAtCursor(snippet)}
           />
+          <BibPanel
+            candidates={bibCandidates}
+            oninsert={(cite) => editorRef!.insertAtCursor(cite)}
+            onlookup={(query, kind) => projectController.addReference(query, kind)}
+            onimport={(content) => projectController.importBibText(content)}
+          />
           <SymbolPalette oninsert={(code) => editorRef!.insertAtCursor(code)} />
         {/if}
       </div>
@@ -485,6 +499,7 @@
             language={editorLanguage}
             keymapMode={editorPrefs.keymapMode}
             {spellChecker}
+            citations={() => projectController.citeCandidates()}
             onedit={(content) => projectController.edit(content)}
             oncreate={(e) => {
               editorRef = e;
