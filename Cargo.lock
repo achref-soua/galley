@@ -825,6 +825,9 @@ dependencies = [
 [[package]]
 name = "galley-ai"
 version = "0.4.2"
+dependencies = [
+ "galley-core",
+]
 
 [[package]]
 name = "galley-compile"
