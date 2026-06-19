@@ -20,8 +20,10 @@ function props(over: Record<string, unknown> = {}) {
   return {
     symbols: [] as DocumentSymbol[],
     includes: [] as string[],
+    content: '',
     onjump: vi.fn(),
     onopenfile: vi.fn(),
+    onreorder: vi.fn(),
     ...over
   };
 }
@@ -178,5 +180,83 @@ describe('OutlinePanel — collapse / expand', () => {
     await fireEvent.click(toggle);
     await fireEvent.click(toggle);
     expect(screen.getByText('Introduction')).toBeTruthy();
+  });
+});
+
+describe('OutlinePanel — section drag/drop reorder', () => {
+  const twoSections = '\\section{Alpha}\nTextA\n\\section{Beta}\nTextB';
+
+  it('renders sections when content has headings', () => {
+    render(OutlinePanel, { props: props({ content: twoSections }) });
+    expect(screen.getByText('Sections')).toBeTruthy();
+    expect(screen.getByText('Alpha')).toBeTruthy();
+    expect(screen.getByText('Beta')).toBeTruthy();
+  });
+
+  it('calls onreorder when a section is dragged to a different index', async () => {
+    const onreorder = vi.fn();
+    render(OutlinePanel, { props: props({ content: twoSections, onreorder }) });
+    const items = screen.getAllByRole('listitem');
+    const dragItem = items[0];
+    const dropItem = items[1];
+    await fireEvent.dragStart(dragItem);
+    await fireEvent.dragOver(dropItem);
+    await fireEvent.drop(dropItem);
+    expect(onreorder).toHaveBeenCalledWith(0, 1);
+  });
+
+  it('does not call onreorder when dropped on the same section', async () => {
+    const onreorder = vi.fn();
+    render(OutlinePanel, { props: props({ content: twoSections, onreorder }) });
+    const items = screen.getAllByRole('listitem');
+    await fireEvent.dragStart(items[0]);
+    await fireEvent.drop(items[0]);
+    expect(onreorder).not.toHaveBeenCalled();
+  });
+
+  it('clears draggedIdx on dragend', async () => {
+    render(OutlinePanel, { props: props({ content: twoSections }) });
+    const items = screen.getAllByRole('listitem');
+    await fireEvent.dragStart(items[0]);
+    await fireEvent.dragEnd(items[0]);
+    // After dragend the dragging class should be removed — no throw expected.
+    expect(items[0].classList.contains('dragging')).toBe(false);
+  });
+
+  it('does not call onreorder when drop fires without a prior dragstart', async () => {
+    const onreorder = vi.fn();
+    render(OutlinePanel, { props: props({ content: twoSections, onreorder }) });
+    const items = screen.getAllByRole('listitem');
+    // Drop without dragstart → draggedIdx is null → no reorder
+    await fireEvent.drop(items[1]);
+    expect(onreorder).not.toHaveBeenCalled();
+  });
+
+  it('filters sections by search term', async () => {
+    render(OutlinePanel, { props: props({ content: twoSections }) });
+    const input = screen.getByRole('searchbox');
+    await fireEvent.input(input, { target: { value: 'Alpha' } });
+    expect(screen.getByText('Alpha')).toBeTruthy();
+    expect(screen.queryByText('Beta')).toBeNull();
+  });
+
+  it('shows (untitled) for a section with an empty title', () => {
+    render(OutlinePanel, { props: props({ content: '\\section{}' }) });
+    expect(screen.getByText('(untitled)')).toBeTruthy();
+  });
+
+  it('includes section count in the summary text', () => {
+    render(OutlinePanel, { props: props({ content: twoSections }) });
+    expect(screen.getByText('2 sections')).toBeTruthy();
+  });
+
+  it("shows '1 section' singular", () => {
+    render(OutlinePanel, { props: props({ content: '\\section{Only}' }) });
+    expect(screen.getByText('1 section')).toBeTruthy();
+  });
+
+  it('shows Outline label when sections and symbols are both present', () => {
+    render(OutlinePanel, { props: props({ content: twoSections, symbols: tree }) });
+    expect(screen.getByText('Outline')).toBeTruthy();
   });
 });

@@ -41,6 +41,13 @@
   import { selectBibBackend, type BibBackend } from './lib/bib-backend';
   import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
+  import {
+    moveSectionBlock,
+    parseSectionBlocks,
+    setImageWidth,
+    type ImageSpec
+  } from './lib/visual';
+  import { acceptEntries, rejectEntries, type ReviewEntry } from './lib/review';
   import Titlebar from './lib/Titlebar.svelte';
   import FormatBar from './lib/FormatBar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
@@ -52,6 +59,7 @@
   import EditorPane from './lib/EditorPane.svelte';
   import ProblemsPanel from './lib/ProblemsPanel.svelte';
   import OutlinePanel from './lib/OutlinePanel.svelte';
+  import ReviewPanel from './lib/ReviewPanel.svelte';
   import PreviewPane from './lib/PreviewPane.svelte';
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
@@ -73,7 +81,8 @@
     synctex = selectSyncTexBackend(),
     assetBackend = selectAssetBackend(),
     bibBackend = selectBibBackend(),
-    mathFieldSetup = realMathFieldSetup
+    mathFieldSetup = realMathFieldSetup,
+    initialReviewEntries = [] as ReviewEntry[]
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -85,6 +94,7 @@
     assetBackend?: AssetBackend;
     bibBackend?: BibBackend;
     mathFieldSetup?: MathFieldSetup;
+    initialReviewEntries?: ReviewEntry[];
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -118,6 +128,7 @@
   let mathOpen = $state(false);
   let tableOpen = $state(false);
   let viewMode = $state<'code' | 'visual'>('code');
+  let reviewEntries = $state<ReviewEntry[]>(untrack(() => initialReviewEntries.slice()));
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
   let previewPrefs = $state(previewPrefsStore.prefs);
@@ -425,6 +436,31 @@
     editorRef!.insertAtCursor(latex);
     tableOpen = false;
   }
+
+  function handleSectionReorder(fromIdx: number, toIdx: number) {
+    const blocks = parseSectionBlocks(project.content);
+    const newSrc = moveSectionBlock(project.content, blocks, fromIdx, toIdx);
+    if (newSrc !== project.content) {
+      projectController.edit(newSrc);
+    }
+  }
+
+  function handleImageResize(spec: ImageSpec, width: string) {
+    const newSrc = setImageWidth(project.content, spec, width);
+    projectController.edit(newSrc);
+  }
+
+  function handleAcceptReview(id: string) {
+    reviewEntries = acceptEntries(reviewEntries, id);
+  }
+
+  function handleRejectReview(id: string) {
+    const result = rejectEntries(reviewEntries, id, project.content);
+    reviewEntries = result.entries;
+    if (result.src !== project.content) {
+      projectController.edit(result.src);
+    }
+  }
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
@@ -465,7 +501,9 @@
           <AssetPanel
             root={project.project.root}
             backend={assetBackend}
+            content={project.content}
             oninsert={(snippet) => editorRef!.insertAtCursor(snippet)}
+            onresize={handleImageResize}
           />
           <BibPanel
             candidates={bibCandidates}
@@ -536,8 +574,15 @@
         <OutlinePanel
           symbols={project.symbols}
           {includes}
+          content={project.content}
           onjump={(line) => jumpToLine(line + 1)}
           onopenfile={(path) => void projectController.requestOpenFile(path)}
+          onreorder={handleSectionReorder}
+        />
+        <ReviewPanel
+          entries={reviewEntries}
+          onaccept={handleAcceptReview}
+          onreject={handleRejectReview}
         />
         {#if searchOpen}
           <SearchPanel

@@ -4,6 +4,28 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-06-19
+
+Layout, drag/drop section reorder, image resize, and track-changes review queue.
+
+### Added
+
+- **`visual.ts`** — `SectionBlock` interface, `parseSectionBlocks`, `moveSectionBlock`,
+  `CaptionSpec` interface, `parseCaptions`, `setCaption`, `parseImageWidth`,
+  `setImageWidth`; all pure helpers covered at 100 %.
+- **`review.ts`** — immutable `ReviewEntry` type and four pure operations:
+  `createReviewEntry`, `applyReject`, `acceptEntries`, `rejectEntries`, `pendingCount`.
+- **`ReviewPanel.svelte`** — sidebar panel rendering the pending review queue with
+  before/after diff view and Accept/Reject actions per entry.
+- **`OutlinePanel.svelte`** — new "Sections" drag list above includes/outline; HTML5
+  Drag and Drop reorders sections via `parseSectionBlocks` + `moveSectionBlock`; summary
+  text now includes section count.
+- **`AssetPanel.svelte`** — "Resize inserted images" section with ½/¾/1× preset buttons
+  for every `\includegraphics` found in the current document.
+- **`Button.svelte`** — now accepts and forwards `aria-label` (a11y gap surfaced by
+  ReviewPanel).
+- **ADR-0018** — documents all design decisions for this release.
+
 ## [0.4.1] - 2026-06-19
 
 Visual text and structure editing — the v0.4.0 read-only decoration layer becomes

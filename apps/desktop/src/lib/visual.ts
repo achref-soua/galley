@@ -351,3 +351,174 @@ export function toggleItalic(src: string, from: number, to: number): VisualEdit 
 export function isItemLine(lineText: string): boolean {
   return /^[ \t]*\\item(?:\s|$)/.test(lineText);
 }
+
+// ---------------------------------------------------------------------------
+// Section block helpers — section drag-to-reorder
+// ---------------------------------------------------------------------------
+
+/**
+ * A parsed top-level section block: the heading text and the byte range
+ * covering the heading plus all subordinate content until the next block of the
+ * same structural level (or end of document).
+ */
+export interface SectionBlock {
+  level: HeadingLevel;
+  title: string;
+  /** Absolute byte offset of the `\` that opens the heading command. */
+  from: number;
+  /** Exclusive end — equals the start of the next same-level block or `src.length`. */
+  to: number;
+}
+
+/**
+ * Parse the top-level section blocks in `src`.
+ *
+ * Only the headings at the shallowest nesting level present in the document
+ * are returned (e.g., if the document contains `\section` headings the
+ * function returns one block per `\section`, not one per `\subsection`).
+ * Each block spans from its heading to just before the next same-level heading,
+ * or to the end of the source when there is none.
+ *
+ * Returns an empty array when `src` contains no headings.
+ */
+export function parseSectionBlocks(src: string): SectionBlock[] {
+  const headings = parseHeadings(src);
+  if (headings.length === 0) return [];
+  const minLevel = headings.reduce<HeadingLevel>(
+    (min, h) => (h.level < min ? h.level : min),
+    headings[0].level
+  );
+  const top = headings.filter((h) => h.level === minLevel);
+  return top.map((h, i) => ({
+    level: h.level,
+    title: h.title,
+    from: h.from,
+    to: i + 1 < top.length ? top[i + 1].from : src.length
+  }));
+}
+
+/**
+ * Swap the source text of two section blocks identified by their indices in
+ * `blocks` (as returned by {@link parseSectionBlocks}).
+ *
+ * Returns the original `src` unchanged when `fromIdx` equals `toIdx`, or when
+ * either index is out of range.
+ */
+export function moveSectionBlock(
+  src: string,
+  blocks: SectionBlock[],
+  fromIdx: number,
+  toIdx: number
+): string {
+  if (
+    fromIdx === toIdx ||
+    fromIdx < 0 ||
+    toIdx < 0 ||
+    fromIdx >= blocks.length ||
+    toIdx >= blocks.length
+  ) {
+    return src;
+  }
+  const lo = Math.min(fromIdx, toIdx);
+  const hi = Math.max(fromIdx, toIdx);
+  const bLo = blocks[lo];
+  const bHi = blocks[hi];
+  const textLo = src.slice(bLo.from, bLo.to);
+  const textHi = src.slice(bHi.from, bHi.to);
+  const between = src.slice(bLo.to, bHi.from);
+  return src.slice(0, bLo.from) + textHi + between + textLo + src.slice(bHi.to);
+}
+
+// ---------------------------------------------------------------------------
+// Caption editing helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * A parsed `\caption{…}` command: the full command range plus the byte range
+ * of the content inside the braces (for in-place editing).
+ */
+export interface CaptionSpec {
+  content: string;
+  from: number;
+  contentFrom: number;
+  contentTo: number;
+  to: number;
+}
+
+/**
+ * Find all `\caption{…}` commands in `src` (single-level brace content only).
+ */
+export function parseCaptions(src: string): CaptionSpec[] {
+  const re = /\\caption\{([^}]*)\}/g;
+  const results: CaptionSpec[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    const content = m[1];
+    const from = m.index;
+    const to = from + m[0].length;
+    const contentFrom = from + 9; // '\\caption{' is 9 characters
+    const contentTo = contentFrom + content.length;
+    results.push({ content, from, contentFrom, contentTo, to });
+  }
+  return results;
+}
+
+/**
+ * Return a new source string with the content of `spec`'s caption replaced by
+ * `newText`.  Only the inner text (between `{` and `}`) is changed.
+ */
+export function setCaption(src: string, spec: CaptionSpec, newText: string): string {
+  return src.slice(0, spec.contentFrom) + newText + src.slice(spec.contentTo);
+}
+
+// ---------------------------------------------------------------------------
+// Image width helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the value of the `width=` key from a `\includegraphics` option
+ * string (the content between `[` and `]`).  Returns `null` when no `width=`
+ * key is present.
+ *
+ * @example parseImageWidth('width=\\linewidth,height=5cm') // '\\linewidth'
+ */
+export function parseImageWidth(optString: string): string | null {
+  const m = /(?:^|,)\s*width\s*=\s*([^,\]]+)/.exec(optString);
+  if (m === null) return null;
+  return m[1].trim();
+}
+
+/**
+ * Return a new source string with the `width=` option of the `\includegraphics`
+ * command identified by `spec` set to `width`.
+ *
+ * - If the command already has `[…]` options and a `width=` key, that key's
+ *   value is replaced.
+ * - If the command has `[…]` options but no `width=` key, `,width=…` is
+ *   appended to the options.
+ * - If the command has no `[…]` options at all, `[width=…]` is inserted.
+ *
+ * The path argument of the command is preserved unchanged.
+ */
+export function setImageWidth(src: string, spec: ImageSpec, width: string): string {
+  const cmd = src.slice(spec.from, spec.to);
+  // The path is always the last {...} group.
+  const pathMatch = /\{([^}]*)\}$/.exec(cmd);
+  if (pathMatch === null) return src;
+  const path = pathMatch[1];
+  // Options are the first [...] group, if present.
+  const optsMatch = /\[([^\]]*)\]/.exec(cmd);
+  const rawOpts = optsMatch !== null ? optsMatch[1] : '';
+  const widthRe = /(?:^|,)\s*width\s*=[^,\]]*/;
+  let newOpts: string;
+  if (widthRe.test(rawOpts)) {
+    newOpts = rawOpts.replace(widthRe, (m) =>
+      m.startsWith(',') ? `,width=${width}` : `width=${width}`
+    );
+  } else if (rawOpts.length > 0) {
+    newOpts = `${rawOpts},width=${width}`;
+  } else {
+    newOpts = `width=${width}`;
+  }
+  return src.slice(0, spec.from) + `\\includegraphics[${newOpts}]{${path}}` + src.slice(spec.to);
+}
