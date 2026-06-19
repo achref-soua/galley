@@ -9,6 +9,8 @@
     type ThemePreference
   } from '@galley/ui-kit';
   import { type KeymapMode } from './keymap-prefs';
+  import { type AiBackend } from './ai-backend';
+  import AiSettingsPanel from './AiSettingsPanel.svelte';
 
   let {
     themePreference,
@@ -18,6 +20,8 @@
     keymapMode,
     spellCheck,
     syncScroll,
+    aiBackend,
+    projectRoot = '',
     onthemechange,
     onautocompilechange,
     onsoundchange,
@@ -33,6 +37,8 @@
     keymapMode: KeymapMode;
     spellCheck: boolean;
     syncScroll: boolean;
+    aiBackend: AiBackend;
+    projectRoot?: string;
     onthemechange: (pref: ThemePreference) => void;
     onautocompilechange: (enabled: boolean) => void;
     onsoundchange: (enabled: boolean) => void;
@@ -42,7 +48,7 @@
     onclose: () => void;
   } = $props();
 
-  type Section = 'appearance' | 'editor' | 'compilation' | 'preview' | 'about';
+  type Section = 'appearance' | 'editor' | 'compilation' | 'preview' | 'ai' | 'about';
   let active = $state<Section>('appearance');
 
   const sections: { id: Section; label: string }[] = [
@@ -50,6 +56,7 @@
     { id: 'editor', label: 'Editor' },
     { id: 'compilation', label: 'Compilation' },
     { id: 'preview', label: 'Preview' },
+    { id: 'ai', label: 'AI' },
     { id: 'about', label: 'About' }
   ];
 
@@ -156,6 +163,8 @@
               onchange={(checked) => onsyncscrollchange(checked)}
             />
           </p>
+        {:else if active === 'ai'}
+          <AiSettingsPanel backend={aiBackend} {projectRoot} />
         {:else}
           <h2>About</h2>
           <p class="muted">Galley — a local-first LaTeX studio. Pull a proof.</p>

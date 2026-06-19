@@ -5,6 +5,7 @@
 //! exercised to full coverage with plain unit tests. As the product grows, the
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
+pub mod ai;
 pub mod assets;
 pub mod bibliography;
 pub mod compile;
@@ -21,6 +22,10 @@ pub mod synctex;
 pub mod table;
 pub mod time;
 
+pub use ai::{
+    GatewayConfig, LlmError, LlmMessage, LlmProvider, LlmRequest, LlmResponse, ProjectAiConsent,
+    Provider, ProviderConfig,
+};
 pub use assets::{figure_snippet, needs_graphicspath};
 pub use bibliography::{
     arxiv_atom_to_entry, entry_summary, parse_bib, serialize_bib, serialize_entry,
