@@ -40,6 +40,8 @@
   import { selectAssetBackend, type AssetBackend } from './lib/asset-backend';
   import { selectBibBackend, type BibBackend } from './lib/bib-backend';
   import { selectAiBackend, type AiBackend } from './lib/ai-backend';
+  import { locatePatch } from './lib/assistant';
+  import AiChatPanel from './lib/AiChatPanel.svelte';
   import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import {
@@ -126,6 +128,8 @@
   let preference = $state<ThemePreference>(theme.preference);
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
+  let chatOpen = $state(false);
+  let chatProjectRoot = $state('');
   let paletteOpen = $state(false);
   let searchOpen = $state(false);
   let mathOpen = $state(false);
@@ -151,6 +155,7 @@
   let graphicspathBannerDismissed = $state(false);
   $effect(() => {
     searchRoot = project.project == null ? null : project.project.root;
+    chatProjectRoot = project.project != null ? project.project.root : '';
   });
 
   let resizeBaseline = 0;
@@ -270,6 +275,13 @@
       label: 'Toggle Visual Mode',
       run() {
         toggleViewMode();
+      }
+    },
+    {
+      id: 'toggle-assistant',
+      label: 'Toggle AI Assistant',
+      run() {
+        chatOpen = !chatOpen;
       }
     },
     {
@@ -464,6 +476,13 @@
       projectController.edit(result.src);
     }
   }
+
+  let reviewCounter = 0;
+
+  function handleAiPatch(before: string, after: string) {
+    const id = String(reviewCounter++);
+    reviewEntries = [...reviewEntries, locatePatch(id, project.content, before, after)];
+  }
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
@@ -485,6 +504,8 @@
     onopensettings={() => (settingsOpen = true)}
     onopenmatch={() => (mathOpen = true)}
     onopentable={() => (tableOpen = true)}
+    ontogglechat={() => (chatOpen = !chatOpen)}
+    {chatOpen}
     ontoggleviewmode={toggleViewMode}
   />
 
@@ -598,6 +619,16 @@
           />
         {/if}
         <StatusBar content={project.content} />
+        {#if chatOpen}
+          <AiChatPanel
+            backend={aiBackend}
+            projectRoot={chatProjectRoot}
+            content={project.content}
+            selectedText=""
+            errorLog={project.compile.log}
+            onpatch={handleAiPatch}
+          />
+        {/if}
       </div>
     </div>
 

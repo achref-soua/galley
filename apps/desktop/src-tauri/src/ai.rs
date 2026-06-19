@@ -219,8 +219,7 @@ impl LlmProvider for AnthropicAdapter {
             ("x-api-key", self.api_key.as_str()),
             ("anthropic-version", "2023-06-01"),
         ];
-        let raw =
-            post_json(&url, &payload.to_string(), &hdrs).map_err(LlmError::ProviderError)?;
+        let raw = post_json(&url, &payload.to_string(), &hdrs).map_err(LlmError::ProviderError)?;
         let v: serde_json::Value =
             serde_json::from_str(&raw).map_err(|e| LlmError::ProviderError(e.to_string()))?;
         let content = v["content"][0]["text"].as_str().unwrap_or("").to_string();
