@@ -25,6 +25,10 @@ function spyEditor() {
     setSpellChecker: (checker) => calls.setSpellChecker.push(checker),
     insertAtCursor: () => {},
     setViewMode: (mode) => calls.setViewMode.push(mode),
+    toggleBold: () => {},
+    toggleItalic: () => {},
+    promoteHeading: () => {},
+    demoteHeading: () => {},
     destroy: () => {}
   });
   return { factory, calls };

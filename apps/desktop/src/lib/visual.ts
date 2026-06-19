@@ -170,3 +170,184 @@ export function parseImages(doc: string): ImageSpec[] {
   }
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Visual editing helpers — precise source patches for WYSIWYG operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Canonical order of LaTeX heading commands from largest (part) to smallest
+ * (subparagraph). Used for promote/demote operations.
+ */
+export const HEADING_ORDER = [
+  'part',
+  'chapter',
+  'section',
+  'subsection',
+  'subsubsection',
+  'paragraph',
+  'subparagraph'
+] as const;
+
+/** A LaTeX heading command name. */
+export type HeadingCmd = (typeof HEADING_ORDER)[number];
+
+/**
+ * Detect the heading command at the start of `line` (ignoring leading
+ * whitespace; accepts both starred and unstarred forms).
+ * Returns the command name, or `null` when the line is not a heading.
+ */
+export function lineHeadingCmd(line: string): HeadingCmd | null {
+  const m =
+    /^[ \t]*\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)(?:\*?\{|\s|$)/.exec(
+      line
+    );
+  if (m === null) return null;
+  return m[1] as HeadingCmd;
+}
+
+/**
+ * Return `line` with its heading command replaced by the next-larger heading
+ * (e.g. `\subsection` → `\section`), or `null` when the line is not a heading
+ * or is already at the largest level (`\part`).
+ */
+export function promoteHeading(line: string): string | null {
+  const cmd = lineHeadingCmd(line);
+  if (cmd === null) return null;
+  const idx = HEADING_ORDER.indexOf(cmd);
+  if (idx <= 0) return null;
+  return line.replace(`\\${cmd}`, `\\${HEADING_ORDER[idx - 1]}`);
+}
+
+/**
+ * Return `line` with its heading command replaced by the next-smaller heading
+ * (e.g. `\section` → `\subsection`), or `null` when the line is not a heading
+ * or is already at the smallest level (`\subparagraph`).
+ */
+export function demoteHeading(line: string): string | null {
+  const cmd = lineHeadingCmd(line);
+  if (cmd === null) return null;
+  const idx = HEADING_ORDER.indexOf(cmd);
+  if (idx >= HEADING_ORDER.length - 1) return null;
+  return line.replace(`\\${cmd}`, `\\${HEADING_ORDER[idx + 1]}`);
+}
+
+/**
+ * A targeted source edit: a list of non-overlapping, position-sorted changes
+ * and the resulting selection anchors.
+ */
+export interface VisualEdit {
+  readonly changes: ReadonlyArray<{
+    readonly from: number;
+    readonly to: number;
+    readonly insert: string;
+  }>;
+  readonly anchor: number;
+  readonly head: number;
+}
+
+/**
+ * Toggle `\textbf{…}` around the selection `[from, to]` in `src`.
+ *
+ * Unwrap when the selection is exactly the *content* of an existing
+ * `\textbf{…}` (i.e. the source has `\textbf{` immediately before `from`
+ * and `}` immediately after `to`), or when the selection text itself is a
+ * complete `\textbf{…}` command. Otherwise wrap with `\textbf{…}`.
+ */
+export function toggleBold(src: string, from: number, to: number): VisualEdit {
+  // Unwrap via surrounding context (\textbf{ before, } after)
+  if (from >= 8 && src.slice(from - 8, from) === '\\textbf{' && src[to] === '}') {
+    return {
+      changes: [
+        { from: from - 8, to: from, insert: '' },
+        { from: to, to: to + 1, insert: '' }
+      ],
+      anchor: from - 8,
+      head: to - 8
+    };
+  }
+  // Unwrap when the selection text itself is \textbf{content}
+  const selected = src.slice(from, to);
+  const mFull = /^\\textbf\{([^}]*)\}$/.exec(selected);
+  if (mFull !== null) {
+    return {
+      changes: [{ from, to, insert: mFull[1] }],
+      anchor: from,
+      head: from + mFull[1].length
+    };
+  }
+  // Wrap the selection
+  const wrapped = `\\textbf{${selected}}`;
+  return {
+    changes: [{ from, to, insert: wrapped }],
+    anchor: from,
+    head: from + wrapped.length
+  };
+}
+
+/**
+ * Toggle `\textit{…}` (or unwrap `\emph{…}`) around the selection `[from,
+ * to]` in `src`. Wraps with `\textit{…}`.
+ *
+ * Unwrap when the selection content sits inside an existing `\textit{…}` or
+ * `\emph{…}` in the source, or when the selection itself is such a command.
+ */
+export function toggleItalic(src: string, from: number, to: number): VisualEdit {
+  // Unwrap \textit{ … }
+  if (from >= 8 && src.slice(from - 8, from) === '\\textit{' && src[to] === '}') {
+    return {
+      changes: [
+        { from: from - 8, to: from, insert: '' },
+        { from: to, to: to + 1, insert: '' }
+      ],
+      anchor: from - 8,
+      head: to - 8
+    };
+  }
+  // Unwrap \emph{ … }
+  if (from >= 6 && src.slice(from - 6, from) === '\\emph{' && src[to] === '}') {
+    return {
+      changes: [
+        { from: from - 6, to: from, insert: '' },
+        { from: to, to: to + 1, insert: '' }
+      ],
+      anchor: from - 6,
+      head: to - 6
+    };
+  }
+  // Unwrap when selection text itself is \textit{content}
+  const selected = src.slice(from, to);
+  const mTextit = /^\\textit\{([^}]*)\}$/.exec(selected);
+  if (mTextit !== null) {
+    return {
+      changes: [{ from, to, insert: mTextit[1] }],
+      anchor: from,
+      head: from + mTextit[1].length
+    };
+  }
+  // Unwrap when selection text itself is \emph{content}
+  const mEmph = /^\\emph\{([^}]*)\}$/.exec(selected);
+  if (mEmph !== null) {
+    return {
+      changes: [{ from, to, insert: mEmph[1] }],
+      anchor: from,
+      head: from + mEmph[1].length
+    };
+  }
+  // Wrap with \textit{…}
+  const wrapped = `\\textit{${selected}}`;
+  return {
+    changes: [{ from, to, insert: wrapped }],
+    anchor: from,
+    head: from + wrapped.length
+  };
+}
+
+/**
+ * Return `true` when `lineText` starts (ignoring leading whitespace) with
+ * `\item` followed by a space, `{`, or end-of-string — i.e. it is a list item
+ * line and not a `\itemize` environment opener.
+ */
+export function isItemLine(lineText: string): boolean {
+  return /^[ \t]*\\item(?:\s|$)/.test(lineText);
+}
