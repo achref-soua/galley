@@ -4,6 +4,7 @@ import App from '../src/App.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
 import type { EditorFactory, LanguageContext } from '../src/lib/editor';
 import type { AssetBackend } from '../src/lib/asset-backend';
+import type { MathFieldSetup } from '../src/lib/math-field.js';
 import { firePointer, fakeEditorFactory } from './setup';
 
 /** A fake PDF renderer that reports a one-page document. */
@@ -394,6 +395,31 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.click(within(await openPalette()).getByText('Compile'));
   });
 
+  it('palette insert-equation action opens the equation editor', async () => {
+    const fakeMathSetup: MathFieldSetup = (el, init) => {
+      const input = document.createElement('input');
+      input.setAttribute('aria-label', 'math-input');
+      input.value = init;
+      el.appendChild(input);
+      return { getValue: () => input.value };
+    };
+    renderApp({ mathFieldSetup: fakeMathSetup });
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Insert Equation'));
+    expect(screen.getByRole('dialog', { name: 'Equation editor' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  });
+
+  it('palette insert-table action opens the table builder', async () => {
+    renderApp();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Insert Table'));
+    expect(screen.getByRole('dialog', { name: 'Table builder' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  });
+
   it('changes the keymap mode via Settings > Editor section', async () => {
     renderApp();
     await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
@@ -704,6 +730,45 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await screen.findByRole('button', { name: /Introduction/ });
     await fireEvent.click(screen.getByRole('button', { name: /Introduction/ }));
     await waitFor(() => expect(gotoLine).toHaveBeenCalledWith(1));
+  });
+
+  it('SymbolPalette oninsert calls insertAtCursor on the editor', async () => {
+    await openDemoFolder();
+    // Greek group is open by default; \alpha button should be visible.
+    const alphaBtn = await screen.findByTitle('\\alpha');
+    await fireEvent.click(alphaBtn);
+    // The fake editor appends inserted text to the textarea.
+    const textarea = screen.getByLabelText('Source') as HTMLTextAreaElement;
+    expect(textarea.value).toContain('\\alpha');
+  });
+
+  it('insertMath inserts inline LaTeX at the cursor via the equation editor', async () => {
+    const fakeMathSetup: MathFieldSetup = (el, init) => {
+      const input = document.createElement('input');
+      input.setAttribute('aria-label', 'math-input');
+      input.value = init;
+      el.appendChild(input);
+      return { getValue: () => input.value };
+    };
+    renderApp({ mathFieldSetup: fakeMathSetup });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    const textarea = (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
+    await fireEvent.click(screen.getByTitle('Insert equation'));
+    expect(screen.getByRole('dialog', { name: 'Equation editor' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
+    expect(screen.queryByRole('dialog', { name: 'Equation editor' })).toBeNull();
+    expect(textarea.value).toContain('$');
+  });
+
+  it('insertTable inserts a tabular block at the cursor via the table builder', async () => {
+    renderApp();
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    const textarea = (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
+    await fireEvent.click(screen.getByTitle('Insert table'));
+    expect(screen.getByRole('dialog', { name: 'Table builder' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
+    expect(screen.queryByRole('dialog', { name: 'Table builder' })).toBeNull();
+    expect(textarea.value).toContain('\\begin{tabular}');
   });
 });
 

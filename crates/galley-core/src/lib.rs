@@ -13,9 +13,11 @@ pub mod hash;
 pub mod include_graph;
 pub mod intel;
 pub mod manifest;
+pub mod math;
 pub mod project;
 pub mod search;
 pub mod synctex;
+pub mod table;
 pub mod time;
 
 pub use assets::{figure_snippet, needs_graphicspath};
@@ -35,9 +37,11 @@ pub use intel::{
     Position, SymbolKind, TextDocument,
 };
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
+pub use math::{wrap_display, wrap_inline};
 pub use project::{project_name_from_path, Project};
 pub use search::{search_in_content, SearchMatch, SearchQuery};
 pub use synctex::{SyncTexBox, SyncTexLocation, SyncTexMapper};
+pub use table::{build_booktabs, build_tabular, Align};
 pub use time::iso8601_utc;
 
 /// Product name, as shown in the UI and the window title.

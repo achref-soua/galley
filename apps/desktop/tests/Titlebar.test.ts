@@ -16,7 +16,9 @@ const base = {
   onsave: noop,
   ontogglesidebar: noop,
   ontogglepreview: noop,
-  onopensettings: noop
+  onopensettings: noop,
+  onopenmatch: noop,
+  onopentable: noop
 };
 
 describe('Titlebar', () => {
@@ -84,5 +86,25 @@ describe('Titlebar', () => {
     render(Titlebar, { props: { ...base, canCompile: true, compiling: true } });
     const compile = screen.getByRole('button', { name: 'Compiling…' });
     expect(compile.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('fires onopenmatch when the equation button is clicked', async () => {
+    const onopenmatch = vi.fn();
+    render(Titlebar, { props: { ...base, canCompile: true, onopenmatch } });
+    await fireEvent.click(screen.getByTitle('Insert equation'));
+    expect(onopenmatch).toHaveBeenCalledOnce();
+  });
+
+  it('fires onopentable when the table button is clicked', async () => {
+    const onopentable = vi.fn();
+    render(Titlebar, { props: { ...base, canCompile: true, onopentable } });
+    await fireEvent.click(screen.getByTitle('Insert table'));
+    expect(onopentable).toHaveBeenCalledOnce();
+  });
+
+  it('disables equation and table buttons when canCompile is false', () => {
+    render(Titlebar, { props: { ...base, canCompile: false } });
+    expect(screen.getByTitle('Insert equation').hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTitle('Insert table').hasAttribute('disabled')).toBe(true);
   });
 });
