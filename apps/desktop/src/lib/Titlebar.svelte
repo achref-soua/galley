@@ -9,6 +9,7 @@
     compiling,
     sidebarCollapsed,
     previewCollapsed,
+    chatOpen = false,
     viewMode = 'code',
     oncompile,
     onsave,
@@ -17,6 +18,7 @@
     onopensettings,
     onopenmatch,
     onopentable,
+    ontogglechat = undefined,
     ontoggleviewmode = undefined
   }: {
     documentName: string;
@@ -26,6 +28,7 @@
     compiling: boolean;
     sidebarCollapsed: boolean;
     previewCollapsed: boolean;
+    chatOpen?: boolean;
     viewMode?: 'code' | 'visual';
     oncompile: () => void;
     onsave: () => void;
@@ -34,6 +37,7 @@
     onopensettings: () => void;
     onopenmatch: () => void;
     onopentable: () => void;
+    ontogglechat?: () => void;
     ontoggleviewmode?: () => void;
   } = $props();
 </script>
@@ -103,6 +107,13 @@
       onclick={ontogglepreview}
     >
       <Icon name="panel-right" />
+    </IconButton>
+    <IconButton
+      label={chatOpen ? 'Close assistant' : 'Open assistant'}
+      pressed={chatOpen}
+      onclick={ontogglechat}
+    >
+      <Icon name="chat" />
     </IconButton>
     <IconButton label="Settings" onclick={onopensettings}>
       <Icon name="settings" />

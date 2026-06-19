@@ -4,6 +4,33 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-06-20
+
+AI chat assistant panel (suggest mode).
+
+### Added
+
+- **`galley-core::assistant`** — pure domain types and prompt construction: `ChatRole`,
+  `ChatMessage`, `ChatThread`, `ChatIntent` (Explain / FixError / Transform), and
+  `build_chat_prompt`. 100 % llvm-cov covered, no I/O.
+- **`assistant.ts`** — TypeScript mirror: `PanelMessage`, three intent-based prompt builders,
+  `parsePatches` (extracts `` ```latex ``` `` blocks from an AI response), and `locatePatch`
+  (maps a before/after pair to a `ReviewEntry` by searching document content).
+- **`AiChatPanel.svelte`** — chat side-panel with intent tabs (Explain / Fix Error / Transform),
+  message history, stop-in-flight via a generation counter, and automatic patch proposal via
+  the existing ReviewEntry queue. All AI-proposed edits require author accept/reject — no silent
+  writes.
+- **Titlebar** — "Open / Close assistant" `IconButton` with `pressed` state and `ontogglechat`
+  callback. New `chat` icon added to `@galley/ui-kit`.
+- **`App.svelte`** — `chatOpen` state, `handleAiPatch` handler, `toggle-assistant` command
+  palette action, `AiChatPanel` mounted inside `{#if chatOpen}`.
+- **ADR-0020** — documents the suggest-mode design, patch-flow, stop mechanism, and scope limits.
+
+### Changed
+
+- `chatProjectRoot` computed via `$effect` alongside `searchRoot` to keep both null and
+  non-null branches reachable for coverage.
+
 ## [0.5.0] - 2026-06-19
 
 AI settings & provider gateway.
