@@ -61,4 +61,23 @@ describe('Button', () => {
     await fireEvent.click(button);
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('sets aria-pressed when provided', () => {
+    render(Button, { props: { 'aria-pressed': true, children: textSnippet('Toggle') } });
+    expect(screen.getByRole('button', { name: 'Toggle' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+  });
+
+  it('sets aria-pressed to false when explicitly false', () => {
+    render(Button, { props: { 'aria-pressed': false, children: textSnippet('Toggle') } });
+    expect(screen.getByRole('button', { name: 'Toggle' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    );
+  });
+
+  it('omits aria-pressed when not provided', () => {
+    render(Button, { props: { children: textSnippet('Action') } });
+    expect(screen.getByRole('button', { name: 'Action' }).getAttribute('aria-pressed')).toBeNull();
+  });
 });

@@ -25,6 +25,7 @@ export function fakeEditorFactory(): EditorFactory {
       },
       setKeymapMode() {},
       setSpellChecker() {},
+      setViewMode() {},
       insertAtCursor(text) {
         area.value += text;
         onChange(area.value);

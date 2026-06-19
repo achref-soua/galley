@@ -16,17 +16,23 @@ import {
   StateEffect,
   StateField,
   RangeSet,
+  RangeSetBuilder,
   type Extension,
   type Text
 } from '@codemirror/state';
 import {
   EditorView,
   GutterMarker,
+  ViewPlugin,
+  WidgetType,
+  Decoration,
   gutter,
   hoverTooltip,
   keymap,
   lineNumbers,
   highlightActiveLine,
+  type DecorationSet,
+  type ViewUpdate,
   type Tooltip
 } from '@codemirror/view';
 import {
@@ -61,6 +67,141 @@ import {
 import { type KeymapMode } from './keymap-prefs';
 import { type SpellChecker, makeSpellLinter } from './spell-check';
 import { type CiteCandidate } from './bibliography';
+import {
+  parseHeadings,
+  parseMarkup,
+  parseItems,
+  parseInlineMath,
+  parseLinks,
+  parseImages
+} from './visual';
+
+// ---------------------------------------------------------------------------
+// Visual (WYSIWYG) decoration layer — render-first, read-only
+// ---------------------------------------------------------------------------
+
+/** Replaces `\item` with a typographic bullet point. */
+export class BulletWidget extends WidgetType {
+  toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = 'cm-visual-bullet';
+    span.setAttribute('aria-hidden', 'true');
+    span.textContent = '•';
+    return span;
+  }
+  eq(other: WidgetType): boolean {
+    return other instanceof BulletWidget;
+  }
+}
+
+/** Replaces a range (math, image, unknown command) with a styled inline chip. */
+export class ChipWidget extends WidgetType {
+  constructor(
+    readonly text: string,
+    readonly cls: string
+  ) {
+    super();
+  }
+  toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = `cm-visual-chip ${this.cls}`;
+    span.textContent = this.text;
+    return span;
+  }
+  eq(other: WidgetType): boolean {
+    return other instanceof ChipWidget && other.text === this.text && other.cls === this.cls;
+  }
+}
+
+/**
+ * Build the full decoration set for `doc` in visual mode.
+ *
+ * Decorations are sorted by position and overlapping ranges are skipped so the
+ * CM6 RangeSetBuilder constraint (non-decreasing `from`) is always satisfied.
+ * Exported so unit tests can drive it directly without a live editor.
+ */
+export function buildVisualDecorations(doc: string): DecorationSet {
+  type R = { from: number; to: number; deco: Decoration };
+  const ranges: R[] = [];
+
+  for (const h of parseHeadings(doc)) {
+    ranges.push({ from: h.from, to: h.titleFrom, deco: Decoration.replace({}) });
+    ranges.push({
+      from: h.titleFrom,
+      to: h.titleTo,
+      deco: Decoration.mark({ class: `cm-visual-h${h.level}` })
+    });
+    ranges.push({ from: h.titleTo, to: h.to, deco: Decoration.replace({}) });
+  }
+
+  for (const m of parseMarkup(doc)) {
+    const cls = m.kind === 'bold' ? 'cm-visual-bold' : 'cm-visual-italic';
+    ranges.push({ from: m.from, to: m.contentFrom, deco: Decoration.replace({}) });
+    ranges.push({
+      from: m.contentFrom,
+      to: m.contentTo,
+      deco: Decoration.mark({ class: cls })
+    });
+    ranges.push({ from: m.contentTo, to: m.to, deco: Decoration.replace({}) });
+  }
+
+  for (const it of parseItems(doc)) {
+    ranges.push({
+      from: it.from,
+      to: it.to,
+      deco: Decoration.replace({ widget: new BulletWidget() })
+    });
+  }
+
+  for (const mx of parseInlineMath(doc)) {
+    ranges.push({
+      from: mx.from,
+      to: mx.to,
+      deco: Decoration.replace({ widget: new ChipWidget(mx.content, 'cm-visual-math') })
+    });
+  }
+
+  for (const img of parseImages(doc)) {
+    ranges.push({
+      from: img.from,
+      to: img.to,
+      deco: Decoration.replace({ widget: new ChipWidget(`[${img.path}]`, 'cm-visual-image') })
+    });
+  }
+
+  for (const lk of parseLinks(doc)) {
+    ranges.push({ from: lk.from, to: lk.to, deco: Decoration.mark({ class: 'cm-visual-link' }) });
+  }
+
+  // Sort by `from`, then `to` (wider ranges first so marks nest under replacements).
+  ranges.sort((a, b) => a.from - b.from || b.to - a.to);
+
+  const builder = new RangeSetBuilder<Decoration>();
+  let lastTo = -1;
+  for (const r of ranges) {
+    if (r.from >= lastTo) {
+      builder.add(r.from, r.to, r.deco);
+      lastTo = r.to;
+    }
+  }
+  return builder.finish();
+}
+
+/** Build a CM6 ViewPlugin that applies visual decorations over the source. */
+export function visualPlugin(): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = buildVisualDecorations(view.state.doc.toString());
+      }
+      update(update: ViewUpdate) {
+        this.decorations = buildVisualDecorations(update.view.state.doc.toString());
+      }
+    },
+    { decorations: (v) => v.decorations }
+  );
+}
 
 /**
  * Find the fold range for a LaTeX environment that opens on the line spanning
@@ -142,7 +283,35 @@ const editorTheme = EditorView.theme({
   },
   '.cm-diag-error': { color: 'var(--ribbon)' },
   '.cm-diag-warning': { color: 'var(--syn-keyword)' },
-  '.cm-diag-badbox': { color: 'var(--syn-comment)' }
+  '.cm-diag-badbox': { color: 'var(--syn-comment)' },
+
+  // Visual-mode decoration classes
+  '.cm-visual-h1': { fontWeight: '700', fontSize: '1.5em', color: 'var(--fg)' },
+  '.cm-visual-h2': { fontWeight: '700', fontSize: '1.3em', color: 'var(--fg)' },
+  '.cm-visual-h3': { fontWeight: '600', fontSize: '1.15em', color: 'var(--fg)' },
+  '.cm-visual-h4': { fontWeight: '600', fontSize: '1.05em', color: 'var(--fg)' },
+  '.cm-visual-h5': { fontWeight: '600', color: 'var(--fg)' },
+  '.cm-visual-h6': { fontWeight: '500', color: 'var(--fg-muted)' },
+  '.cm-visual-bold': { fontWeight: '700' },
+  '.cm-visual-italic': { fontStyle: 'italic' },
+  '.cm-visual-link': { color: 'var(--ribbon)', textDecoration: 'underline' },
+  '.cm-visual-bullet': {
+    color: 'var(--ribbon)',
+    marginRight: '0.4em',
+    fontWeight: '700',
+    userSelect: 'none'
+  },
+  '.cm-visual-chip': {
+    background: 'var(--surface-raised)',
+    border: '1px solid var(--border)',
+    borderRadius: '3px',
+    padding: '0 4px',
+    fontSize: '0.85em',
+    fontFamily: 'var(--galley-font-mono)',
+    userSelect: 'none'
+  },
+  '.cm-visual-math': { color: 'var(--syn-math)' },
+  '.cm-visual-image': { color: 'var(--fg-muted)' }
 });
 
 /** The minimal shape of editor state the fold service needs. */
@@ -653,6 +822,8 @@ export interface LatexEditorOptions {
   onscroll?: (fraction: number) => void;
   /** Live provider of bibliography keys for `\cite{…}` completion. */
   citations?: () => CiteCandidate[];
+  /** Initial view mode — `'code'` shows raw LaTeX, `'visual'` overlays the rendering. */
+  viewMode?: 'code' | 'visual';
 }
 
 /** A request to reveal a source line, stamped so the same line can re-fire. */
@@ -679,6 +850,8 @@ export interface LatexEditor {
   setSpellChecker(checker: SpellChecker | null): void;
   /** Insert `text` at the current cursor position, replacing any selection. */
   insertAtCursor(text: string): void;
+  /** Switch between `'code'` (raw LaTeX) and `'visual'` (rendered decoration layer). */
+  setViewMode(mode: 'code' | 'visual'): void;
   /** Tear the editor down and release its DOM. */
   destroy(): void;
 }
@@ -695,10 +868,12 @@ export const createLatexEditor: EditorFactory = ({
   keymapMode = 'default',
   spellChecker = null,
   onscroll,
-  citations
+  citations,
+  viewMode = 'code'
 }) => {
   const keymapCompartment = new Compartment();
   const spellCompartment = new Compartment();
+  const visualCompartment = new Compartment();
   const scrollExtension =
     onscroll !== undefined
       ? [
@@ -724,6 +899,7 @@ export const createLatexEditor: EditorFactory = ({
           spellCompartment,
           citations
         ),
+        visualCompartment.of(viewMode === 'visual' ? visualPlugin() : []),
         ...scrollExtension
       ]
     })
@@ -753,6 +929,11 @@ export const createLatexEditor: EditorFactory = ({
     },
     insertAtCursor(text) {
       view.dispatch(view.state.replaceSelection(text));
+    },
+    setViewMode(mode) {
+      view.dispatch({
+        effects: visualCompartment.reconfigure(mode === 'visual' ? visualPlugin() : [])
+      });
     },
     destroy() {
       view.destroy();

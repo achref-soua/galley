@@ -9,13 +9,15 @@
     compiling,
     sidebarCollapsed,
     previewCollapsed,
+    viewMode = 'code',
     oncompile,
     onsave,
     ontogglesidebar,
     ontogglepreview,
     onopensettings,
     onopenmatch,
-    onopentable
+    onopentable,
+    ontoggleviewmode = undefined
   }: {
     documentName: string;
     dirty: boolean;
@@ -24,6 +26,7 @@
     compiling: boolean;
     sidebarCollapsed: boolean;
     previewCollapsed: boolean;
+    viewMode?: 'code' | 'visual';
     oncompile: () => void;
     onsave: () => void;
     ontogglesidebar: () => void;
@@ -31,6 +34,7 @@
     onopensettings: () => void;
     onopenmatch: () => void;
     onopentable: () => void;
+    ontoggleviewmode?: () => void;
   } = $props();
 </script>
 
@@ -72,6 +76,16 @@
       onclick={onopentable}
     >
       ⊞
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      title={viewMode === 'visual' ? 'Switch to code view' : 'Switch to visual view'}
+      disabled={!canCompile}
+      onclick={ontoggleviewmode}
+      aria-pressed={viewMode === 'visual'}
+    >
+      {viewMode === 'visual' ? '<>' : '¶'}
     </Button>
     <IconButton label="Save" title="Save (⌘/Ctrl+S)" disabled={!canSave} onclick={onsave}>
       <Icon name="save" />

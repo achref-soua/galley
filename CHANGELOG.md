@@ -4,6 +4,37 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-19
+
+Rich-text view — a CM6 decoration layer that renders headings, emphasis, lists, links,
+images, and math over the canonical `.tex` source as a read-only visual overlay, with an
+instant code ↔ visual toggle.
+
+### Added
+
+- **`visual.ts`** — pure, CM6-free parse helpers (`parseHeadings`, `parseMarkup`,
+  `parseItems`, `parseInlineMath`, `parseLinks`, `parseImages`) that return typed spec
+  objects with `from`/`to` byte offsets; fully unit-tested at 100 % coverage with no DOM.
+- **`BulletWidget` / `ChipWidget`** — CM6 `WidgetType` subclasses for replacing `\item`
+  with a bullet glyph and inline-math / `\includegraphics` commands with read-only chips.
+- **`buildVisualDecorations(doc)`** — builds the sorted, non-overlapping `DecorationSet`
+  from all parse results, using `Decoration.replace`, `Decoration.mark`, and
+  `Decoration.widget`; exported for direct unit testing.
+- **`visualPlugin()`** — a CM6 `ViewPlugin` wrapping `buildVisualDecorations`; rebuilds
+  on every document update.
+- **Visual mode toggle** via a CM6 `Compartment` in `createLatexEditor`; exposes
+  `setViewMode(mode)` on the `LatexEditor` interface for runtime reconfiguration without
+  rebuilding the `EditorView`.
+- **Titlebar toggle button** — a ghost `Button` with `aria-pressed` for the code ↔ visual
+  toggle; disabled when no document is open; reachable from the command palette as
+  "Toggle Visual Mode".
+- **Onionskin and Carbon theme** styles for `.cm-visual-h1`–`.cm-visual-h6`,
+  `.cm-visual-bold`, `.cm-visual-italic`, `.cm-visual-link`, `.cm-visual-bullet`,
+  `.cm-visual-chip`, `.cm-visual-math`, `.cm-visual-image`.
+- **`aria-pressed` support in `Button`** — the ui-kit `Button` component now forwards an
+  optional `aria-pressed` prop to the underlying `<button>` for toggle semantics.
+- **ADR-0016** — records the decoration-only approach and the alternatives considered.
+
 ## [0.3.4] - 2026-06-19
 
 Bibliography — `.bib` management, DOI/arXiv reference lookup, citation completion, and

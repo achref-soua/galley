@@ -8,6 +8,7 @@
     disabled = false,
     title,
     onclick,
+    'aria-pressed': ariaPressed = undefined,
     children
   }: {
     variant?: 'primary' | 'default' | 'ghost';
@@ -16,6 +17,7 @@
     disabled?: boolean;
     title?: string;
     onclick?: () => void;
+    'aria-pressed'?: boolean;
     children: Snippet;
   } = $props();
 </script>
@@ -29,6 +31,7 @@
   {disabled}
   {title}
   {onclick}
+  aria-pressed={ariaPressed}
 >
   {@render children()}
 </button>

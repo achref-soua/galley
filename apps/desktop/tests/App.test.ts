@@ -390,6 +390,13 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
+    // toggle-view-mode switches the editor between code and visual
+    await fireEvent.click(within(await openPalette()).getByText('Toggle Visual Mode'));
+    expect(screen.getByTitle('Switch to code view')).toBeTruthy();
+    // Toggle back so subsequent tests start in code mode
+    await fireEvent.click(within(await openPalette()).getByText('Toggle Visual Mode'));
+    expect(screen.getByTitle('Switch to visual view')).toBeTruthy();
+
     // save and compile are no-ops without an open project but must not throw
     await fireEvent.click(within(await openPalette()).getByText('Save'));
     await fireEvent.click(within(await openPalette()).getByText('Compile'));
@@ -523,6 +530,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -578,6 +586,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -700,6 +709,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -766,6 +776,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };
@@ -836,6 +847,22 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
     expect(screen.queryByRole('dialog', { name: 'Table builder' })).toBeNull();
     expect(textarea.value).toContain('\\begin{tabular}');
+  });
+
+  it('view-mode toggle button is disabled when no project is open', () => {
+    renderApp();
+    const toggle = screen.getByTitle('Switch to visual view');
+    expect((toggle as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('view-mode toggle button switches mode when a project is open', async () => {
+    await openDemoFolder();
+    const toggle = screen.getByTitle('Switch to visual view');
+    expect((toggle as HTMLButtonElement).disabled).toBe(false);
+    await fireEvent.click(toggle);
+    expect(screen.getByTitle('Switch to code view')).toBeTruthy();
+    await fireEvent.click(screen.getByTitle('Switch to code view'));
+    expect(screen.getByTitle('Switch to visual view')).toBeTruthy();
   });
 });
 
@@ -970,6 +997,7 @@ describe('App — SyncTeX forward and inverse search', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };
@@ -1030,6 +1058,7 @@ describe('App — SyncTeX forward and inverse search', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        setViewMode: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };

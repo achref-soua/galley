@@ -26,6 +26,7 @@
     keymapMode = 'default',
     spellChecker = null,
     citations = undefined,
+    viewMode = 'code',
     onedit,
     oncreate = undefined,
     oneditorscroll = undefined,
@@ -40,6 +41,7 @@
     keymapMode?: KeymapMode;
     spellChecker?: SpellChecker | null;
     citations?: () => CiteCandidate[];
+    viewMode?: 'code' | 'visual';
     onedit: (content: string) => void;
     oncreate?: (editor: LatexEditor) => void;
     oneditorscroll?: (fraction: number) => void;
@@ -53,6 +55,7 @@
     reveal: RevealRequest | null;
     keymapMode: KeymapMode;
     spellChecker: SpellChecker | null;
+    viewMode: 'code' | 'visual';
   }
 
   // Jump to a freshly-requested line, returning the nonce now acted on so a
@@ -69,7 +72,14 @@
     return lastNonce;
   }
 
-  const input = $derived<EditorInput>({ content, diagnostics, reveal, keymapMode, spellChecker });
+  const input = $derived<EditorInput>({
+    content,
+    diagnostics,
+    reveal,
+    keymapMode,
+    spellChecker,
+    viewMode
+  });
 
   // A Svelte action: build the editor when the surface mounts, push external
   // content, diagnostics, jump requests, and mode changes in, then tear down.
@@ -82,7 +92,8 @@
       keymapMode: value.keymapMode,
       spellChecker: value.spellChecker,
       onscroll: oneditorscroll,
-      citations
+      citations,
+      viewMode: value.viewMode
     });
     oncreate?.(editor);
     editor.setDiagnostics(value.diagnostics);
@@ -94,6 +105,7 @@
         lastNonce = applyReveal(editor, next.reveal, lastNonce);
         editor.setKeymapMode(next.keymapMode);
         editor.setSpellChecker(next.spellChecker);
+        editor.setViewMode(next.viewMode);
       },
       destroy() {
         editor.destroy();

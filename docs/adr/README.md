@@ -20,3 +20,4 @@ codebase stays legible.
 | 0013 | Assets & figures: image insertion workflow                                | Accepted |
 | 0014 | Math & tables: MathLive editor, symbol palette, table builder             | Accepted |
 | 0015 | Bibliography: `.bib` management, reference lookup, citation completion    | Accepted |
+| 0016 | Visual editor: CM6 decoration layer for rich-text view                    | Accepted |
