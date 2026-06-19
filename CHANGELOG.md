@@ -4,6 +4,39 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-06-19
+
+Bibliography — `.bib` management, DOI/arXiv reference lookup, citation completion, and
+on-disk bibliography rendering.
+
+### Added
+
+- **`galley-core::bibliography`** — a pure, tolerant `.bib` parser/serializer (`parse_bib`,
+  `serialize_bib`, `serialize_entry`) over `BibEntry`/`BibField`, plus `entry_summary`,
+  `suggest_cite_key`, and `arxiv_atom_to_entry` (arXiv Atom → entry). BibTeX and biblatex both
+  parse unchanged.
+- **`bibliography.ts`** — a faithful TypeScript mirror of the parser/serializer for client-side
+  use (`parseBib`, `serializeBib`, `serializeEntry`, `entryField`, `entrySummary`,
+  `citeCandidates`), so the project's `.bib` files parse with no IPC round-trip.
+- **Reference lookup** — a `lookup_reference` command resolves a DOI (via content negotiation)
+  or an arXiv id (via the arXiv API) into a bibliography entry, keeping network egress in the
+  Rust core. A `BibBackend` seam (`bib-backend.ts`) abstracts it for the browser and tests.
+- **Citation completion** — typing inside a `\cite`-family argument (including biblatex's
+  `\autocite`, `\textcite`, `\parencite`, `\nocite`, …) completes from the project's `.bib`
+  keys, including entries added but not yet saved.
+- **`BibPanel.svelte`** — a sidebar panel listing the project's references, a DOI/arXiv lookup
+  form, a `.bib` import (for Zotero exports), and click-to-insert `\cite{…}`.
+- **On-disk bibliography rendering** — `CompileRequest` now carries an optional project root,
+  threaded into the embedded Tectonic engine as a `filesystem_root` so `.bib` bibliographies,
+  `\input`-ed files, and on-disk images resolve during a compile, and the bibliography pass
+  (bibtex/biber) runs automatically.
+
+### Changed
+
+- `ProjectController` parses the project's `.bib` files into its state on open, exposes
+  `citeCandidates()`, and gains `addReference()` and `importBibText()` for managing references.
+- The frontend `compile` seam now passes the project root so renders resolve sibling files.
+
 ## [0.3.3] - 2026-06-19
 
 Math & tables — MathLive equation editor, symbol palette, and visual table builder.

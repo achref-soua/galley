@@ -90,6 +90,15 @@ impl LatexEngine for TectonicEngine {
             .output_format(OutputFormat::Pdf)
             .do_not_write_output_files();
 
+        // When a project root is known, let the engine read sibling files from
+        // disk — `.bib` bibliographies, `\input`-ed chapters, and images — so a
+        // multi-file document renders fully rather than as the primary input
+        // alone. Tectonic still runs the bibliography pass (bibtex/biber)
+        // automatically when the document cites entries.
+        if let Some(root) = &plan.project_root {
+            builder.filesystem_root(root);
+        }
+
         let mut session = builder
             .create(&mut status)
             .map_err(|e| EngineFailure::new(format!("failed to start the engine: {e}")))?;
