@@ -4,6 +4,44 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-06-19
+
+Assets & figures — image insertion workflow, collapsible asset panel, OS drag-and-drop, and `\graphicspath` banner.
+
+### Added
+
+- **`galley-core::assets`** — pure, I/O-free helpers: `figure_snippet(rel_path)` produces an
+  `\includegraphics[width=\linewidth]{…}` command; `needs_graphicspath(source)` detects whether
+  a document uses `\includegraphics` without a matching `\graphicspath` declaration.
+- **`SafeRoot::write_bytes`** (`galley-security`) — a binary-safe complement to `write`; accepts
+  `&[u8]` so image files can be copied into the sandbox with the same path-traversal and
+  symlink-escape protections as text files.
+- **Two new Tauri commands** (`copy_asset`, `list_assets`) write image files into an `assets/`
+  sub-directory of the project root (via `SafeRoot::write_bytes`) and enumerate them for the
+  sidebar panel.
+- **`assets.ts`** — TS-side helpers mirroring `galley-core::assets`: `isImageExt`, `assetSnippet`,
+  `needsGraphicspath`, `insertGraphicspath`.
+- **`asset-backend.ts`** — `AssetBackend` interface with `tauriAssetBackend` (invokes the Tauri
+  commands), `browserAssetBackend` (in-memory Map, for tests), and `selectAssetBackend(win)`
+  (auto-detects environment). Injectable via the `assetBackend` prop on `App`.
+- **`AssetPanel.svelte`** — collapsible sidebar panel that lists all files under `assets/`; shows
+  an `img` badge for recognized image extensions; clicking an asset calls `oninsert` with the
+  corresponding `\includegraphics` snippet; the `+` button opens the OS file picker; the panel
+  is only rendered when a project is open.
+- **`LatexEditor.insertAtCursor`** — new method on the editor interface and `createLatexEditor`;
+  dispatches a `replaceSelection` transaction so pasted snippets land at the cursor.
+- **OS drag-and-drop** on the editor area: dropping an image or PDF file copies it into
+  `assets/` and inserts the snippet at the cursor.
+- **`\graphicspath` banner** — appears above the editor when the open document uses
+  `\includegraphics` but has no `\graphicspath` declaration; "Add" inserts
+  `\graphicspath{{assets/}}` before `\begin{document}` and dismisses the banner; "Dismiss"
+  hides it without editing.
+
+### Internal
+
+- `fakeEditorFactory` in `tests/setup.ts` implements `insertAtCursor` so integration tests
+  can verify snippet injection without CodeMirror.
+
 ## [0.3.1] - 2026-06-19
 
 Preview polish — page navigation, zoom selector, synced scroll, and scroll-fraction propagation from the editor.

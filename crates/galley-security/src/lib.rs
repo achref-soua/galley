@@ -143,6 +143,36 @@ impl SafeRoot {
         fs::write(&target, contents).map_err(SandboxError::Io)
     }
 
+    /// Write binary content to a project-relative file, creating parent directories as needed.
+    ///
+    /// Identical to [`write`] but accepts arbitrary bytes — useful for copying
+    /// images and other binary assets into the project. Writing through a symlink
+    /// (final component or any parent) is refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SandboxError`] if the path is invalid, resolves outside the
+    /// root, or cannot be written.
+    pub fn write_bytes(&self, rel: &str, contents: &[u8]) -> Result<(), SandboxError> {
+        let parts = self.parts(rel)?;
+        let dir_parts = &parts[..parts.len() - 1];
+        self.assert_within(dir_parts)?;
+
+        let mut parent = self.root.clone();
+        for part in dir_parts {
+            parent.push(part);
+        }
+        fs::create_dir_all(&parent).map_err(SandboxError::Io)?;
+
+        let mut target = parent;
+        target.push(parts[parts.len() - 1]);
+        match fs::symlink_metadata(&target) {
+            Ok(meta) if meta.file_type().is_symlink() => return Err(SandboxError::Escape),
+            _ => {}
+        }
+        fs::write(&target, contents).map_err(SandboxError::Io)
+    }
+
     /// List every file in the project (recursively), excluding the `.galley/`
     /// metadata directory and never following symlinks. Paths are returned
     /// project-relative, forward-slashed, and sorted.
@@ -389,6 +419,56 @@ mod tests {
         // Restore permissions so the TempDir can be cleaned up.
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
         assert_eq!(tag(&result.unwrap_err()), "io");
+    }
+
+    #[test]
+    fn write_bytes_creates_binary_file_and_parents() {
+        let (dir, store) = temp();
+        let data: &[u8] = &[0x89, 0x50, 0x4e, 0x47]; // PNG magic
+        store.write_bytes("assets/sub/logo.png", data).unwrap();
+        let path = dir.path().join("assets/sub/logo.png");
+        assert_eq!(fs::read(path).unwrap(), data);
+    }
+
+    #[test]
+    fn write_bytes_rejects_traversal_and_bad_parent_and_dir_target() {
+        let (_dir, store) = temp();
+        assert_eq!(
+            tag(&store.write_bytes("../x", &[]).unwrap_err()),
+            "traversal"
+        );
+        // Parent path runs through a regular file.
+        store.write_bytes("file", &[0]).unwrap();
+        assert_eq!(
+            tag(&store.write_bytes("file/img.png", &[1]).unwrap_err()),
+            "io"
+        );
+        // Writing to an existing directory (non-symlink) fails.
+        store.write_bytes("dir/f", &[0]).unwrap();
+        assert_eq!(tag(&store.write_bytes("dir", &[1]).unwrap_err()), "io");
+    }
+
+    #[test]
+    fn write_bytes_refuses_symlink_final_and_parent() {
+        use std::os::unix::fs::symlink;
+        let outside = TempDir::new().unwrap();
+        let (dir, store) = temp();
+        let outside_file = outside.path().join("secret");
+        let outside_dir = outside.path().join("outdir");
+        fs::write(&outside_file, "x").unwrap();
+        fs::create_dir(&outside_dir).unwrap();
+        // Final component is a symlink to an external file.
+        symlink(&outside_file, dir.path().join("link.png")).unwrap();
+        assert_eq!(
+            tag(&store.write_bytes("link.png", &[1]).unwrap_err()),
+            "escape"
+        );
+        // A parent directory is a symlink to an external directory.
+        symlink(&outside_dir, dir.path().join("outdir")).unwrap();
+        assert_eq!(
+            tag(&store.write_bytes("outdir/img.png", &[1]).unwrap_err()),
+            "escape"
+        );
     }
 
     #[test]

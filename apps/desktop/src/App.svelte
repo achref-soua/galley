@@ -20,7 +20,11 @@
     type RevealRequest
   } from './lib/editor';
   import { pdfjsRenderer, type PdfRenderer } from './lib/pdf';
-  import { selectSyncTexBackend, type SyncTexBackend, type SyncTexBox } from './lib/synctex-backend';
+  import {
+    selectSyncTexBackend,
+    type SyncTexBackend,
+    type SyncTexBox
+  } from './lib/synctex-backend';
   import { windowTimer, type Timer } from './lib/debounce';
   import { systemClock, type Clock } from './lib/timing';
   import { webAudioBell, type Bell } from './lib/bell';
@@ -32,8 +36,11 @@
   } from './lib/keymap';
   import { type PaletteAction } from './lib/palette';
   import { parseIncludes, resolveIncludePath } from './lib/include-graph';
+  import { needsGraphicspath, insertGraphicspath, assetSnippet } from './lib/assets';
+  import { selectAssetBackend, type AssetBackend } from './lib/asset-backend';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
+  import AssetPanel from './lib/AssetPanel.svelte';
   import EditorPane from './lib/EditorPane.svelte';
   import ProblemsPanel from './lib/ProblemsPanel.svelte';
   import OutlinePanel from './lib/OutlinePanel.svelte';
@@ -55,7 +62,8 @@
     compileClock = systemClock(),
     bell = webAudioBell(),
     language = selectLanguageBackend(),
-    synctex = selectSyncTexBackend()
+    synctex = selectSyncTexBackend(),
+    assetBackend = selectAssetBackend()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -64,6 +72,7 @@
     bell?: Bell;
     language?: LanguageBackend;
     synctex?: SyncTexBackend;
+    assetBackend?: AssetBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -101,12 +110,15 @@
   let revealTarget = $state<RevealRequest | null>(null);
   let editorScrollFraction = $state<number | undefined>(undefined);
   projectController.subscribe((state) => (project = state));
-  previewPrefsStore.subscribe((p) => { previewPrefs = p; });
+  previewPrefsStore.subscribe((p) => {
+    previewPrefs = p;
+  });
   editorPrefsStore.subscribe((prefs) => {
     editorPrefs = prefs;
   });
   const reduceMotion = prefersReducedMotion();
   let searchRoot = $state<string | null>(null);
+  let graphicspathBannerDismissed = $state(false);
   $effect(() => {
     searchRoot = project.project == null ? null : project.project.root;
   });
@@ -238,6 +250,9 @@
   );
   // Resolved include paths from the live editor content, shown in the structure panel.
   const includes = $derived(parseIncludes(project.content).map(resolveIncludePath));
+  const showGraphicspathBanner = $derived(
+    project.project !== null && !graphicspathBannerDismissed && needsGraphicspath(project.content)
+  );
 
   function handleEditorScroll(frac: number) {
     editorScrollFraction = frac;
@@ -334,6 +349,22 @@
 
   function endResize() {}
 
+  function applyGraphicspath() {
+    projectController.edit(insertGraphicspath(project.content));
+    graphicspathBannerDismissed = true;
+  }
+
+  async function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    if (project.project === null) return;
+    const dt = event.dataTransfer;
+    if (dt == null || dt.files.length === 0) return;
+    const file = dt.files[0];
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const rel = await assetBackend.copyAsset(project.project.root, bytes, file.name);
+    editorRef!.insertAtCursor(assetSnippet(rel));
+  }
+
   function handleReplace(path: string, newContent: string) {
     if (path === project.activePath) {
       projectController.edit(newContent);
@@ -371,6 +402,13 @@
           onopenfolder={() => void projectController.pickAndOpen()}
           onopenrecent={(root) => void projectController.openFolder(root)}
         />
+        {#if project.project !== null}
+          <AssetPanel
+            root={project.project.root}
+            backend={assetBackend}
+            oninsert={(snippet) => editorRef!.insertAtCursor(snippet)}
+          />
+        {/if}
       </div>
       <Resizer
         label="Resize sidebar"
@@ -383,7 +421,24 @@
 
     <div class="pane editor">
       <div class="editor-stack">
-        <div class="editor-area">
+        {#if showGraphicspathBanner}
+          <div class="graphicspath-banner" role="alert">
+            <span>Add <code>\graphicspath</code> to locate images in assets/</span>
+            <button onclick={applyGraphicspath} aria-label="Add graphicspath">Add</button>
+            <button
+              onclick={() => {
+                graphicspathBannerDismissed = true;
+              }}>Dismiss</button
+            >
+          </div>
+        {/if}
+        <div
+          class="editor-area"
+          role="region"
+          aria-label="Editor area"
+          ondragover={(e) => e.preventDefault()}
+          ondrop={handleDrop}
+        >
           <EditorPane
             documentName={project.activePath}
             content={project.content}
@@ -394,7 +449,9 @@
             keymapMode={editorPrefs.keymapMode}
             {spellChecker}
             onedit={(content) => projectController.edit(content)}
-            oncreate={(e) => { editorRef = e; }}
+            oncreate={(e) => {
+              editorRef = e;
+            }}
             oneditorscroll={handleEditorScroll}
             createEditor={editor}
           />
@@ -518,5 +575,37 @@
   .editor-area {
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  .graphicspath-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--galley-space-3);
+    padding: var(--galley-space-2) var(--galley-space-4);
+    background: var(--surface);
+    border-bottom: var(--galley-border-thin) solid var(--border);
+    font-size: var(--galley-text-xs);
+    color: var(--fg-muted);
+    flex: none;
+  }
+
+  .graphicspath-banner span {
+    flex: 1 1 auto;
+  }
+
+  .graphicspath-banner button {
+    background: transparent;
+    border: var(--galley-border-thin) solid var(--border);
+    border-radius: 3px;
+    color: var(--fg-muted);
+    font-size: var(--galley-text-xs);
+    padding: 2px var(--galley-space-2);
+    cursor: pointer;
+    flex: none;
+  }
+
+  .graphicspath-banner button:hover {
+    color: var(--fg);
+    border-color: var(--fg-faint);
   }
 </style>

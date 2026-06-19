@@ -18,8 +18,8 @@
 //! `pdf_y = page_height - v`.  The page height is read from the first vbox
 //! record of each page (which is always the full-page bounding box).
 
-use galley_core::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 use flate2::read::GzDecoder;
+use galley_core::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 use std::collections::HashMap;
 use std::io::Read;
 
@@ -229,10 +229,8 @@ fn parse_record(line: &str) -> Option<Record> {
         b
     } else if let Some(b) = line.strip_prefix(']') {
         b
-    } else if let Some(b) = line.strip_prefix("vb") {
-        b
     } else {
-        return None;
+        line.strip_prefix("vb")?
     };
     parse_box_body(body)
 }
@@ -257,21 +255,28 @@ fn parse_box_body(body: &str) -> Option<Record> {
         (rest1, None)
     };
 
-    let hv: Vec<i64> = hv_str
-        .split(',')
-        .filter_map(|s| s.parse().ok())
-        .collect();
+    let hv: Vec<i64> = hv_str.split(',').filter_map(|s| s.parse().ok()).collect();
     let h = hv.first().copied().unwrap_or(0);
     let v = hv.get(1).copied().unwrap_or(0);
 
     let (w, d) = if let Some(wda) = wda_str {
         let wda: Vec<i64> = wda.split(',').filter_map(|s| s.parse().ok()).collect();
-        (wda.first().copied().unwrap_or(0), wda.get(1).copied().unwrap_or(0))
+        (
+            wda.first().copied().unwrap_or(0),
+            wda.get(1).copied().unwrap_or(0),
+        )
     } else {
         (0, 0)
     };
 
-    Some(Record { file_num, line, h, v, w, d })
+    Some(Record {
+        file_num,
+        line,
+        h,
+        v,
+        w,
+        d,
+    })
 }
 
 /// Parse a complete decompressed SyncTeX document.

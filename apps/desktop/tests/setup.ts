@@ -20,9 +20,15 @@ export function fakeEditorFactory(): EditorFactory {
       },
       setDiagnostics() {},
       gotoLine() {},
-      currentLine() { return 1; },
+      currentLine() {
+        return 1;
+      },
       setKeymapMode() {},
       setSpellChecker() {},
+      insertAtCursor(text) {
+        area.value += text;
+        onChange(area.value);
+      },
       destroy() {
         area.remove();
       }

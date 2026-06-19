@@ -22,6 +22,7 @@ function spyEditor() {
     currentLine: () => 1,
     setKeymapMode: (mode) => calls.setKeymapMode.push(mode),
     setSpellChecker: (checker) => calls.setSpellChecker.push(checker),
+    insertAtCursor: () => {},
     destroy: () => {}
   });
   return { factory, calls };

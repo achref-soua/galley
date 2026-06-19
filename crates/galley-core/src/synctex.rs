@@ -82,7 +82,10 @@ mod tests {
         assert_eq!(b.d, 50);
         assert_eq!(b.page_height, 5000);
         assert_eq!(b.clone(), b);
-        let b2 = SyncTexBox { h: 999, ..b.clone() };
+        let b2 = SyncTexBox {
+            h: 999,
+            ..b.clone()
+        };
         assert_ne!(b, b2);
         assert!(format!("{b:?}").contains("SyncTexBox"));
     }
@@ -96,7 +99,10 @@ mod tests {
         assert_eq!(loc.file, "/a/b.tex");
         assert_eq!(loc.line, 42);
         assert_eq!(loc.clone(), loc);
-        let loc2 = SyncTexLocation { line: 1, ..loc.clone() };
+        let loc2 = SyncTexLocation {
+            line: 1,
+            ..loc.clone()
+        };
         assert_ne!(loc, loc2);
         assert!(format!("{loc:?}").contains("SyncTexLocation"));
     }

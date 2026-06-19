@@ -130,10 +130,16 @@ describe('PreviewPane', () => {
     // Give the canvas real pixel dimensions so canvasWidth/canvasHeight are non-zero
     // when the renderProof .then callback fires, exercising the viewBox update branch.
     Object.defineProperty(HTMLCanvasElement.prototype, 'width', {
-      get() { return 800; }, configurable: true
+      get() {
+        return 800;
+      },
+      configurable: true
     });
     Object.defineProperty(HTMLCanvasElement.prototype, 'height', {
-      get() { return 1100; }, configurable: true
+      get() {
+        return 1100;
+      },
+      configurable: true
     });
     const { rerender } = render(PreviewPane, {
       props: {
@@ -144,8 +150,13 @@ describe('PreviewPane', () => {
         createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
       }
     });
-    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box,
-      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await rerender({
+      status: 'ok',
+      log: '',
+      pdf: new Uint8Array([1]),
+      highlightBox: box,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+    });
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
     // Restore canvas prototype to avoid affecting other tests.
     delete (HTMLCanvasElement.prototype as { width?: unknown }).width;
@@ -159,7 +170,9 @@ describe('PreviewPane', () => {
         status: 'ok',
         log: '',
         pdf: new Uint8Array([1]),
-        oninversesearch: (page: number, x: number, y: number) => { calls.push([page, x, y]); },
+        oninversesearch: (page: number, x: number, y: number) => {
+          calls.push([page, x, y]);
+        },
         createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
       }
     });
@@ -167,7 +180,14 @@ describe('PreviewPane', () => {
     const canvas = screen.getByLabelText('Proof') as HTMLCanvasElement;
     // Provide real CSS dimensions so the rect.width > 0 branch in handleCanvasClick is taken.
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
-      width: 100, height: 150, left: 10, top: 20, right: 110, bottom: 170, x: 10, y: 20,
+      width: 100,
+      height: 150,
+      left: 10,
+      top: 20,
+      right: 110,
+      bottom: 170,
+      x: 10,
+      y: 20,
       toJSON: () => ({})
     } as DOMRect);
     canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 80 }));
@@ -194,13 +214,20 @@ describe('PreviewPane', () => {
     const box = { page: 1, h: 65781, v: 131563, w: 65781, d: 6578, page_height: 200000 };
     const { rerender } = render(PreviewPane, {
       props: {
-        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
         highlightBox: null,
         createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
       }
     });
-    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box,
-      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await rerender({
+      status: 'ok',
+      log: '',
+      pdf: new Uint8Array([1]),
+      highlightBox: box,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+    });
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
     vi.advanceTimersByTime(2001);
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).toBeNull());
@@ -233,12 +260,16 @@ describe('PreviewPane', () => {
       props: { status: 'ok', log: '', pdf: new Uint8Array([1]), createRenderer: create }
     });
     await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy());
-    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(
+      true
+    );
     expect(screen.getByRole('button', { name: 'Next page' }).hasAttribute('disabled')).toBe(false);
 
     await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
     await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy());
-    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Previous page' }).hasAttribute('disabled')).toBe(
+      false
+    );
     expect(screen.getByRole('button', { name: 'Next page' }).hasAttribute('disabled')).toBe(true);
   });
 
@@ -280,16 +311,22 @@ describe('PreviewPane', () => {
     const create = rendererWith(() => Promise.resolve({ pageCount: 1 }));
     const { rerender } = render(PreviewPane, {
       props: {
-        status: 'ok', log: '', pdf: new Uint8Array([1]),
-        syncScroll: false, editorScrollFraction: undefined,
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        syncScroll: false,
+        editorScrollFraction: undefined,
         createRenderer: create
       }
     });
     await waitFor(() => expect(screen.getByLabelText('Proof')).toBeTruthy());
     // Enable sync scroll and feed a fraction — no crash expected.
     await rerender({
-      status: 'ok', log: '', pdf: new Uint8Array([1]),
-      syncScroll: true, editorScrollFraction: 0.5,
+      status: 'ok',
+      log: '',
+      pdf: new Uint8Array([1]),
+      syncScroll: true,
+      editorScrollFraction: 0.5,
       createRenderer: create
     });
   });
@@ -298,8 +335,11 @@ describe('PreviewPane', () => {
     const create = rendererWith(() => Promise.resolve({ pageCount: 1 }));
     render(PreviewPane, {
       props: {
-        status: 'ok', log: '', pdf: new Uint8Array([1]),
-        syncScroll: false, editorScrollFraction: 0.5,
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        syncScroll: false,
+        editorScrollFraction: 0.5,
         createRenderer: create
       }
     });
@@ -311,8 +351,12 @@ describe('PreviewPane', () => {
     const create = rendererWith(() => Promise.resolve({ pageCount: 2 }));
     render(PreviewPane, {
       props: {
-        status: 'ok', log: '', pdf: new Uint8Array([1]),
-        oninversesearch: (page: number) => { calls.push(page); },
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
+        oninversesearch: (page: number) => {
+          calls.push(page);
+        },
         createRenderer: create
       }
     });
@@ -322,7 +366,14 @@ describe('PreviewPane', () => {
 
     const canvas = screen.getByLabelText('Proof') as HTMLCanvasElement;
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
-      width: 100, height: 150, left: 0, top: 0, right: 100, bottom: 150, x: 0, y: 0,
+      width: 100,
+      height: 150,
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 150,
+      x: 0,
+      y: 0,
       toJSON: () => ({})
     } as DOMRect);
     canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 50 }));
@@ -335,15 +386,22 @@ describe('PreviewPane', () => {
     const box2 = { page: 1, h: 131563, v: 262000, w: 65781, d: 6578, page_height: 200000 };
     const { rerender } = render(PreviewPane, {
       props: {
-        status: 'ok', log: '', pdf: new Uint8Array([1]),
+        status: 'ok',
+        log: '',
+        pdf: new Uint8Array([1]),
         highlightBox: box1,
         createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
       }
     });
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
     // A second highlight arrives while the first timer is still pending.
-    await rerender({ status: 'ok', log: '', pdf: new Uint8Array([1]), highlightBox: box2,
-      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 })) });
+    await rerender({
+      status: 'ok',
+      log: '',
+      pdf: new Uint8Array([1]),
+      highlightBox: box2,
+      createRenderer: rendererWith(() => Promise.resolve({ pageCount: 1 }))
+    });
     await waitFor(() => expect(document.querySelector('.synctex-highlight')).not.toBeNull());
     vi.useRealTimers();
   });
