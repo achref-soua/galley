@@ -5,7 +5,14 @@ import {
   parseItems,
   parseInlineMath,
   parseLinks,
-  parseImages
+  parseImages,
+  HEADING_ORDER,
+  lineHeadingCmd,
+  promoteHeading,
+  demoteHeading,
+  toggleBold,
+  toggleItalic,
+  isItemLine
 } from '../src/lib/visual';
 
 // ---------------------------------------------------------------------------
@@ -289,5 +296,285 @@ describe('parseImages', () => {
   it('handles empty path', () => {
     const [img] = parseImages('\\includegraphics{}');
     expect(img.path).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HEADING_ORDER
+// ---------------------------------------------------------------------------
+describe('HEADING_ORDER', () => {
+  it('starts with part and ends with subparagraph', () => {
+    expect(HEADING_ORDER[0]).toBe('part');
+    expect(HEADING_ORDER[HEADING_ORDER.length - 1]).toBe('subparagraph');
+  });
+
+  it('has 7 levels', () => {
+    expect(HEADING_ORDER).toHaveLength(7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lineHeadingCmd
+// ---------------------------------------------------------------------------
+describe('lineHeadingCmd', () => {
+  it('returns null for a plain text line', () => {
+    expect(lineHeadingCmd('Hello world')).toBeNull();
+  });
+
+  it('returns null for \\itemize', () => {
+    expect(lineHeadingCmd('\\itemize')).toBeNull();
+  });
+
+  it('detects \\section', () => {
+    expect(lineHeadingCmd('\\section{Introduction}')).toBe('section');
+  });
+
+  it('detects \\subsection', () => {
+    expect(lineHeadingCmd('\\subsection{Methods}')).toBe('subsection');
+  });
+
+  it('detects \\subsubsection', () => {
+    expect(lineHeadingCmd('\\subsubsection{Detail}')).toBe('subsubsection');
+  });
+
+  it('detects \\paragraph', () => {
+    expect(lineHeadingCmd('\\paragraph{Note}')).toBe('paragraph');
+  });
+
+  it('detects \\subparagraph', () => {
+    expect(lineHeadingCmd('\\subparagraph{Fine}')).toBe('subparagraph');
+  });
+
+  it('detects \\part', () => {
+    expect(lineHeadingCmd('\\part{Part One}')).toBe('part');
+  });
+
+  it('detects \\chapter', () => {
+    expect(lineHeadingCmd('\\chapter{One}')).toBe('chapter');
+  });
+
+  it('detects starred variant \\section*{…}', () => {
+    expect(lineHeadingCmd('\\section*{Unnumbered}')).toBe('section');
+  });
+
+  it('detects heading with leading whitespace', () => {
+    expect(lineHeadingCmd('  \\section{A}')).toBe('section');
+  });
+
+  it('returns null for \\sectionmark (not a heading command)', () => {
+    expect(lineHeadingCmd('\\sectionmark')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// promoteHeading
+// ---------------------------------------------------------------------------
+describe('promoteHeading', () => {
+  it('returns null for a non-heading line', () => {
+    expect(promoteHeading('Hello')).toBeNull();
+  });
+
+  it('returns null for \\part (already at top)', () => {
+    expect(promoteHeading('\\part{P}')).toBeNull();
+  });
+
+  it('promotes \\chapter → \\part', () => {
+    expect(promoteHeading('\\chapter{C}')).toBe('\\part{C}');
+  });
+
+  it('promotes \\section → \\chapter', () => {
+    expect(promoteHeading('\\section{S}')).toBe('\\chapter{S}');
+  });
+
+  it('promotes \\subsection → \\section', () => {
+    expect(promoteHeading('\\subsection{M}')).toBe('\\section{M}');
+  });
+
+  it('promotes \\subsubsection → \\subsection', () => {
+    expect(promoteHeading('\\subsubsection{D}')).toBe('\\subsection{D}');
+  });
+
+  it('promotes \\paragraph → \\subsubsection', () => {
+    expect(promoteHeading('\\paragraph{N}')).toBe('\\subsubsection{N}');
+  });
+
+  it('promotes \\subparagraph → \\paragraph', () => {
+    expect(promoteHeading('\\subparagraph{F}')).toBe('\\paragraph{F}');
+  });
+
+  it('preserves content after the command', () => {
+    const line = '\\subsection{Methods} % comment';
+    const result = promoteHeading(line);
+    expect(result).toBe('\\section{Methods} % comment');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// demoteHeading
+// ---------------------------------------------------------------------------
+describe('demoteHeading', () => {
+  it('returns null for a non-heading line', () => {
+    expect(demoteHeading('Hello')).toBeNull();
+  });
+
+  it('returns null for \\subparagraph (already at bottom)', () => {
+    expect(demoteHeading('\\subparagraph{F}')).toBeNull();
+  });
+
+  it('demotes \\part → \\chapter', () => {
+    expect(demoteHeading('\\part{P}')).toBe('\\chapter{P}');
+  });
+
+  it('demotes \\chapter → \\section', () => {
+    expect(demoteHeading('\\chapter{C}')).toBe('\\section{C}');
+  });
+
+  it('demotes \\section → \\subsection', () => {
+    expect(demoteHeading('\\section{S}')).toBe('\\subsection{S}');
+  });
+
+  it('demotes \\subsection → \\subsubsection', () => {
+    expect(demoteHeading('\\subsection{M}')).toBe('\\subsubsection{M}');
+  });
+
+  it('demotes \\subsubsection → \\paragraph', () => {
+    expect(demoteHeading('\\subsubsection{D}')).toBe('\\paragraph{D}');
+  });
+
+  it('demotes \\paragraph → \\subparagraph', () => {
+    expect(demoteHeading('\\paragraph{N}')).toBe('\\subparagraph{N}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toggleBold
+// ---------------------------------------------------------------------------
+describe('toggleBold', () => {
+  it('wraps plain selection with \\textbf{…}', () => {
+    const src = 'hello world';
+    const edit = toggleBold(src, 6, 11);
+    expect(edit.changes).toHaveLength(1);
+    expect(edit.changes[0]).toEqual({ from: 6, to: 11, insert: '\\textbf{world}' });
+    expect(edit.anchor).toBe(6);
+    expect(edit.head).toBe(6 + '\\textbf{world}'.length);
+  });
+
+  it('wraps an empty selection (cursor) at position 0', () => {
+    const src = 'abc';
+    const edit = toggleBold(src, 0, 0);
+    expect(edit.changes[0].insert).toBe('\\textbf{}');
+  });
+
+  it('unwraps when selection is the content of \\textbf{…}', () => {
+    const src = '\\textbf{hello}';
+    // from=8 (after \textbf{), to=13 (before })
+    const edit = toggleBold(src, 8, 13);
+    expect(edit.changes).toHaveLength(2);
+    expect(edit.changes[0]).toEqual({ from: 0, to: 8, insert: '' });
+    expect(edit.changes[1]).toEqual({ from: 13, to: 14, insert: '' });
+    expect(edit.anchor).toBe(0);
+    expect(edit.head).toBe(5); // 13 - 8
+  });
+
+  it('unwraps when the full selection text is \\textbf{content}', () => {
+    const src = 'see \\textbf{hello} there';
+    const edit = toggleBold(src, 4, 18);
+    expect(edit.changes).toHaveLength(1);
+    expect(edit.changes[0]).toEqual({ from: 4, to: 18, insert: 'hello' });
+    expect(edit.anchor).toBe(4);
+    expect(edit.head).toBe(9);
+  });
+
+  it('does not unwrap when prefix is \\textbf{ but no closing }', () => {
+    // src: \textbf{hello  (missing closing brace)
+    const src = '\\textbf{hello extra';
+    const edit = toggleBold(src, 8, 13);
+    // src[13] is ' ', not '}', so it should wrap
+    expect(edit.changes[0].insert).toBe('\\textbf{hello}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toggleItalic
+// ---------------------------------------------------------------------------
+describe('toggleItalic', () => {
+  it('wraps plain selection with \\textit{…}', () => {
+    const src = 'hello world';
+    const edit = toggleItalic(src, 6, 11);
+    expect(edit.changes[0]).toEqual({ from: 6, to: 11, insert: '\\textit{world}' });
+    expect(edit.head).toBe(6 + '\\textit{world}'.length);
+  });
+
+  it('unwraps \\textit{ … } via surrounding context', () => {
+    const src = '\\textit{hello}';
+    const edit = toggleItalic(src, 8, 13);
+    expect(edit.changes).toHaveLength(2);
+    expect(edit.changes[0]).toEqual({ from: 0, to: 8, insert: '' });
+    expect(edit.changes[1]).toEqual({ from: 13, to: 14, insert: '' });
+    expect(edit.anchor).toBe(0);
+    expect(edit.head).toBe(5);
+  });
+
+  it('unwraps \\emph{ … } via surrounding context', () => {
+    const src = '\\emph{hello}';
+    // from=6 (after \emph{), to=11 (before })
+    const edit = toggleItalic(src, 6, 11);
+    expect(edit.changes).toHaveLength(2);
+    expect(edit.changes[0]).toEqual({ from: 0, to: 6, insert: '' });
+    expect(edit.changes[1]).toEqual({ from: 11, to: 12, insert: '' });
+    expect(edit.anchor).toBe(0);
+    expect(edit.head).toBe(5);
+  });
+
+  it('unwraps when selection text is \\textit{content}', () => {
+    const src = 'see \\textit{hello} there';
+    const edit = toggleItalic(src, 4, 18);
+    expect(edit.changes[0]).toEqual({ from: 4, to: 18, insert: 'hello' });
+    expect(edit.anchor).toBe(4);
+    expect(edit.head).toBe(9);
+  });
+
+  it('unwraps when selection text is \\emph{content}', () => {
+    const src = 'see \\emph{hello} there';
+    const edit = toggleItalic(src, 4, 16);
+    expect(edit.changes[0]).toEqual({ from: 4, to: 16, insert: 'hello' });
+    expect(edit.anchor).toBe(4);
+    expect(edit.head).toBe(9);
+  });
+
+  it('wraps when prefix matches \\textit{ but no closing }', () => {
+    const src = '\\textit{hello extra';
+    const edit = toggleItalic(src, 8, 13);
+    // src[13] = ' ', not }, so wraps
+    expect(edit.changes[0].insert).toBe('\\textit{hello}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isItemLine
+// ---------------------------------------------------------------------------
+describe('isItemLine', () => {
+  it('returns true for \\item followed by space', () => {
+    expect(isItemLine('\\item First line')).toBe(true);
+  });
+
+  it('returns true for \\item at end of string', () => {
+    expect(isItemLine('\\item')).toBe(true);
+  });
+
+  it('returns true for indented \\item', () => {
+    expect(isItemLine('  \\item text')).toBe(true);
+  });
+
+  it('returns false for \\itemize', () => {
+    expect(isItemLine('\\itemize')).toBe(false);
+  });
+
+  it('returns false for plain text', () => {
+    expect(isItemLine('hello world')).toBe(false);
+  });
+
+  it('returns false for \\begin{itemize}', () => {
+    expect(isItemLine('\\begin{itemize}')).toBe(false);
   });
 });
