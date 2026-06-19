@@ -11,7 +11,8 @@ function spyEditor() {
     setDiagnostics: 0,
     gotoLine: [] as number[],
     setKeymapMode: [] as string[],
-    setSpellChecker: [] as unknown[]
+    setSpellChecker: [] as unknown[],
+    setViewMode: [] as string[]
   };
   const factory: EditorFactory = () => ({
     setDoc: (value) => calls.setDoc.push(value),
@@ -23,6 +24,7 @@ function spyEditor() {
     setKeymapMode: (mode) => calls.setKeymapMode.push(mode),
     setSpellChecker: (checker) => calls.setSpellChecker.push(checker),
     insertAtCursor: () => {},
+    setViewMode: (mode) => calls.setViewMode.push(mode),
     destroy: () => {}
   });
   return { factory, calls };
@@ -137,5 +139,24 @@ describe('EditorPane', () => {
 
     await rerender({ ...base, keymapMode: 'vim' as const, spellChecker: fakeChecker });
     expect(calls.setSpellChecker).toContain(fakeChecker);
+  });
+
+  it('calls setViewMode when viewMode prop changes', async () => {
+    const { factory, calls } = spyEditor();
+    const base = {
+      documentName: 'main.tex',
+      content: 'x',
+      dirty: false,
+      viewMode: 'code' as const,
+      onedit: () => {},
+      createEditor: factory
+    };
+    const { rerender } = render(EditorPane, { props: base });
+
+    await rerender({ ...base, viewMode: 'visual' as const });
+    expect(calls.setViewMode).toContain('visual');
+
+    await rerender({ ...base, viewMode: 'code' as const });
+    expect(calls.setViewMode).toContain('code');
   });
 });

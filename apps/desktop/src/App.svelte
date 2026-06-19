@@ -116,6 +116,7 @@
   let searchOpen = $state(false);
   let mathOpen = $state(false);
   let tableOpen = $state(false);
+  let viewMode = $state<'code' | 'visual'>('code');
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
   let previewPrefs = $state(previewPrefsStore.prefs);
@@ -247,6 +248,13 @@
       label: 'Open Settings',
       run() {
         settingsOpen = true;
+      }
+    },
+    {
+      id: 'toggle-view-mode',
+      label: 'Toggle Visual Mode',
+      run() {
+        toggleViewMode();
       }
     },
     {
@@ -403,6 +411,10 @@
     }
   }
 
+  function toggleViewMode() {
+    viewMode = viewMode === 'code' ? 'visual' : 'code';
+  }
+
   function insertMath(wrapped: string) {
     editorRef!.insertAtCursor(wrapped);
     mathOpen = false;
@@ -425,6 +437,7 @@
     {compiling}
     sidebarCollapsed={layout.sidebarCollapsed}
     previewCollapsed={layout.previewCollapsed}
+    {viewMode}
     oncompile={() => void projectController.compile()}
     onsave={() => void projectController.save()}
     ontogglesidebar={toggleSidebar}
@@ -432,6 +445,7 @@
     onopensettings={() => (settingsOpen = true)}
     onopenmatch={() => (mathOpen = true)}
     onopentable={() => (tableOpen = true)}
+    ontoggleviewmode={toggleViewMode}
   />
 
   <main class="workspace">
@@ -500,6 +514,7 @@
             keymapMode={editorPrefs.keymapMode}
             {spellChecker}
             citations={() => projectController.citeCandidates()}
+            {viewMode}
             onedit={(content) => projectController.edit(content)}
             oncreate={(e) => {
               editorRef = e;

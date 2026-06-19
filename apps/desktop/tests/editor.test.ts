@@ -370,3 +370,222 @@ describe('createLatexEditor — setKeymapMode and setSpellChecker', () => {
     host.remove();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Visual mode: BulletWidget, ChipWidget, buildVisualDecorations, setViewMode
+// ---------------------------------------------------------------------------
+import { BulletWidget, ChipWidget, buildVisualDecorations, visualPlugin } from '../src/lib/editor';
+import { EditorView } from '@codemirror/view';
+import { EditorState as ES2 } from '@codemirror/state';
+
+describe('BulletWidget', () => {
+  it('toDOM produces a bullet span', () => {
+    const w = new BulletWidget();
+    const dom = w.toDOM();
+    expect(dom.tagName).toBe('SPAN');
+    expect(dom.className).toContain('cm-visual-bullet');
+    expect(dom.textContent).toBe('•');
+    expect(dom.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('eq returns true for same type', () => {
+    expect(new BulletWidget().eq(new BulletWidget())).toBe(true);
+  });
+
+  it('eq returns false for ChipWidget', () => {
+    expect(new BulletWidget().eq(new ChipWidget('x', 'cls'))).toBe(false);
+  });
+});
+
+describe('ChipWidget', () => {
+  it('toDOM produces a chip span with correct text and class', () => {
+    const w = new ChipWidget('x^2', 'cm-visual-math');
+    const dom = w.toDOM();
+    expect(dom.tagName).toBe('SPAN');
+    expect(dom.className).toContain('cm-visual-chip');
+    expect(dom.className).toContain('cm-visual-math');
+    expect(dom.textContent).toBe('x^2');
+  });
+
+  it('eq returns true for same text and class', () => {
+    const a = new ChipWidget('t', 'c');
+    const b = new ChipWidget('t', 'c');
+    expect(a.eq(b)).toBe(true);
+  });
+
+  it('eq returns false when text differs', () => {
+    expect(new ChipWidget('a', 'c').eq(new ChipWidget('b', 'c'))).toBe(false);
+  });
+
+  it('eq returns false when class differs', () => {
+    expect(new ChipWidget('a', 'c').eq(new ChipWidget('a', 'd'))).toBe(false);
+  });
+
+  it('eq returns false for BulletWidget', () => {
+    expect(new ChipWidget('x', 'c').eq(new BulletWidget())).toBe(false);
+  });
+});
+
+describe('buildVisualDecorations', () => {
+  it('returns an empty set for an empty document', () => {
+    const set = buildVisualDecorations('');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBe(0);
+  });
+
+  it('produces decorations for a heading', () => {
+    const set = buildVisualDecorations('\\section{Introduction}');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    // replace(\section{) + mark(Introduction) + replace(}) = 3
+    expect(count).toBe(3);
+  });
+
+  it('produces decorations for bold markup', () => {
+    const set = buildVisualDecorations('\\textbf{hello}');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBe(3); // replace + mark + replace
+  });
+
+  it('produces decorations for italic markup', () => {
+    const set = buildVisualDecorations('\\emph{test}');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBe(3);
+  });
+
+  it('produces a decoration for \\item', () => {
+    const set = buildVisualDecorations('\\item text');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('produces a decoration for inline math', () => {
+    const set = buildVisualDecorations('The value $x^2$.');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('produces a decoration for \\includegraphics', () => {
+    const set = buildVisualDecorations('\\includegraphics{fig.png}');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('produces a decoration for \\url', () => {
+    const set = buildVisualDecorations('\\url{https://example.com}');
+    let count = 0;
+    const it2 = set.iter();
+    while (it2.value !== null) {
+      count++;
+      it2.next();
+    }
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skips overlapping ranges (lastTo filter)', () => {
+    // \textbf{\emph{nested}} — outer match covers part of inner; lastTo filter drops the inner
+    // In practice [^}]* won't match nested braces; this test just confirms no crash
+    expect(() => buildVisualDecorations('\\textbf{a} \\emph{b}')).not.toThrow();
+  });
+
+  it('handles an empty heading title (two ranges share the same from, exercises sort tiebreaker)', () => {
+    // \section{} produces titleFrom === titleTo — the mark and the closing-brace replace
+    // both start at the same position, exercising the b.to - a.to tiebreaker in the sort.
+    expect(() => buildVisualDecorations('\\section{}')).not.toThrow();
+    const set = buildVisualDecorations('\\section{}');
+    let count = 0;
+    set.between(0, '\\section{}'.length, () => {
+      count++;
+    });
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('visualPlugin', () => {
+  it('creates a CM6 extension without throwing', () => {
+    expect(() => visualPlugin()).not.toThrow();
+  });
+
+  it('applies decorations to an EditorView and responds to doc changes', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const plugin = visualPlugin();
+    const view = new EditorView({
+      parent: host,
+      state: ES2.create({
+        doc: '\\section{Hello}',
+        extensions: [plugin]
+      })
+    });
+    // The plugin's update() fires after dispatch — no throw expected
+    expect(() =>
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '\\section{World}' } })
+    ).not.toThrow();
+    view.destroy();
+    host.remove();
+  });
+});
+
+describe('createLatexEditor — setViewMode', () => {
+  it('toggles to visual mode and back without throwing', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({
+      parent: host,
+      doc: '\\section{Title}\n\\item text\n$x^2$',
+      onChange: vi.fn()
+    });
+    expect(() => editor.setViewMode('visual')).not.toThrow();
+    expect(() => editor.setViewMode('code')).not.toThrow();
+    editor.destroy();
+    host.remove();
+  });
+
+  it('constructs with viewMode visual without throwing', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const editor = createLatexEditor({
+      parent: host,
+      doc: '\\section{Title}',
+      onChange: vi.fn(),
+      viewMode: 'visual'
+    });
+    expect(host.querySelector('.cm-editor')).not.toBeNull();
+    editor.destroy();
+    host.remove();
+  });
+});
