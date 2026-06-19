@@ -42,6 +42,8 @@
   import { selectAiBackend, type AiBackend } from './lib/ai-backend';
   import { locatePatch } from './lib/assistant';
   import AiChatPanel from './lib/AiChatPanel.svelte';
+  import AgentPanel from './lib/AgentPanel.svelte';
+  import { selectAgentToolBackend, type AgentToolBackend } from './lib/agent-backend';
   import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import {
@@ -85,6 +87,7 @@
     assetBackend = selectAssetBackend(),
     bibBackend = selectBibBackend(),
     aiBackend = selectAiBackend(),
+    agentBackend = selectAgentToolBackend('') as AgentToolBackend,
     mathFieldSetup = realMathFieldSetup,
     initialReviewEntries = [] as ReviewEntry[]
   }: {
@@ -98,6 +101,7 @@
     assetBackend?: AssetBackend;
     bibBackend?: BibBackend;
     aiBackend?: AiBackend;
+    agentBackend?: AgentToolBackend;
     mathFieldSetup?: MathFieldSetup;
     initialReviewEntries?: ReviewEntry[];
   } = $props();
@@ -129,6 +133,7 @@
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
   let chatOpen = $state(false);
+  let agentsOpen = $state(false);
   let chatProjectRoot = $state('');
   let paletteOpen = $state(false);
   let searchOpen = $state(false);
@@ -282,6 +287,13 @@
       label: 'Toggle AI Assistant',
       run() {
         chatOpen = !chatOpen;
+      }
+    },
+    {
+      id: 'toggle-agents',
+      label: 'Toggle Agent Orchestrator',
+      run() {
+        agentsOpen = !agentsOpen;
       }
     },
     {
@@ -626,6 +638,16 @@
             content={project.content}
             selectedText=""
             errorLog={project.compile.log}
+            onpatch={handleAiPatch}
+          />
+        {/if}
+        {#if agentsOpen}
+          <AgentPanel
+            backend={aiBackend}
+            {agentBackend}
+            projectRoot={chatProjectRoot}
+            projectTitle={project.project?.name ?? ''}
+            content={project.content}
             onpatch={handleAiPatch}
           />
         {/if}

@@ -11,13 +11,13 @@ v0.5.0 shipped a provider-agnostic AI gateway (`galley-ai`, `AiSettingsPanel`, 8
 
 Add a **chat side-panel** (`AiChatPanel.svelte`) toggled from the titlebar. The panel supports three intents:
 
-| Intent | Trigger | Sends |
-|--------|---------|-------|
-| **Explain** | Always available | selected text + full document context |
-| **Fix Error** | Only when compile log is non-empty | log + full document as snippet |
-| **Transform** | Only when text is selected | selection only |
+| Intent        | Trigger                            | Sends                                 |
+| ------------- | ---------------------------------- | ------------------------------------- |
+| **Explain**   | Always available                   | selected text + full document context |
+| **Fix Error** | Only when compile log is non-empty | log + full document as snippet        |
+| **Transform** | Only when text is selected         | selection only                        |
 
-**Patch proposals flow into the existing ReviewEntry queue** rather than being applied directly. The AI response is scanned for `` ```latex ``` `` fenced blocks; each block becomes a ReviewEntry via `locatePatch` (which searches for `before` text in the document, or falls back to a 0-length insertion). The author accepts or rejects each proposal using the existing review UI — no new write paths were added.
+**Patch proposals flow into the existing ReviewEntry queue** rather than being applied directly. The AI response is scanned for ` ```latex ``` ` fenced blocks; each block becomes a ReviewEntry via `locatePatch` (which searches for `before` text in the document, or falls back to a 0-length insertion). The author accepts or rejects each proposal using the existing review UI — no new write paths were added.
 
 **Stop-in-flight** is handled by a monotonic `generation` counter. `sendMessage` captures `const myGen = ++generation` before every `await`. After the promise resolves (or rejects), it checks `if (myGen !== generation) return` and discards any stale response. `stop()` simply increments `generation` and sets `busy = false`.
 
@@ -34,7 +34,7 @@ All prompt-construction logic lives in a new, I/O-free Rust module:
 The TypeScript side mirrors this with functions in `apps/desktop/src/lib/assistant.ts` (also pure, fully unit-tested):
 
 - `buildExplainPrompt` / `buildFixErrorPrompt` / `buildTransformPrompt`
-- `parsePatches(response, originalText)` — regex-extracts `` ```latex ``` `` blocks
+- `parsePatches(response, originalText)` — regex-extracts ` ```latex ``` ` blocks
 - `locatePatch(id, content, before, after)` — maps a before/after pair to a ReviewEntry
 
 ## Coverage strategy

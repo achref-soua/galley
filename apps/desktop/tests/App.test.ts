@@ -1311,6 +1311,27 @@ describe('App — layout, drag/drop, and review handlers', () => {
     expect(screen.queryByLabelText('AI assistant')).toBeNull();
   });
 
+  it('palette toggle-agents action opens the agent orchestrator panel', async () => {
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell
+      }
+    });
+    expect(screen.queryByLabelText('Agent orchestrator')).toBeNull();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Toggle Agent Orchestrator'));
+    expect(screen.getByLabelText('Agent orchestrator')).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette2 = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette2).getByText('Toggle Agent Orchestrator'));
+    expect(screen.queryByLabelText('Agent orchestrator')).toBeNull();
+  });
+
   it('handleAiPatch queues a review entry when the AI panel emits a patch', async () => {
     const response = 'Fix:\n```latex\n\\emph{corrected}\n```';
     const aiBackend = { ...browserAiBackend(), complete: async () => response };

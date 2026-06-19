@@ -6,6 +6,10 @@
 //! `P: LlmProvider` so it can be driven to 100% coverage with a single
 //! configurable mock type.
 
+pub mod mcp;
+
+pub use mcp::{parse_tool_call, McpRouter, McpToolCall, McpToolName, ToolPermissions};
+
 use galley_core::ai::{GatewayConfig, LlmError, LlmProvider, LlmRequest, LlmResponse};
 
 /// A provider-agnostic AI gateway.
