@@ -531,6 +531,10 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -587,6 +591,10 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -710,6 +718,10 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor(text) {
           insertedText = text;
         },
@@ -777,6 +789,10 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };
@@ -863,6 +879,35 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     expect(screen.getByTitle('Switch to code view')).toBeTruthy();
     await fireEvent.click(screen.getByTitle('Switch to code view'));
     expect(screen.getByTitle('Switch to visual view')).toBeTruthy();
+  });
+
+  it('shows FormatBar only in visual mode', async () => {
+    await openDemoFolder();
+    expect(screen.queryByRole('toolbar', { name: 'Text formatting' })).toBeNull();
+    const toggle = screen.getByTitle('Switch to visual view');
+    await fireEvent.click(toggle);
+    expect(screen.getByRole('toolbar', { name: 'Text formatting' })).toBeTruthy();
+    await fireEvent.click(screen.getByTitle('Switch to code view'));
+    expect(screen.queryByRole('toolbar', { name: 'Text formatting' })).toBeNull();
+  });
+
+  it('Ctrl+B does not compile in visual mode', async () => {
+    await openDemoFolder();
+    const toggle = screen.getByTitle('Switch to visual view');
+    await fireEvent.click(toggle);
+    // In visual mode Ctrl+B must not trigger compile — proof should not appear
+    await fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(screen.queryByLabelText('Proof')).toBeNull();
+  });
+
+  it('FormatBar buttons invoke editor methods without throwing', async () => {
+    await openDemoFolder();
+    await fireEvent.click(screen.getByTitle('Switch to visual view'));
+    await fireEvent.click(screen.getByTitle('Bold (⌘/Ctrl+B)'));
+    await fireEvent.click(screen.getByTitle('Italic (⌘/Ctrl+I)'));
+    await fireEvent.click(screen.getByTitle('Promote heading (Shift+Tab)'));
+    await fireEvent.click(screen.getByTitle('Demote heading (Tab)'));
+    expect(screen.getByRole('toolbar', { name: 'Text formatting' })).toBeTruthy();
   });
 });
 
@@ -998,6 +1043,10 @@ describe('App — SyncTeX forward and inverse search', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };
@@ -1059,6 +1108,10 @@ describe('App — SyncTeX forward and inverse search', () => {
         setKeymapMode: () => {},
         setSpellChecker: () => {},
         setViewMode: () => {},
+        toggleBold: () => {},
+        toggleItalic: () => {},
+        promoteHeading: () => {},
+        demoteHeading: () => {},
         insertAtCursor: () => {},
         destroy: () => area.remove()
       };

@@ -374,7 +374,18 @@ describe('createLatexEditor — setKeymapMode and setSpellChecker', () => {
 // ---------------------------------------------------------------------------
 // Visual mode: BulletWidget, ChipWidget, buildVisualDecorations, setViewMode
 // ---------------------------------------------------------------------------
-import { BulletWidget, ChipWidget, buildVisualDecorations, visualPlugin } from '../src/lib/editor';
+import {
+  BulletWidget,
+  ChipWidget,
+  buildVisualDecorations,
+  visualPlugin,
+  visualHeadingPromote,
+  visualHeadingDemote,
+  visualToggleBold,
+  visualToggleItalic,
+  visualInsertItem,
+  VISUAL_KEY_BINDINGS
+} from '../src/lib/editor';
 import { EditorView } from '@codemirror/view';
 import { EditorState as ES2 } from '@codemirror/state';
 
@@ -586,6 +597,242 @@ describe('createLatexEditor — setViewMode', () => {
     });
     expect(host.querySelector('.cm-editor')).not.toBeNull();
     editor.destroy();
+    host.remove();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Visual editing commands
+// ---------------------------------------------------------------------------
+
+function makeView(doc: string, cursorPos?: number): EditorView {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const selection = cursorPos !== undefined ? { anchor: cursorPos } : undefined;
+  return new EditorView({
+    parent: host,
+    state: ES2.create({ doc, ...(selection ? { selection } : {}) })
+  });
+}
+
+describe('visualHeadingPromote', () => {
+  it('returns false on a non-heading line', () => {
+    const view = makeView('hello world', 0);
+    expect(visualHeadingPromote(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('returns false on \\part (already at top)', () => {
+    const view = makeView('\\part{P}', 0);
+    expect(visualHeadingPromote(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('promotes \\section → \\chapter and returns true', () => {
+    const view = makeView('\\section{S}', 0);
+    expect(visualHeadingPromote(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe('\\chapter{S}');
+    view.destroy();
+  });
+
+  it('promotes \\subsection → \\section', () => {
+    const view = makeView('\\subsection{M}', 0);
+    visualHeadingPromote(view);
+    expect(view.state.doc.toString()).toBe('\\section{M}');
+    view.destroy();
+  });
+});
+
+describe('visualHeadingDemote', () => {
+  it('returns false on a non-heading line', () => {
+    const view = makeView('plain text', 0);
+    expect(visualHeadingDemote(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('returns false on \\subparagraph (already at bottom)', () => {
+    const view = makeView('\\subparagraph{F}', 0);
+    expect(visualHeadingDemote(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('demotes \\section → \\subsection and returns true', () => {
+    const view = makeView('\\section{S}', 0);
+    expect(visualHeadingDemote(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe('\\subsection{S}');
+    view.destroy();
+  });
+
+  it('demotes \\chapter → \\section', () => {
+    const view = makeView('\\chapter{C}', 0);
+    visualHeadingDemote(view);
+    expect(view.state.doc.toString()).toBe('\\section{C}');
+    view.destroy();
+  });
+});
+
+describe('visualToggleBold', () => {
+  it('wraps selected text with \\textbf{…} and returns true', () => {
+    const doc = 'hello world';
+    const view = new EditorView({
+      parent: (() => {
+        const h = document.createElement('div');
+        document.body.appendChild(h);
+        return h;
+      })(),
+      state: ES2.create({ doc, selection: { anchor: 6, head: 11 } })
+    });
+    expect(visualToggleBold(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe('hello \\textbf{world}');
+    view.destroy();
+  });
+
+  it('unwraps \\textbf{…} when selection is the content', () => {
+    const doc = '\\textbf{hello}';
+    const view = new EditorView({
+      parent: (() => {
+        const h = document.createElement('div');
+        document.body.appendChild(h);
+        return h;
+      })(),
+      state: ES2.create({ doc, selection: { anchor: 8, head: 13 } })
+    });
+    visualToggleBold(view);
+    expect(view.state.doc.toString()).toBe('hello');
+    view.destroy();
+  });
+});
+
+describe('visualToggleItalic', () => {
+  it('wraps selected text with \\textit{…} and returns true', () => {
+    const doc = 'hello world';
+    const view = new EditorView({
+      parent: (() => {
+        const h = document.createElement('div');
+        document.body.appendChild(h);
+        return h;
+      })(),
+      state: ES2.create({ doc, selection: { anchor: 6, head: 11 } })
+    });
+    expect(visualToggleItalic(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe('hello \\textit{world}');
+    view.destroy();
+  });
+
+  it('unwraps \\emph{…} when selection is the content', () => {
+    const doc = '\\emph{hello}';
+    const view = new EditorView({
+      parent: (() => {
+        const h = document.createElement('div');
+        document.body.appendChild(h);
+        return h;
+      })(),
+      state: ES2.create({ doc, selection: { anchor: 6, head: 11 } })
+    });
+    visualToggleItalic(view);
+    expect(view.state.doc.toString()).toBe('hello');
+    view.destroy();
+  });
+});
+
+describe('visualInsertItem', () => {
+  it('returns false when selection is non-empty', () => {
+    const view = new EditorView({
+      parent: (() => {
+        const h = document.createElement('div');
+        document.body.appendChild(h);
+        return h;
+      })(),
+      state: ES2.create({ doc: '\\item text', selection: { anchor: 0, head: 5 } })
+    });
+    expect(visualInsertItem(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('returns false when cursor is not on a \\item line', () => {
+    const view = makeView('plain text', 0);
+    expect(visualInsertItem(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('returns false when cursor is not at end of line', () => {
+    // cursor at position 1, not end
+    const view = makeView('\\item text', 1);
+    expect(visualInsertItem(view)).toBe(false);
+    view.destroy();
+  });
+
+  it('inserts new \\item at end of \\item line and returns true', () => {
+    const doc = '\\item text';
+    const view = makeView(doc, doc.length);
+    expect(visualInsertItem(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe('\\item text\n\\item ');
+    view.destroy();
+  });
+
+  it('preserves indentation of the current \\item line', () => {
+    const doc = '  \\item text';
+    const view = makeView(doc, doc.length);
+    visualInsertItem(view);
+    expect(view.state.doc.toString()).toBe('  \\item text\n  \\item ');
+    view.destroy();
+  });
+});
+
+describe('VISUAL_KEY_BINDINGS', () => {
+  it('has 5 bindings', () => {
+    expect(VISUAL_KEY_BINDINGS).toHaveLength(5);
+  });
+
+  it('contains Shift-Tab, Tab, Mod-b, Mod-i, Enter', () => {
+    const keys = VISUAL_KEY_BINDINGS.map((b) => b.key);
+    expect(keys).toContain('Shift-Tab');
+    expect(keys).toContain('Tab');
+    expect(keys).toContain('Mod-b');
+    expect(keys).toContain('Mod-i');
+    expect(keys).toContain('Enter');
+  });
+
+  it('all bindings have a run function', () => {
+    for (const b of VISUAL_KEY_BINDINGS) {
+      expect(typeof b.run).toBe('function');
+    }
+  });
+});
+
+describe('createLatexEditor — toggleBold/toggleItalic/promoteHeading/demoteHeading', () => {
+  function makeEditor(doc: string) {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const ed = createLatexEditor({ parent: host, doc, onChange: vi.fn() });
+    return { ed, host };
+  }
+
+  it('toggleBold does not throw', () => {
+    const { ed, host } = makeEditor('hello world');
+    expect(() => ed.toggleBold()).not.toThrow();
+    ed.destroy();
+    host.remove();
+  });
+
+  it('toggleItalic does not throw', () => {
+    const { ed, host } = makeEditor('hello world');
+    expect(() => ed.toggleItalic()).not.toThrow();
+    ed.destroy();
+    host.remove();
+  });
+
+  it('promoteHeading does not throw', () => {
+    const { ed, host } = makeEditor('\\section{S}');
+    expect(() => ed.promoteHeading()).not.toThrow();
+    ed.destroy();
+    host.remove();
+  });
+
+  it('demoteHeading does not throw', () => {
+    const { ed, host } = makeEditor('\\section{S}');
+    expect(() => ed.demoteHeading()).not.toThrow();
+    ed.destroy();
     host.remove();
   });
 });

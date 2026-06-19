@@ -42,6 +42,7 @@
   import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import Titlebar from './lib/Titlebar.svelte';
+  import FormatBar from './lib/FormatBar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import AssetPanel from './lib/AssetPanel.svelte';
   import BibPanel from './lib/BibPanel.svelte';
@@ -335,7 +336,7 @@
     } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       void handleForwardSearch();
-    } else if (isCompileShortcut(event)) {
+    } else if (isCompileShortcut(event) && viewMode === 'code') {
       event.preventDefault();
       void projectController.compile();
     } else if (isCommandPaletteShortcut(event)) {
@@ -486,6 +487,14 @@
 
     <div class="pane editor">
       <div class="editor-stack">
+        {#if viewMode === 'visual'}
+          <FormatBar
+            onbold={() => editorRef!.toggleBold()}
+            onitalic={() => editorRef!.toggleItalic()}
+            onpromote={() => editorRef!.promoteHeading()}
+            ondemote={() => editorRef!.demoteHeading()}
+          />
+        {/if}
         {#if showGraphicspathBanner}
           <div class="graphicspath-banner" role="alert">
             <span>Add <code>\graphicspath</code> to locate images in assets/</span>
