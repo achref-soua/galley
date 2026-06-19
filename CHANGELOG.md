@@ -4,6 +4,33 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-19
+
+AI settings & provider gateway.
+
+### Added
+
+- **`galley-core::ai`** — pure domain types: `Provider`, `ProviderConfig`, `GatewayConfig`,
+  `LlmMessage`, `LlmRequest`, `LlmResponse`, `LlmError`, `ProjectAiConsent`, `LlmProvider` trait.
+  All types are Clone + PartialEq; 100 % covered with no serde derives.
+- **`galley-ai`** — `ProviderGateway<P>` — provider-agnostic routing and policy enforcement.
+  Enforces per-project consent gate, active-provider selection, and global local-only policy.
+- **`src-tauri::ai`** — file-based secret store (`secrets.json` at 0o600), AI config persistence
+  (`ai.json`), per-project consent (`<project>/.galley/ai-consent.json`), `OpenAiAdapter`
+  (ChatCompletions-compatible; also covers Ollama), `AnthropicAdapter` (Messages API), and
+  `AnyAdapter` discriminated enum implementing `LlmProvider`.
+- **8 new Tauri commands:** `get_ai_config`, `set_ai_config`, `store_ai_key`, `remove_ai_key`,
+  `get_project_consent`, `set_project_consent`, `test_ai_provider`, `send_ai_completion`.
+- **`ai-backend.ts`** — `AiBackend` interface with `tauriAiBackend()`, `browserAiBackend()`, and
+  `selectAiBackend()` following the established backend-seam pattern.
+- **`AiSettingsPanel.svelte`** — Settings "AI" section: policy toggles (local-only, per-project
+  consent), provider list with active-provider selector, masked API key input with store/remove,
+  and per-provider connectivity test button.
+- **Settings.svelte** — new "AI" section added to the section list; `aiBackend` and `projectRoot`
+  props wired through.
+- **ADR-0019** — documents provider gateway design, the single-monomorphization mock pattern, the
+  file-based secret store rationale, and the serde-free workspace constraint.
+
 ## [0.4.2] - 2026-06-19
 
 Layout, drag/drop section reorder, image resize, and track-changes review queue.

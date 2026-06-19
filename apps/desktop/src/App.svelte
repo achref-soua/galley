@@ -39,6 +39,7 @@
   import { needsGraphicspath, insertGraphicspath, assetSnippet } from './lib/assets';
   import { selectAssetBackend, type AssetBackend } from './lib/asset-backend';
   import { selectBibBackend, type BibBackend } from './lib/bib-backend';
+  import { selectAiBackend, type AiBackend } from './lib/ai-backend';
   import { citeCandidates as buildCiteCandidates } from './lib/bibliography';
   import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import {
@@ -81,6 +82,7 @@
     synctex = selectSyncTexBackend(),
     assetBackend = selectAssetBackend(),
     bibBackend = selectBibBackend(),
+    aiBackend = selectAiBackend(),
     mathFieldSetup = realMathFieldSetup,
     initialReviewEntries = [] as ReviewEntry[]
   }: {
@@ -93,6 +95,7 @@
     synctex?: SyncTexBackend;
     assetBackend?: AssetBackend;
     bibBackend?: BibBackend;
+    aiBackend?: AiBackend;
     mathFieldSetup?: MathFieldSetup;
     initialReviewEntries?: ReviewEntry[];
   } = $props();
@@ -636,6 +639,8 @@
       keymapMode={editorPrefs.keymapMode}
       spellCheck={editorPrefs.spellCheck}
       syncScroll={previewPrefs.syncScroll}
+      {aiBackend}
+      projectRoot={project.project?.root ?? ''}
       onthemechange={changeTheme}
       onautocompilechange={changeAutoCompile}
       onsoundchange={changeSound}
