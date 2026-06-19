@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import Settings from '../src/lib/Settings.svelte';
+import { browserAiBackend } from '../src/lib/ai-backend';
 
 const base = {
   themePreference: 'onionskin' as const,
@@ -10,6 +11,7 @@ const base = {
   keymapMode: 'default' as const,
   spellCheck: false,
   syncScroll: false,
+  aiBackend: browserAiBackend(),
   onthemechange: () => {},
   onautocompilechange: () => {},
   onsoundchange: () => {},
@@ -134,6 +136,16 @@ describe('Settings — Editor section', () => {
     expect(screen.getByRole('switch', { name: 'Spell-check' }).getAttribute('aria-checked')).toBe(
       'true'
     );
+  });
+});
+
+describe('Settings — AI section', () => {
+  it('shows the AI settings panel when AI section is selected', async () => {
+    render(Settings, { props: base });
+    await fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    await waitFor(() => {
+      expect(screen.getByText('AI policy')).toBeTruthy();
+    });
   });
 });
 

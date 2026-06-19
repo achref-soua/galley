@@ -7,7 +7,14 @@
 //! in those crates and is exercised there. This file holds no testable business
 //! logic and is excluded from coverage (see `docs/adr/0002`).
 
+mod ai;
+
+use ai::{
+    build_adapter, get_api_key, load_ai_config, load_consent, remove_api_key, save_ai_config,
+    save_consent, store_api_key, AiConfigFile, ConsentFile, ProviderConfigFile,
+};
 use galley_compile::{CachingCompiler, EmbeddedCompiler, TectonicEngine};
+use galley_core::ai::LlmProvider;
 use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
@@ -662,6 +669,186 @@ fn lookup_reference(query: String, kind: String) -> Result<BibEntryDto, String> 
         .ok_or_else(|| "no reference found for that identifier".to_string())
 }
 
+// ── AI commands ───────────────────────────────────────────────────────────────
+
+/// DTO for a provider config as sent to / received from the frontend.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ProviderConfigDto {
+    id: String,
+    name: String,
+    provider: String,
+    api_base: String,
+    model: String,
+    local: bool,
+    has_key: bool,
+}
+
+/// DTO for the full AI gateway config.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct AiConfigDto {
+    local_only: bool,
+    active_provider: Option<String>,
+    providers: Vec<ProviderConfigDto>,
+}
+
+#[tauri::command]
+fn get_ai_config(app: tauri::AppHandle) -> AiConfigDto {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let cfg = load_ai_config(&config_dir);
+    let secrets_keys: std::collections::HashMap<String, bool> = cfg
+        .providers
+        .iter()
+        .map(|p| {
+            let has = get_api_key(&config_dir, &p.id).is_some();
+            (p.id.clone(), has)
+        })
+        .collect();
+    AiConfigDto {
+        local_only: cfg.local_only,
+        active_provider: cfg.active_provider,
+        providers: cfg
+            .providers
+            .into_iter()
+            .map(|p| {
+                let has_key = *secrets_keys.get(&p.id).unwrap_or(&false);
+                ProviderConfigDto {
+                    id: p.id,
+                    name: p.name,
+                    provider: p.provider,
+                    api_base: p.api_base,
+                    model: p.model,
+                    local: p.local,
+                    has_key,
+                }
+            })
+            .collect(),
+    }
+}
+
+#[tauri::command]
+fn set_ai_config(app: tauri::AppHandle, config: AiConfigDto) -> Result<(), String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let file = AiConfigFile {
+        local_only: config.local_only,
+        active_provider: config.active_provider,
+        providers: config
+            .providers
+            .into_iter()
+            .map(|p| ProviderConfigFile {
+                id: p.id,
+                name: p.name,
+                provider: p.provider,
+                api_base: p.api_base,
+                model: p.model,
+                local: p.local,
+            })
+            .collect(),
+    };
+    save_ai_config(&config_dir, &file)
+}
+
+#[tauri::command]
+fn store_ai_key(app: tauri::AppHandle, provider_id: String, key: String) -> Result<(), String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    store_api_key(&config_dir, &provider_id, &key)
+}
+
+#[tauri::command]
+fn remove_ai_key(app: tauri::AppHandle, provider_id: String) -> Result<(), String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    remove_api_key(&config_dir, &provider_id)
+}
+
+#[tauri::command]
+fn get_project_consent(project_root: String) -> bool {
+    load_consent(Path::new(&project_root)).cloud_ai_enabled
+}
+
+#[tauri::command]
+fn set_project_consent(project_root: String, enabled: bool) -> Result<(), String> {
+    save_consent(
+        Path::new(&project_root),
+        &ConsentFile {
+            cloud_ai_enabled: enabled,
+        },
+    )
+}
+
+/// Ping the given provider with a minimal request and return true on success.
+#[tauri::command]
+fn test_ai_provider(app: tauri::AppHandle, provider_id: String) -> bool {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let cfg = load_ai_config(&config_dir);
+    let Some(pcfg) = cfg.providers.iter().find(|p| p.id == provider_id) else {
+        return false;
+    };
+    let key = get_api_key(&config_dir, &provider_id);
+    let adapter = build_adapter(pcfg, key);
+    let req =
+        galley_core::ai::LlmRequest::new(vec![galley_core::ai::LlmMessage::user("Say hi.")], 4);
+    adapter.complete(&req).is_ok()
+}
+
+/// Send a completion through the active provider (requires project consent).
+#[tauri::command]
+fn send_ai_completion(
+    app: tauri::AppHandle,
+    messages: Vec<serde_json::Value>,
+    max_tokens: u32,
+    project_root: String,
+) -> Result<String, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let consent = load_consent(Path::new(&project_root)).cloud_ai_enabled;
+    if !consent {
+        return Err("AI not enabled for this project — enable it in Settings > AI.".to_string());
+    }
+    let cfg = load_ai_config(&config_dir);
+    let active_id = cfg
+        .active_provider
+        .as_deref()
+        .ok_or_else(|| "No active AI provider configured.".to_string())?;
+    let pcfg = cfg
+        .providers
+        .iter()
+        .find(|p| p.id == active_id)
+        .ok_or_else(|| "Active provider not found in config.".to_string())?;
+    if cfg.local_only && !pcfg.local {
+        return Err("Local-only mode: cloud providers are disabled.".to_string());
+    }
+    let key = get_api_key(&config_dir, active_id);
+    let adapter = build_adapter(pcfg, key);
+    let llm_messages: Vec<galley_core::ai::LlmMessage> = messages
+        .into_iter()
+        .map(|v| galley_core::ai::LlmMessage {
+            role: v["role"].as_str().unwrap_or("user").to_string(),
+            content: v["content"].as_str().unwrap_or("").to_string(),
+        })
+        .collect();
+    let req = galley_core::ai::LlmRequest::new(llm_messages, max_tokens);
+    adapter
+        .complete(&req)
+        .map(|r| r.content)
+        .map_err(|e| e.to_string())
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
@@ -692,7 +879,15 @@ pub fn run() {
             synctex_inverse,
             copy_asset,
             list_assets,
-            lookup_reference
+            lookup_reference,
+            get_ai_config,
+            set_ai_config,
+            store_ai_key,
+            remove_ai_key,
+            get_project_consent,
+            set_project_consent,
+            test_ai_provider,
+            send_ai_completion
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");
