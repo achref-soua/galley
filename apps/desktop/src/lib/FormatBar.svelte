@@ -25,9 +25,7 @@
   <Button variant="ghost" size="sm" title="Promote heading (Shift+Tab)" onclick={onpromote}>
     ↑H
   </Button>
-  <Button variant="ghost" size="sm" title="Demote heading (Tab)" onclick={ondemote}>
-    ↓H
-  </Button>
+  <Button variant="ghost" size="sm" title="Demote heading (Tab)" onclick={ondemote}>↓H</Button>
 </div>
 
 <style>

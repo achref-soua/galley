@@ -12,7 +12,13 @@ import {
   demoteHeading,
   toggleBold,
   toggleItalic,
-  isItemLine
+  isItemLine,
+  parseSectionBlocks,
+  moveSectionBlock,
+  parseCaptions,
+  setCaption,
+  parseImageWidth,
+  setImageWidth
 } from '../src/lib/visual';
 
 // ---------------------------------------------------------------------------
@@ -576,5 +582,254 @@ describe('isItemLine', () => {
 
   it('returns false for \\begin{itemize}', () => {
     expect(isItemLine('\\begin{itemize}')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseSectionBlocks
+// ---------------------------------------------------------------------------
+describe('parseSectionBlocks', () => {
+  it('returns empty for a doc with no headings', () => {
+    expect(parseSectionBlocks('Hello world')).toEqual([]);
+  });
+
+  it('returns a single block spanning to end-of-doc when there is one heading', () => {
+    const src = '\\section{Intro}\nSome text.';
+    const blocks = parseSectionBlocks(src);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].title).toBe('Intro');
+    expect(blocks[0].from).toBe(0);
+    expect(blocks[0].to).toBe(src.length);
+  });
+
+  it('returns one block per top-level heading with correct extents', () => {
+    const src = '\\section{A}\nTextA\n\\section{B}\nTextB';
+    const blocks = parseSectionBlocks(src);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].title).toBe('A');
+    expect(blocks[0].from).toBe(0);
+    expect(blocks[0].to).toBe(src.indexOf('\\section{B}'));
+    expect(blocks[1].title).toBe('B');
+    expect(blocks[1].to).toBe(src.length);
+  });
+
+  it('ignores subordinate headings when top-level sections are present', () => {
+    const src = '\\section{A}\n\\subsection{Sub}\n\\section{B}';
+    const blocks = parseSectionBlocks(src);
+    // Only \section headings are top-level
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].title).toBe('A');
+    expect(blocks[1].title).toBe('B');
+    // Block A spans from its heading through the subsection up to \section{B}
+    expect(blocks[0].to).toBe(src.indexOf('\\section{B}'));
+  });
+
+  it('uses subsection as top-level when no section exists', () => {
+    const src = '\\subsection{X}\n\\subsection{Y}';
+    const blocks = parseSectionBlocks(src);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].title).toBe('X');
+    expect(blocks[1].title).toBe('Y');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// moveSectionBlock
+// ---------------------------------------------------------------------------
+describe('moveSectionBlock', () => {
+  const src = '\\section{A}\nTextA\n\\section{B}\nTextB';
+
+  it('returns src unchanged when fromIdx === toIdx', () => {
+    const blocks = parseSectionBlocks(src);
+    expect(moveSectionBlock(src, blocks, 0, 0)).toBe(src);
+  });
+
+  it('returns src unchanged when fromIdx is out of range', () => {
+    const blocks = parseSectionBlocks(src);
+    expect(moveSectionBlock(src, blocks, -1, 0)).toBe(src);
+  });
+
+  it('returns src unchanged when toIdx is out of range', () => {
+    const blocks = parseSectionBlocks(src);
+    expect(moveSectionBlock(src, blocks, 0, 5)).toBe(src);
+  });
+
+  it('swaps the two blocks (forward move)', () => {
+    const blocks = parseSectionBlocks(src);
+    const result = moveSectionBlock(src, blocks, 0, 1);
+    // B should appear before A in the output
+    expect(result.indexOf('\\section{B}')).toBeLessThan(result.indexOf('\\section{A}'));
+  });
+
+  it('swaps the two blocks (backward move)', () => {
+    const blocks = parseSectionBlocks(src);
+    const result = moveSectionBlock(src, blocks, 1, 0);
+    expect(result.indexOf('\\section{B}')).toBeLessThan(result.indexOf('\\section{A}'));
+  });
+
+  it('preserves all text content after a swap', () => {
+    const blocks = parseSectionBlocks(src);
+    const result = moveSectionBlock(src, blocks, 0, 1);
+    expect(result).toContain('TextA');
+    expect(result).toContain('TextB');
+    expect(result.length).toBe(src.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseCaptions
+// ---------------------------------------------------------------------------
+describe('parseCaptions', () => {
+  it('returns empty for text without captions', () => {
+    expect(parseCaptions('Hello world')).toEqual([]);
+  });
+
+  it('parses a single caption', () => {
+    const src = '\\caption{A nice figure}';
+    const caps = parseCaptions(src);
+    expect(caps).toHaveLength(1);
+    expect(caps[0].content).toBe('A nice figure');
+    expect(caps[0].from).toBe(0);
+    expect(caps[0].to).toBe(src.length);
+    expect(caps[0].contentFrom).toBe(9); // '\caption{'.length
+    expect(caps[0].contentTo).toBe(9 + 'A nice figure'.length);
+  });
+
+  it('parses multiple captions', () => {
+    const src = '\\caption{Fig 1}\n\\caption{Fig 2}';
+    const caps = parseCaptions(src);
+    expect(caps).toHaveLength(2);
+    expect(caps[0].content).toBe('Fig 1');
+    expect(caps[1].content).toBe('Fig 2');
+  });
+
+  it('handles an empty caption', () => {
+    const caps = parseCaptions('\\caption{}');
+    expect(caps).toHaveLength(1);
+    expect(caps[0].content).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setCaption
+// ---------------------------------------------------------------------------
+describe('setCaption', () => {
+  it('replaces caption content with new text', () => {
+    const src = '\\caption{Old text}';
+    const caps = parseCaptions(src);
+    const result = setCaption(src, caps[0], 'New text');
+    expect(result).toBe('\\caption{New text}');
+  });
+
+  it('works when caption is surrounded by other text', () => {
+    const src = 'Before \\caption{Old} After';
+    const caps = parseCaptions(src);
+    const result = setCaption(src, caps[0], 'New');
+    expect(result).toBe('Before \\caption{New} After');
+  });
+
+  it('can set an empty caption', () => {
+    const src = '\\caption{text}';
+    const caps = parseCaptions(src);
+    const result = setCaption(src, caps[0], '');
+    expect(result).toBe('\\caption{}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseImageWidth
+// ---------------------------------------------------------------------------
+describe('parseImageWidth', () => {
+  it('returns null when no width= key is present', () => {
+    expect(parseImageWidth('height=5cm')).toBeNull();
+  });
+
+  it('returns null for an empty options string', () => {
+    expect(parseImageWidth('')).toBeNull();
+  });
+
+  it('extracts the width value at the start of options', () => {
+    expect(parseImageWidth('width=\\linewidth')).toBe('\\linewidth');
+  });
+
+  it('extracts width after a comma', () => {
+    expect(parseImageWidth('height=5cm,width=0.5\\linewidth')).toBe('0.5\\linewidth');
+  });
+
+  it('strips surrounding whitespace from the value', () => {
+    expect(parseImageWidth('width = \\linewidth')).toBe('\\linewidth');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setImageWidth
+// ---------------------------------------------------------------------------
+describe('setImageWidth', () => {
+  it('adds [width=...] when the command has no options', () => {
+    const src = '\\includegraphics{fig.png}';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '\\linewidth');
+    expect(result).toBe('\\includegraphics[width=\\linewidth]{fig.png}');
+  });
+
+  it('replaces an existing width= value at the start of options', () => {
+    const src = '\\includegraphics[width=0.5\\linewidth]{fig.png}';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '\\linewidth');
+    expect(result).toBe('\\includegraphics[width=\\linewidth]{fig.png}');
+  });
+
+  it('replaces width= when it follows another option', () => {
+    const src = '\\includegraphics[height=5cm,width=0.5\\linewidth]{fig.png}';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '\\linewidth');
+    expect(result).toBe('\\includegraphics[height=5cm,width=\\linewidth]{fig.png}');
+  });
+
+  it('appends width= when options exist but no width key', () => {
+    const src = '\\includegraphics[height=5cm]{fig.png}';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '0.75\\linewidth');
+    expect(result).toBe('\\includegraphics[height=5cm,width=0.75\\linewidth]{fig.png}');
+  });
+
+  it('replaces empty options bracket with width=', () => {
+    const src = '\\includegraphics[]{fig.png}';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '\\linewidth');
+    expect(result).toBe('\\includegraphics[width=\\linewidth]{fig.png}');
+  });
+
+  it('preserves surrounding source text', () => {
+    const src = 'Before \\includegraphics{fig.png} After';
+    const specs = parseImages(src);
+    const result = setImageWidth(src, specs[0], '\\linewidth');
+    expect(result).toBe('Before \\includegraphics[width=\\linewidth]{fig.png} After');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseSectionBlocks — reduce true-branch (level < running min)
+// ---------------------------------------------------------------------------
+describe('parseSectionBlocks — level reduction', () => {
+  it('picks the section level when preceded only by a subsection', () => {
+    // subsection(3) first → initial min=3; then section(2) → 2<3=true → min becomes 2
+    // So top-level = sections only.
+    const src = '\\subsection{Sub}\n\\section{Main}';
+    const blocks = parseSectionBlocks(src);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].title).toBe('Main');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setImageWidth — pathMatch===null defensive guard (coverage-only)
+// ---------------------------------------------------------------------------
+describe('setImageWidth — null path guard', () => {
+  it('returns src unchanged when the spec slice has no closing brace', () => {
+    const src = '\\includegraphics[width=\\linewidth]';
+    // Build a spec pointing at a slice that has no trailing {...} — defensive path.
+    const spec = { path: '', from: 0, to: src.length };
+    expect(setImageWidth(src, spec, '\\linewidth')).toBe(src);
   });
 });
