@@ -7,6 +7,7 @@
 
 pub mod ai;
 pub mod assets;
+pub mod assistant;
 pub mod bibliography;
 pub mod compile;
 pub mod diagnostics;
@@ -27,6 +28,9 @@ pub use ai::{
     Provider, ProviderConfig,
 };
 pub use assets::{figure_snippet, needs_graphicspath};
+pub use assistant::{
+    build_chat_prompt, ChatIntent, ChatMessage as AssistantMessage, ChatRole, ChatThread,
+};
 pub use bibliography::{
     arxiv_atom_to_entry, entry_summary, parse_bib, serialize_bib, serialize_entry,
     suggest_cite_key, BibEntry, BibField,
