@@ -5,6 +5,7 @@
 //! exercised to full coverage with plain unit tests. As the product grows, the
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
+pub mod agents;
 pub mod ai;
 pub mod assets;
 pub mod assistant;
@@ -23,6 +24,7 @@ pub mod synctex;
 pub mod table;
 pub mod time;
 
+pub use agents::{parse_plan_response, plan_goal, AgentPlan, AgentRole, AgentTask};
 pub use ai::{
     GatewayConfig, LlmError, LlmMessage, LlmProvider, LlmRequest, LlmResponse, ProjectAiConsent,
     Provider, ProviderConfig,
