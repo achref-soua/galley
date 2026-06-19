@@ -60,6 +60,7 @@ import {
 } from './language-backend';
 import { type KeymapMode } from './keymap-prefs';
 import { type SpellChecker, makeSpellLinter } from './spell-check';
+import { type CiteCandidate } from './bibliography';
 
 /**
  * Find the fold range for a LaTeX environment that opens on the line spanning
@@ -360,6 +361,12 @@ export function latexCompletionSource(
       return null;
     }
     const source = cc.state.doc.toString();
+    // Inside a `\cite{…}` argument, defer to the dedicated citation source so
+    // bibliography keys (including unsaved ones) win and never double up with
+    // the language server's own citation completions.
+    if (citeContext(source, cc.pos) !== null) {
+      return null;
+    }
     const from = completionStart(source, cc.pos);
     // With nothing typed and no explicit request, do not pop up unprompted.
     if (from === cc.pos && !cc.explicit) {
@@ -377,6 +384,69 @@ export function latexCompletionSource(
       return null;
     }
     return { from, options: toCmCompletions(items) };
+  };
+}
+
+/**
+ * When `pos` sits inside the argument of a `\cite`-family command, return where
+ * the current citation key begins (so a completion replaces just that key);
+ * otherwise `null`. Handles multiple comma-separated keys and the biblatex
+ * commands (`\citep`, `\autocite`, `\textcite`, `\nocite`, …).
+ */
+export function citeContext(text: string, pos: number): { from: number } | null {
+  // Walk back to the `{` that opens the current group, bailing if the group is
+  // already closed or the line ends first.
+  let braceOpen = -1;
+  for (let i = pos; i > 0; i -= 1) {
+    const c = text[i - 1];
+    if (c === '}' || c === '\n') {
+      return null;
+    }
+    if (c === '{') {
+      braceOpen = i - 1;
+      break;
+    }
+  }
+  if (braceOpen < 0) {
+    return null;
+  }
+  // The command name must immediately precede the `{` and contain `cite`.
+  if (!/\\[a-zA-Z]*cite[a-zA-Z]*\*?$/.test(text.slice(0, braceOpen))) {
+    return null;
+  }
+  // The current key starts after the last `{`, `,`, or whitespace.
+  let from = pos;
+  while (from > braceOpen + 1 && !/[,{\s]/.test(text[from - 1])) {
+    from -= 1;
+  }
+  return { from };
+}
+
+/**
+ * A CodeMirror completion source offering bibliography keys inside `\cite{…}`.
+ * Backed by a live provider so additions (even unsaved ones) appear at once.
+ */
+export function latexCiteCompletionSource(
+  citations: (() => CiteCandidate[]) | undefined
+): (cc: CompletionContext) => CompletionResult | null {
+  return (cc) => {
+    const context = citeContext(cc.state.doc.toString(), cc.pos);
+    if (context === null) {
+      return null;
+    }
+    const candidates = citations === undefined ? [] : citations();
+    if (candidates.length === 0) {
+      return null;
+    }
+    return {
+      from: context.from,
+      options: candidates.map((candidate) => ({
+        label: candidate.key,
+        detail: candidate.summary,
+        type: 'variable',
+        apply: candidate.key
+      }))
+    };
   };
 }
 
@@ -445,9 +515,18 @@ export function goToDefinitionCommand(context: LanguageContext): (view: EditorVi
 }
 
 /** The language-server extensions: completion, hovers, and go-to-definition. */
-function languageExtensions(context: LanguageContext): Extension {
+function languageExtensions(
+  context: LanguageContext,
+  citations: (() => CiteCandidate[]) | undefined
+): Extension {
   return [
-    autocompletion({ override: [latexCompletionSource(context), latexSnippetSource] }),
+    autocompletion({
+      override: [
+        latexCiteCompletionSource(citations),
+        latexCompletionSource(context),
+        latexSnippetSource
+      ]
+    }),
     hoverTooltip(latexHoverSource(context)),
     keymap.of([{ key: 'F12', run: goToDefinitionCommand(context) }])
   ];
@@ -525,7 +604,8 @@ function latexExtensions(
   keymapMode: KeymapMode,
   spellChecker: SpellChecker | null,
   keymapCompartment: Compartment,
-  spellCompartment: Compartment
+  spellCompartment: Compartment,
+  citations: (() => CiteCandidate[]) | undefined
 ): Extension {
   return [
     lineNumbers(),
@@ -542,8 +622,12 @@ function latexExtensions(
     syntaxHighlighting(highlightStyle),
     editorTheme,
     ...(language
-      ? [languageExtensions(language)]
-      : [autocompletion({ override: [latexSnippetSource] })]),
+      ? [languageExtensions(language, citations)]
+      : [
+          autocompletion({
+            override: [latexCiteCompletionSource(citations), latexSnippetSource]
+          })
+        ]),
     keymapCompartment.of(keymapExtension(keymapMode)),
     spellCompartment.of(spellChecker !== null ? makeSpellLinter(() => spellChecker) : []),
     EditorView.contentAttributes.of({ 'aria-label': 'LaTeX source' }),
@@ -567,6 +651,8 @@ export interface LatexEditorOptions {
   spellChecker?: SpellChecker | null;
   /** Called with the scroll fraction (0–1) whenever the editor is scrolled. */
   onscroll?: (fraction: number) => void;
+  /** Live provider of bibliography keys for `\cite{…}` completion. */
+  citations?: () => CiteCandidate[];
 }
 
 /** A request to reveal a source line, stamped so the same line can re-fire. */
@@ -608,7 +694,8 @@ export const createLatexEditor: EditorFactory = ({
   language,
   keymapMode = 'default',
   spellChecker = null,
-  onscroll
+  onscroll,
+  citations
 }) => {
   const keymapCompartment = new Compartment();
   const spellCompartment = new Compartment();
@@ -634,7 +721,8 @@ export const createLatexEditor: EditorFactory = ({
           keymapMode,
           spellChecker,
           keymapCompartment,
-          spellCompartment
+          spellCompartment,
+          citations
         ),
         ...scrollExtension
       ]

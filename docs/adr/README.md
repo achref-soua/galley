@@ -19,3 +19,4 @@ codebase stays legible.
 | 0012 | SyncTeX bidirectional source ↔ PDF navigation                             | Accepted |
 | 0013 | Assets & figures: image insertion workflow                                | Accepted |
 | 0014 | Math & tables: MathLive editor, symbol palette, table builder             | Accepted |
+| 0015 | Bibliography: `.bib` management, reference lookup, citation completion    | Accepted |

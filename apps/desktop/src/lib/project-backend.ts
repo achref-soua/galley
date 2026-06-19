@@ -58,8 +58,11 @@ export interface ProjectBackend {
   readDocument(root: string, rel: string): Promise<string>;
   /** Save a project file. */
   saveDocument(root: string, rel: string, contents: string): Promise<void>;
-  /** Compile `source` as `rootDocument`, returning the result. */
-  compile(source: string, rootDocument: string): Promise<CompileOutcome>;
+  /**
+   * Compile `source` as `rootDocument`, resolving sibling files (`.bib`,
+   * `\input`, images) against `projectRoot`, and return the result.
+   */
+  compile(source: string, rootDocument: string, projectRoot: string): Promise<CompileOutcome>;
   /** Ask the user to pick a folder, returning its path or `null` if cancelled. */
   pickFolder(title: string): Promise<string | null>;
   /** Search all `.tex` files in the project for `query`. */
@@ -109,8 +112,12 @@ export function tauriProjectBackend(): ProjectBackend {
     async saveDocument(root, rel, contents) {
       await invoke('save_document', { root, rel, contents });
     },
-    async compile(source, rootDocument) {
-      const raw = await invoke<RawCompile>('compile_document', { source, rootDocument });
+    async compile(source, rootDocument, projectRoot) {
+      const raw = await invoke<RawCompile>('compile_document', {
+        source,
+        rootDocument,
+        projectRoot
+      });
       return {
         ok: raw.ok,
         log: raw.log,

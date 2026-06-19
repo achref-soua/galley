@@ -21,5 +21,8 @@ tectonic = { version = "0.16", default-features = false, features = [
   "serialization",
 ], optional = true }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [lints]
 workspace = true

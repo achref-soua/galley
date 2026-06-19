@@ -11,8 +11,9 @@ use galley_compile::{CachingCompiler, EmbeddedCompiler, TectonicEngine};
 use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
-    CompileRequest, CompletionItem, DocumentKind, DocumentSymbol, Engine, LanguageIntelligence,
-    Location, Position, SyncTexMapper, TextDocument, VERSION,
+    arxiv_atom_to_entry, parse_bib, BibEntry, CompileRequest, CompletionItem, DocumentKind,
+    DocumentSymbol, Engine, LanguageIntelligence, Location, Position, SyncTexMapper, TextDocument,
+    VERSION,
 };
 use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
 use galley_intel::{SyncTexParser, TexLabClient};
@@ -176,8 +177,10 @@ fn compile_document(
     synctex_state: State<'_, SyncTexState>,
     source: String,
     root_document: String,
+    project_root: String,
 ) -> CompileDto {
-    let request = CompileRequest::new(root_document, Engine::Tectonic);
+    let request =
+        CompileRequest::new(root_document, Engine::Tectonic).with_project_root(project_root);
     let mut compiler = compiler_state
         .0
         .lock()
@@ -588,6 +591,77 @@ fn list_assets(root: String) -> Vec<String> {
         .collect()
 }
 
+/// A bibliography field as sent to the UI.
+#[derive(Serialize)]
+struct BibFieldDto {
+    name: String,
+    value: String,
+}
+
+/// A bibliography entry as sent to the UI.
+#[derive(Serialize)]
+struct BibEntryDto {
+    entry_type: String,
+    key: String,
+    fields: Vec<BibFieldDto>,
+}
+
+impl From<BibEntry> for BibEntryDto {
+    fn from(entry: BibEntry) -> Self {
+        Self {
+            entry_type: entry.entry_type,
+            key: entry.key,
+            fields: entry
+                .fields
+                .into_iter()
+                .map(|f| BibFieldDto {
+                    name: f.name,
+                    value: f.value,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Fetch the raw reference text for `query`: BibTeX via DOI content negotiation,
+/// or an Atom feed from the arXiv API.
+fn fetch_reference(query: &str, kind: &str) -> Result<String, String> {
+    let trimmed = query.trim();
+    let agent = "Galley/0.3.4 (https://github.com/achref-soua/galley)";
+    let response = if kind == "arxiv" {
+        let url = format!("http://export.arxiv.org/api/query?id_list={trimmed}&max_results=1");
+        ureq::get(&url).set("User-Agent", agent).call()
+    } else {
+        let url = format!("https://doi.org/{trimmed}");
+        ureq::get(&url)
+            .set("User-Agent", agent)
+            .set("Accept", "application/x-bibtex; charset=utf-8")
+            .call()
+    };
+    response
+        .map_err(|err| err.to_string())?
+        .into_string()
+        .map_err(|err| err.to_string())
+}
+
+/// Resolve a DOI or arXiv id into a bibliography entry.
+///
+/// The HTTP request and the parse both live here, in the (coverage-excluded)
+/// shell, so reference egress stays in the core process. The parsing itself is
+/// the fully-tested `galley_core::bibliography`. `kind` is `"doi"` or `"arxiv"`.
+#[tauri::command]
+fn lookup_reference(query: String, kind: String) -> Result<BibEntryDto, String> {
+    let text = fetch_reference(&query, &kind)?;
+    let entry = if kind == "arxiv" {
+        arxiv_atom_to_entry(&text)
+    } else {
+        parse_bib(&text).into_iter().next()
+    };
+    entry
+        .map(BibEntryDto::from)
+        .ok_or_else(|| "no reference found for that identifier".to_string())
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
@@ -617,7 +691,8 @@ pub fn run() {
             synctex_forward,
             synctex_inverse,
             copy_asset,
-            list_assets
+            list_assets,
+            lookup_reference
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");
