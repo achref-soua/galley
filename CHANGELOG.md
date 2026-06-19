@@ -4,6 +4,35 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-06-19
+
+Math & tables — MathLive equation editor, symbol palette, and visual table builder.
+
+### Added
+
+- **`galley-core::math`** — pure Rust helpers: `wrap_inline(latex)` wraps in `$…$`;
+  `wrap_display(latex)` wraps in `\[…\]`.
+- **`galley-core::table`** — pure Rust table builders: `build_tabular(align, rows)` and
+  `build_booktabs(align, header, rows)` emit well-formed LaTeX table environments.
+- **`math.ts`** — TS mirrors of the Rust helpers (`wrapInline`, `wrapDisplay`).
+- **`table.ts`** — TS table builders (`buildTabular`, `buildBooktabs`) with `Align` and
+  `TableStyle` types.
+- **`math-field.ts`** — `MathFieldHandle`/`MathFieldSetup` interfaces plus `realMathFieldSetup`,
+  which dynamically imports MathLive and appends a `<math-field>` custom element. Fully injectable
+  for tests without jsdom/MathLive compatibility issues.
+- **`MathEditor.svelte`** — modal dialog: a MathLive equation editor with inline/display radio,
+  Insert/Cancel actions, and Escape key handling. `setupField` prop allows test injection.
+- **`SymbolPalette.svelte`** — collapsible accordion with 42 common LaTeX symbols across four
+  groups (Greek, Operators, Relations, Arrows); clicking any symbol fires `oninsert`.
+- **`TableBuilder.svelte`** — modal table builder: configurable column count (1–8) and row count
+  (1–12), per-column alignment selects, header and data cell inputs, tabular/booktabs style
+  toggle, live LaTeX preview, Insert/Cancel actions, and Escape key handling.
+- **Titlebar** — two new toolbar buttons (∑ equation, ⊞ table) that open the respective modals;
+  disabled when no document is open.
+- **App.svelte** — wires `MathEditor`, `SymbolPalette`, and `TableBuilder` into the shell; adds
+  `insert-equation` and `insert-table` command-palette actions; accepts injectable
+  `mathFieldSetup` prop for tests.
+
 ## [0.3.2] - 2026-06-19
 
 Assets & figures — image insertion workflow, collapsible asset panel, OS drag-and-drop, and `\graphicspath` banner.

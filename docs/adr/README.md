@@ -18,3 +18,4 @@ codebase stays legible.
 | 0011 | Power editing: keymap modes, spell-check, command palette, project search | Accepted |
 | 0012 | SyncTeX bidirectional source ↔ PDF navigation                             | Accepted |
 | 0013 | Assets & figures: image insertion workflow                                | Accepted |
+| 0014 | Math & tables: MathLive editor, symbol palette, table builder             | Accepted |

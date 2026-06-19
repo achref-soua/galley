@@ -13,7 +13,9 @@
     onsave,
     ontogglesidebar,
     ontogglepreview,
-    onopensettings
+    onopensettings,
+    onopenmatch,
+    onopentable
   }: {
     documentName: string;
     dirty: boolean;
@@ -27,6 +29,8 @@
     ontogglesidebar: () => void;
     ontogglepreview: () => void;
     onopensettings: () => void;
+    onopenmatch: () => void;
+    onopentable: () => void;
   } = $props();
 </script>
 
@@ -50,6 +54,24 @@
     >
       <Icon name="compile" />
       {compiling ? 'Compiling…' : 'Compile'}
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      title="Insert equation"
+      disabled={!canCompile}
+      onclick={onopenmatch}
+    >
+      ∑
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      title="Insert table"
+      disabled={!canCompile}
+      onclick={onopentable}
+    >
+      ⊞
     </Button>
     <IconButton label="Save" title="Save (⌘/Ctrl+S)" disabled={!canSave} onclick={onsave}>
       <Icon name="save" />

@@ -38,9 +38,13 @@
   import { parseIncludes, resolveIncludePath } from './lib/include-graph';
   import { needsGraphicspath, insertGraphicspath, assetSnippet } from './lib/assets';
   import { selectAssetBackend, type AssetBackend } from './lib/asset-backend';
+  import { realMathFieldSetup, type MathFieldSetup } from './lib/math-field.js';
   import Titlebar from './lib/Titlebar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import AssetPanel from './lib/AssetPanel.svelte';
+  import SymbolPalette from './lib/SymbolPalette.svelte';
+  import MathEditor from './lib/MathEditor.svelte';
+  import TableBuilder from './lib/TableBuilder.svelte';
   import EditorPane from './lib/EditorPane.svelte';
   import ProblemsPanel from './lib/ProblemsPanel.svelte';
   import OutlinePanel from './lib/OutlinePanel.svelte';
@@ -63,7 +67,8 @@
     bell = webAudioBell(),
     language = selectLanguageBackend(),
     synctex = selectSyncTexBackend(),
-    assetBackend = selectAssetBackend()
+    assetBackend = selectAssetBackend(),
+    mathFieldSetup = realMathFieldSetup
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -73,6 +78,7 @@
     language?: LanguageBackend;
     synctex?: SyncTexBackend;
     assetBackend?: AssetBackend;
+    mathFieldSetup?: MathFieldSetup;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -102,6 +108,8 @@
   let settingsOpen = $state(false);
   let paletteOpen = $state(false);
   let searchOpen = $state(false);
+  let mathOpen = $state(false);
+  let tableOpen = $state(false);
   let project = $state(projectController.state);
   let compilePrefs = $state(prefsStore.prefs);
   let previewPrefs = $state(previewPrefsStore.prefs);
@@ -233,6 +241,22 @@
       label: 'Open Settings',
       run() {
         settingsOpen = true;
+      }
+    },
+    {
+      id: 'insert-equation',
+      label: 'Insert Equation',
+      shortcut: '∑',
+      run() {
+        mathOpen = true;
+      }
+    },
+    {
+      id: 'insert-table',
+      label: 'Insert Table',
+      shortcut: '⊞',
+      run() {
+        tableOpen = true;
       }
     }
   ];
@@ -370,6 +394,16 @@
       projectController.edit(newContent);
     }
   }
+
+  function insertMath(wrapped: string) {
+    editorRef!.insertAtCursor(wrapped);
+    mathOpen = false;
+  }
+
+  function insertTable(latex: string) {
+    editorRef!.insertAtCursor(latex);
+    tableOpen = false;
+  }
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
@@ -388,6 +422,8 @@
     ontogglesidebar={toggleSidebar}
     ontogglepreview={togglePreview}
     onopensettings={() => (settingsOpen = true)}
+    onopenmatch={() => (mathOpen = true)}
+    onopentable={() => (tableOpen = true)}
   />
 
   <main class="workspace">
@@ -408,6 +444,7 @@
             backend={assetBackend}
             oninsert={(snippet) => editorRef!.insertAtCursor(snippet)}
           />
+          <SymbolPalette oninsert={(code) => editorRef!.insertAtCursor(code)} />
         {/if}
       </div>
       <Resizer
@@ -532,6 +569,18 @@
       ondiscard={() => void projectController.discardChanges()}
       oncancel={() => projectController.cancelPending()}
     />
+  {/if}
+
+  {#if mathOpen}
+    <MathEditor
+      setupField={mathFieldSetup}
+      oninsert={insertMath}
+      oncancel={() => (mathOpen = false)}
+    />
+  {/if}
+
+  {#if tableOpen}
+    <TableBuilder oninsert={insertTable} oncancel={() => (tableOpen = false)} />
   {/if}
 </div>
 
