@@ -4,6 +4,40 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-06-20
+
+Specialized agents and MCP tool host.
+
+### Added
+
+- **`galley-core::agents`** — pure domain types and helpers: `AgentRole` (7 variants),
+  `AgentTask`, `AgentPlan`, `plan_goal` (keyword-based planner, no I/O), and
+  `parse_plan_response` (`[AGENT:X] [TASK:Y]` line parser). 100 % llvm-cov covered.
+- **`galley-ai::mcp`** — `McpTool` enum (7 tools: `ReadFile`, `SearchProject`, `Compile`,
+  `ReadDiagnostics`, `LookupReference`, `ApplyPatch`, `ListAssets`), `McpToolResult`, and
+  `ToolPermissions::for_role` (least-privilege access per `AgentRole`). 100 % covered.
+- **`agents.ts`** — TypeScript orchestration helpers: `AgentRole` type, `agentLabel`,
+  `agentSystemPrompt`, `buildOrchestratorPrompt`, `buildAgentPrompt`, `parseSteps`, and
+  `parseToolCall`. 100 % Vitest covered (29 tests).
+- **`agent-backend.ts`** — `AgentToolBackend` interface, `tauriAgentToolBackend` (Tauri
+  wrappers for all 7 MCP tools), `browserAgentToolBackend` (deterministic stubs for test /
+  offline use), `selectAgentToolBackend`, and `dispatchTool` (strict switch + unknown-tool
+  guard). 100 % covered (30 tests).
+- **`AgentPanel.svelte`** — Agents side-panel: plain-language goal input, Run / Stop controls,
+  live `aria-live` log. Orchestrates goal → orchestrator plan → per-agent step loop → patch
+  emission via `onpatch` → ReviewEntry queue. Stop-in-flight via generation counter (same
+  pattern as AiChatPanel). 100 % covered (16 tests).
+- **`App.svelte`** — `agentsOpen` state, `toggle-agents` command palette action, `AgentPanel`
+  mounted inside `{#if agentsOpen}`.
+- **ADR-0021** — documents the two-layer markup protocol, keyword-based planner, permission
+  layer, `apply_patch` intercept, and stop-in-flight design.
+- **`docs/ai/agents.md`** — product documentation for the agent system.
+
+### Changed
+
+- All version touchpoints bumped to 0.5.2 (workspace `Cargo.toml`, `apps/desktop/src-tauri/Cargo.toml`,
+  `tauri.conf.json`, `apps/desktop/package.json`, `packages/ui-kit/package.json`).
+
 ## [0.5.1] - 2026-06-20
 
 AI chat assistant panel (suggest mode).
