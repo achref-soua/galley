@@ -134,4 +134,23 @@ describe('Titlebar', () => {
     const btn = screen.getByTitle('Switch to visual view');
     expect(btn.hasAttribute('disabled')).toBe(true);
   });
+
+  it('shows the assistant toggle with "Open assistant" label when chatOpen is false', () => {
+    render(Titlebar, { props: { ...base, chatOpen: false } });
+    const btn = screen.getByRole('button', { name: 'Open assistant' });
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('shows the assistant toggle with "Close assistant" label when chatOpen is true', () => {
+    render(Titlebar, { props: { ...base, chatOpen: true } });
+    const btn = screen.getByRole('button', { name: 'Close assistant' });
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('fires ontogglechat when the assistant button is clicked', async () => {
+    const ontogglechat = vi.fn();
+    render(Titlebar, { props: { ...base, chatOpen: false, ontogglechat } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open assistant' }));
+    expect(ontogglechat).toHaveBeenCalledOnce();
+  });
 });

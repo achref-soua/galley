@@ -6,6 +6,7 @@ import type { EditorFactory, LanguageContext } from '../src/lib/editor';
 import type { AssetBackend } from '../src/lib/asset-backend';
 import type { MathFieldSetup } from '../src/lib/math-field.js';
 import { firePointer, fakeEditorFactory } from './setup';
+import { browserAiBackend } from '../src/lib/ai-backend';
 
 /** A fake PDF renderer that reports a one-page document. */
 const onePageRenderer = (): PdfRenderer => ({ render: () => Promise.resolve({ pageCount: 1 }) });
@@ -1287,6 +1288,54 @@ describe('App — layout, drag/drop, and review handlers', () => {
     await fireEvent.click(screen.getByRole('button', { name: /Reject change r1/ }));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /Reject change r1/ })).toBeNull()
+    );
+  });
+
+  it('palette toggle-assistant action opens the AI chat panel', async () => {
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell
+      }
+    });
+    expect(screen.queryByLabelText('AI assistant')).toBeNull();
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Toggle AI Assistant'));
+    expect(screen.getByLabelText('AI assistant')).toBeTruthy();
+    // Toggle closed via the Titlebar button
+    await fireEvent.click(screen.getByRole('button', { name: 'Close assistant' }));
+    expect(screen.queryByLabelText('AI assistant')).toBeNull();
+  });
+
+  it('handleAiPatch queues a review entry when the AI panel emits a patch', async () => {
+    const response = 'Fix:\n```latex\n\\emph{corrected}\n```';
+    const aiBackend = { ...browserAiBackend(), complete: async () => response };
+    // Open a project first so project.project.root is non-null,
+    // covering the non-fallback branch of projectRoot={project.project?.root ?? ''}.
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        aiBackend
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    // Open the AI chat panel — now project.project.root is defined
+    await fireEvent.click(screen.getByRole('button', { name: 'Open assistant' }));
+    expect(screen.getByLabelText('AI assistant')).toBeTruthy();
+    // Send a message — the fixed backend returns a latex block, triggering handleAiPatch
+    await fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    // A ReviewEntry accept/reject button should appear once the patch is queued
+    await waitFor(() =>
+      expect(screen.queryAllByRole('button', { name: /Accept change/ }).length).toBeGreaterThan(0)
     );
   });
 });

@@ -55,12 +55,12 @@ enables it per project.
 
 ## Alternatives Considered
 
-| Option | Rejected because |
-|---|---|
-| `keyring` crate for secrets | No D-Bus on WSL2; would block non-GUI hosts |
-| `serde` derives in `galley-core` | Untriggerable error arms break 100% coverage gate |
+| Option                                    | Rejected because                                  |
+| ----------------------------------------- | ------------------------------------------------- |
+| `keyring` crate for secrets               | No D-Bus on WSL2; would block non-GUI hosts       |
+| `serde` derives in `galley-core`          | Untriggerable error arms break 100% coverage gate |
 | Dynamic dispatch (`Box<dyn LlmProvider>`) | Multiple monomorphizations leave unreachable arms |
-| Hard-coded Anthropic SDK | Locks vendor; blocks Ollama/local-only mode |
+| Hard-coded Anthropic SDK                  | Locks vendor; blocks Ollama/local-only mode       |
 
 ## Consequences
 
