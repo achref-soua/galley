@@ -60,16 +60,30 @@ pub struct CompileRequest {
     pub root_document: String,
     /// The engine to drive.
     pub engine: Engine,
+    /// The absolute project root, when known. The engine resolves sibling files
+    /// on disk against it — `.bib` bibliographies, `\input`-ed chapters, and
+    /// images — so a multi-file document renders fully. `None` compiles only the
+    /// supplied source against the bundled packages, with no disk access.
+    pub project_root: Option<String>,
 }
 
 impl CompileRequest {
-    /// Build a request for `root_document` using `engine`.
+    /// Build a request for `root_document` using `engine`, with no project root
+    /// (the source compiles in isolation).
     #[must_use]
     pub fn new(root_document: impl Into<String>, engine: Engine) -> Self {
         Self {
             root_document: root_document.into(),
             engine,
+            project_root: None,
         }
+    }
+
+    /// Set the project root the engine resolves sibling files against.
+    #[must_use]
+    pub fn with_project_root(mut self, root: impl Into<String>) -> Self {
+        self.project_root = Some(root.into());
+        self
     }
 }
 
@@ -83,6 +97,8 @@ pub struct BuildPlan {
     pub job_name: String,
     /// The engine to drive.
     pub engine: Engine,
+    /// The absolute project root for on-disk file resolution, when known.
+    pub project_root: Option<String>,
 }
 
 impl BuildPlan {
@@ -103,6 +119,7 @@ impl BuildPlan {
             root_document: request.root_document.clone(),
             job_name: tex_job_name(&request.root_document),
             engine: request.engine,
+            project_root: request.project_root.clone(),
         })
     }
 }
@@ -245,6 +262,25 @@ mod tests {
         assert_eq!(plan.root_document, "chapters/main.tex");
         assert_eq!(plan.job_name, "main");
         assert_eq!(plan.engine, Engine::Tectonic);
+    }
+
+    #[test]
+    fn carries_the_project_root_into_the_plan() {
+        // A bare request has no project root and compiles in isolation.
+        let bare = CompileRequest::new("main.tex", Engine::Tectonic);
+        assert_eq!(bare.project_root, None);
+        assert_eq!(BuildPlan::from_request(&bare).unwrap().project_root, None);
+
+        // `with_project_root` threads the root through to the plan.
+        let rooted =
+            CompileRequest::new("main.tex", Engine::Tectonic).with_project_root("/home/ada/paper");
+        assert_eq!(rooted.project_root.as_deref(), Some("/home/ada/paper"));
+        let plan = BuildPlan::from_request(&rooted).unwrap();
+        assert_eq!(plan.project_root.as_deref(), Some("/home/ada/paper"));
+        // The two requests differ once a root is set.
+        assert_ne!(bare, rooted);
+        assert_eq!(rooted.clone(), rooted);
+        assert!(format!("{plan:?}").contains("/home/ada/paper"));
     }
 
     #[test]

@@ -98,6 +98,49 @@ Hello from Galley. Pull a proof.
     }
 
     #[test]
+    #[ignore = "needs the Tectonic bundle (network on a cold cache); run manually"]
+    fn renders_a_bibliography_from_an_on_disk_bib_file() {
+        // The acceptance for v0.3.4: a document that cites an on-disk `.bib`
+        // entry compiles, with the engine resolving the bibliography from the
+        // project root and running the bibliography pass automatically.
+        let dir = tempfile::tempdir().expect("a temp project dir");
+        std::fs::write(
+            dir.path().join("refs.bib"),
+            "@article{lovelace1843,\n  author = {Lovelace, Ada},\n  title = {Notes},\n  journal = {Memoirs},\n  year = {1843}\n}\n",
+        )
+        .expect("write refs.bib");
+
+        let document = r"\documentclass{article}
+\begin{document}
+As shown by Lovelace~\cite{lovelace1843}, the engine computes.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
+";
+        let compiler = EmbeddedCompiler::new(TectonicEngine::new());
+        let request = CompileRequest::new("main.tex", Engine::Tectonic)
+            .with_project_root(dir.path().to_string_lossy().into_owned());
+        let result = compiler.compile(&request, document);
+        assert!(
+            result.report.is_ok(),
+            "bibliography compile failed; log:\n{}",
+            result.report.log
+        );
+        let pdf = result.pdf.expect("a PDF on success");
+        assert!(pdf.starts_with(b"%PDF-"), "output does not look like a PDF");
+        // The bibliography pass ran: the log records the citation being resolved
+        // rather than left undefined.
+        assert!(
+            !result
+                .report
+                .log
+                .contains("Citation `lovelace1843' undefined"),
+            "the citation was not resolved; log:\n{}",
+            result.report.log
+        );
+    }
+
+    #[test]
     #[ignore = "needs the Tectonic bundle; run manually"]
     fn reports_a_failure_and_keeps_the_log() {
         let compiler = EmbeddedCompiler::new(TectonicEngine::new());

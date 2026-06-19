@@ -16,7 +16,16 @@ import {
   resolveDefinition
 } from './language-backend';
 import { type RecentProject, RecentProjectsStore } from './recent-projects';
-import { basename } from './file-tree';
+import { basename, classifyKind } from './file-tree';
+import {
+  type BibEntry,
+  type CiteCandidate,
+  parseBib,
+  serializeBib,
+  serializeEntry,
+  citeCandidates as buildCiteCandidates
+} from './bibliography';
+import { type BibBackend, type LookupKind } from './bib-backend';
 import { type Timer, windowTimer } from './debounce';
 import { type Clock, systemClock } from './timing';
 import { type Bell, webAudioBell } from './bell';
@@ -53,6 +62,8 @@ export interface ProjectState {
   lspDiagnostics: Diagnostic[];
   /** The document outline from the language server. */
   symbols: DocumentSymbol[];
+  /** Every bibliography entry parsed from the project's `.bib` files. */
+  bibEntries: BibEntry[];
 }
 
 /** Where a compile currently stands. */
@@ -107,6 +118,8 @@ export interface CompileDeps {
   soundOnSuccess?: boolean;
   /** The language-server backend, for live diagnostics and the document outline. */
   language?: LanguageBackend;
+  /** The reference-lookup backend, for resolving DOIs and arXiv ids. */
+  bib?: BibBackend;
 }
 
 /** Owns project state and notifies subscribers on every change. */
@@ -122,6 +135,7 @@ export class ProjectController {
   #autoCompile: boolean;
   #soundOnSuccess: boolean;
   #language: LanguageBackend | null;
+  #bib: BibBackend | null;
   // A monotonic id stamped on each compile so a stale build that finishes after
   // a newer one started can be dropped instead of overwriting the fresh proof.
   #compileGeneration = 0;
@@ -136,6 +150,7 @@ export class ProjectController {
     this.#autoCompile = deps.autoCompile ?? true;
     this.#soundOnSuccess = deps.soundOnSuccess ?? false;
     this.#language = deps.language ?? null;
+    this.#bib = deps.bib ?? null;
     this.#state = {
       project: null,
       activePath: null,
@@ -146,7 +161,8 @@ export class ProjectController {
       recent: recent.list(),
       compile: IDLE_COMPILE,
       lspDiagnostics: [],
-      symbols: []
+      symbols: [],
+      bibEntries: []
     };
   }
 
@@ -203,13 +219,118 @@ export class ProjectController {
       recent: this.#recent.list(),
       compile: IDLE_COMPILE,
       lspDiagnostics: [],
-      symbols: []
+      symbols: [],
+      bibEntries: []
     });
     if (snapshot.rootDocument !== '') {
       await this.#openFile(snapshot.root, snapshot.rootDocument);
     } else {
       this.#set({ activePath: null, content: '', savedContent: '' });
     }
+    await this.#loadBibliography(snapshot);
+  }
+
+  /** The project's primary `.bib` file — the first one, or a default name. */
+  #bibPath(project: ProjectSnapshot): string {
+    const existing = project.documents.find((doc) => doc.path.endsWith('.bib'));
+    return existing === undefined ? 'references.bib' : existing.path;
+  }
+
+  /** Read a `.bib` file, treating a missing file as empty content. */
+  async #readBibOrEmpty(root: string, path: string): Promise<string> {
+    try {
+      return await this.#backend.readDocument(root, path);
+    } catch {
+      return '';
+    }
+  }
+
+  /** Parse every `.bib` file in `project` into the entry list. Best-effort: an
+   * unreadable file is skipped so the rest still load. */
+  async #loadBibliography(project: ProjectSnapshot): Promise<void> {
+    const entries: BibEntry[] = [];
+    for (const doc of project.documents) {
+      if (!doc.path.endsWith('.bib')) {
+        continue;
+      }
+      try {
+        entries.push(...parseBib(await this.#backend.readDocument(project.root, doc.path)));
+      } catch {
+        // An unreadable `.bib` is skipped; the rest still load.
+      }
+    }
+    this.#set({ bibEntries: entries });
+  }
+
+  /** Add `path` to the project's document list when it is not already there,
+   * returning the (possibly updated) project so callers reload from it. */
+  #ensureBibDocument(project: ProjectSnapshot, path: string): ProjectSnapshot {
+    if (project.documents.some((doc) => doc.path === path)) {
+      return project;
+    }
+    const updated: ProjectSnapshot = {
+      ...project,
+      documents: [...project.documents, { path, kind: classifyKind(path) }]
+    };
+    this.#set({ project: updated });
+    return updated;
+  }
+
+  /** Citation candidates (key + summary) for the editor and the bibliography
+   * panel, derived from the parsed entries. */
+  citeCandidates(): CiteCandidate[] {
+    return buildCiteCandidates(this.#state.bibEntries);
+  }
+
+  /**
+   * Look up `query` (a DOI or arXiv id) and append the resolved entry to the
+   * project's `.bib` file, reloading the bibliography. Returns the new citation
+   * key, or `null` when no lookup backend is configured or no project is open.
+   */
+  async addReference(query: string, kind: LookupKind): Promise<string | null> {
+    const project = this.#state.project;
+    const bib = this.#bib;
+    if (project === null || bib === null) {
+      return null;
+    }
+    let key: string | null = null;
+    await this.#run(async () => {
+      const entry = await bib.lookupReference(query, kind);
+      const path = this.#bibPath(project);
+      const existing = await this.#readBibOrEmpty(project.root, path);
+      const block = serializeEntry(entry);
+      const next = existing.trim() === '' ? block : `${existing.trimEnd()}\n\n${block}`;
+      await this.#backend.saveDocument(project.root, path, next);
+      await this.#loadBibliography(this.#ensureBibDocument(project, path));
+      key = entry.key;
+    });
+    return key;
+  }
+
+  /**
+   * Merge the entries in `content` (a `.bib` export, e.g. from Zotero) into the
+   * project's `.bib` file, skipping keys that already exist. Returns the number
+   * of entries added.
+   */
+  async importBibText(content: string): Promise<number> {
+    const project = this.#state.project;
+    if (project === null) {
+      return 0;
+    }
+    let added = 0;
+    await this.#run(async () => {
+      const path = this.#bibPath(project);
+      const current = parseBib(await this.#readBibOrEmpty(project.root, path));
+      const seen = new Set(current.map((entry) => entry.key));
+      const fresh = parseBib(content).filter((entry) => !seen.has(entry.key));
+      if (fresh.length === 0) {
+        return;
+      }
+      await this.#backend.saveDocument(project.root, path, serializeBib([...current, ...fresh]));
+      await this.#loadBibliography(this.#ensureBibDocument(project, path));
+      added = fresh.length;
+    });
+    return added;
   }
 
   async #openFile(root: string, path: string): Promise<void> {
@@ -347,7 +468,7 @@ export class ProjectController {
         rootDoc !== path
           ? await this.#backend.readDocument(project.root, rootDoc)
           : this.#state.content;
-      const outcome = await this.#backend.compile(source, rootDoc);
+      const outcome = await this.#backend.compile(source, rootDoc, project.root);
       const durationMs = this.#clock.now() - start;
       next = outcome.ok
         ? {

@@ -14,6 +14,7 @@
   import { type Diagnostic } from './diagnostics';
   import { type KeymapMode } from './keymap-prefs';
   import { type SpellChecker } from './spell-check';
+  import { type CiteCandidate } from './bibliography';
 
   let {
     documentName,
@@ -24,6 +25,7 @@
     language = undefined,
     keymapMode = 'default',
     spellChecker = null,
+    citations = undefined,
     onedit,
     oncreate = undefined,
     oneditorscroll = undefined,
@@ -37,6 +39,7 @@
     language?: LanguageContext;
     keymapMode?: KeymapMode;
     spellChecker?: SpellChecker | null;
+    citations?: () => CiteCandidate[];
     onedit: (content: string) => void;
     oncreate?: (editor: LatexEditor) => void;
     oneditorscroll?: (fraction: number) => void;
@@ -78,7 +81,8 @@
       language,
       keymapMode: value.keymapMode,
       spellChecker: value.spellChecker,
-      onscroll: oneditorscroll
+      onscroll: oneditorscroll,
+      citations
     });
     oncreate?.(editor);
     editor.setDiagnostics(value.diagnostics);
