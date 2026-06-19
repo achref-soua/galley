@@ -107,4 +107,31 @@ describe('Titlebar', () => {
     expect(screen.getByTitle('Insert equation').hasAttribute('disabled')).toBe(true);
     expect(screen.getByTitle('Insert table').hasAttribute('disabled')).toBe(true);
   });
+
+  it('shows the visual toggle button with ¶ label in code mode', () => {
+    render(Titlebar, { props: { ...base, viewMode: 'code' } });
+    const btn = screen.getByTitle('Switch to visual view');
+    expect(btn.textContent?.trim()).toBe('¶');
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('shows the visual toggle button with <> label in visual mode', () => {
+    render(Titlebar, { props: { ...base, viewMode: 'visual' } });
+    const btn = screen.getByTitle('Switch to code view');
+    expect(btn.textContent?.trim()).toBe('<>');
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('fires ontoggleviewmode when the toggle is clicked', async () => {
+    const ontoggleviewmode = vi.fn();
+    render(Titlebar, { props: { ...base, canCompile: true, ontoggleviewmode } });
+    await fireEvent.click(screen.getByTitle('Switch to visual view'));
+    expect(ontoggleviewmode).toHaveBeenCalledOnce();
+  });
+
+  it('disables the view-mode toggle when canCompile is false', () => {
+    render(Titlebar, { props: { ...base, canCompile: false } });
+    const btn = screen.getByTitle('Switch to visual view');
+    expect(btn.hasAttribute('disabled')).toBe(true);
+  });
 });
