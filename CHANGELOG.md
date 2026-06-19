@@ -4,6 +4,45 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-06-19
+
+Visual text and structure editing — the v0.4.0 read-only decoration layer becomes
+writable. Every edit emits a minimal source patch via a CM6 transaction; the `.tex`
+source remains canonical.
+
+### Added
+
+- **`visual.ts`** — editing helpers: `HEADING_ORDER` canonical array, `HeadingCmd` type,
+  `lineHeadingCmd`, `promoteHeading`, `demoteHeading`, `VisualEdit` interface, `toggleBold`,
+  `toggleItalic`, `isItemLine`; all pure and covered at 100 %.
+- **`visualHeadingPromote` / `visualHeadingDemote`** — CM6 commands bound to Shift-Tab /
+  Tab; return `false` on non-heading lines so Tab still indents and Shift-Tab still
+  dedents in normal text.
+- **`visualToggleBold` / `visualToggleItalic`** — CM6 commands bound to Ctrl/Cmd+B and
+  Ctrl/Cmd+I; detect and unwrap existing `\textbf{…}`, `\textit{…}`, `\emph{…}` by
+  inspecting source context around the selection.
+- **`visualInsertItem`** — CM6 command bound to Enter; inserts a new `\item ` at the end
+  of an `\item` line, preserving the line's leading whitespace; returns `false` otherwise.
+- **`VISUAL_KEY_BINDINGS`** — exported binding array (Shift-Tab, Tab, Mod-b, Mod-i,
+  Enter) installed at `Prec.highest` so visual commands take priority over `indentWithTab`
+  and the default keymap, while still falling through when the guards return `false`.
+- **`LatexEditor`** — four new methods: `toggleBold`, `toggleItalic`, `promoteHeading`,
+  `demoteHeading`.
+- **`FormatBar.svelte`** — floating toolbar visible only in visual mode; Bold, Italic,
+  Promote, Demote buttons with keyboard-shortcut hints in their titles.
+- **ADR-0017** — documents the visual editing architecture, `VisualEdit` interface rationale,
+  `Prec.highest` key-priority strategy, and the Ctrl+B compile guard.
+
+### Changed
+
+- `App.svelte` — `FormatBar` mounted inside `.editor-stack` when `viewMode === 'visual'`;
+  `isCompileShortcut` guarded with `&& viewMode === 'code'` so Ctrl+B in visual mode
+  reaches the CM6 keymap instead of triggering a compile.
+- `visualCompartment` now initialised with `visualExtensions()` (plugin + keybindings) in
+  both the factory constructor and `setViewMode`.
+
+---
+
 ## [0.4.0] - 2026-06-19
 
 Rich-text view — a CM6 decoration layer that renders headings, emphasis, lists, links,

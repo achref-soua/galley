@@ -17,6 +17,7 @@ import {
   StateField,
   RangeSet,
   RangeSetBuilder,
+  Prec,
   type Extension,
   type Text
 } from '@codemirror/state';
@@ -73,7 +74,14 @@ import {
   parseItems,
   parseInlineMath,
   parseLinks,
-  parseImages
+  parseImages,
+  lineHeadingCmd,
+  promoteHeading,
+  demoteHeading,
+  toggleBold,
+  toggleItalic,
+  isItemLine,
+  type VisualEdit
 } from './visual';
 
 // ---------------------------------------------------------------------------
@@ -201,6 +209,103 @@ export function visualPlugin(): Extension {
     },
     { decorations: (v) => v.decorations }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Visual editing commands — precise source patches dispatched as CM6 transactions
+// ---------------------------------------------------------------------------
+
+function applyVisualEdit(view: EditorView, edit: VisualEdit): boolean {
+  view.dispatch({
+    changes: edit.changes.map((c) => ({ from: c.from, to: c.to, insert: c.insert })),
+    selection: { anchor: edit.anchor, head: edit.head }
+  });
+  return true;
+}
+
+/**
+ * CM6 command: promote the heading on the cursor line (Shift-Tab).
+ * Returns `false` when the cursor is not on a heading line, letting the key
+ * fall through to the default Shift-Tab behaviour.
+ */
+export function visualHeadingPromote(view: EditorView): boolean {
+  const { head } = view.state.selection.main;
+  const line = view.state.doc.lineAt(head);
+  if (lineHeadingCmd(line.text) === null) return false;
+  const promoted = promoteHeading(line.text);
+  if (promoted === null) return false;
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: promoted },
+    selection: { anchor: line.from + (head - line.from) }
+  });
+  return true;
+}
+
+/**
+ * CM6 command: demote the heading on the cursor line (Tab).
+ * Returns `false` when the cursor is not on a heading line, letting the key
+ * fall through to `indentWithTab`.
+ */
+export function visualHeadingDemote(view: EditorView): boolean {
+  const { head } = view.state.selection.main;
+  const line = view.state.doc.lineAt(head);
+  if (lineHeadingCmd(line.text) === null) return false;
+  const demoted = demoteHeading(line.text);
+  if (demoted === null) return false;
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: demoted },
+    selection: { anchor: line.from + (head - line.from) }
+  });
+  return true;
+}
+
+/** CM6 command: toggle `\textbf{…}` around the current selection (Ctrl/Cmd+B). */
+export function visualToggleBold(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main;
+  const src = view.state.doc.toString();
+  return applyVisualEdit(view, toggleBold(src, from, to));
+}
+
+/** CM6 command: toggle `\textit{…}` around the current selection (Ctrl/Cmd+I). */
+export function visualToggleItalic(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main;
+  const src = view.state.doc.toString();
+  return applyVisualEdit(view, toggleItalic(src, from, to));
+}
+
+/**
+ * CM6 command: insert a new `\item` line when Enter is pressed at the end of
+ * an existing `\item` line. Returns `false` (not handled) otherwise, letting
+ * Enter produce a normal newline.
+ */
+export function visualInsertItem(view: EditorView): boolean {
+  const sel = view.state.selection.main;
+  if (!sel.empty) return false;
+  const line = view.state.doc.lineAt(sel.head);
+  if (!isItemLine(line.text)) return false;
+  if (sel.head !== line.to) return false;
+  const indent = line.text.match(/^[ \t]*/)![0];
+  const insert = `\n${indent}\\item `;
+  view.dispatch({
+    changes: { from: line.to, to: line.to, insert },
+    selection: { anchor: line.to + insert.length }
+  });
+  return true;
+}
+
+/** Key bindings active only in visual mode, registered at `Prec.highest` so
+ *  they take priority over `indentWithTab` and the default keymap. */
+export const VISUAL_KEY_BINDINGS: readonly { key: string; run: (v: EditorView) => boolean }[] = [
+  { key: 'Shift-Tab', run: visualHeadingPromote },
+  { key: 'Tab', run: visualHeadingDemote },
+  { key: 'Mod-b', run: visualToggleBold },
+  { key: 'Mod-i', run: visualToggleItalic },
+  { key: 'Enter', run: visualInsertItem }
+];
+
+/** The full set of extensions active in visual mode (decorations + keybindings). */
+function visualExtensions(): Extension {
+  return [visualPlugin(), Prec.highest(keymap.of([...VISUAL_KEY_BINDINGS]))];
 }
 
 /**
@@ -852,6 +957,14 @@ export interface LatexEditor {
   insertAtCursor(text: string): void;
   /** Switch between `'code'` (raw LaTeX) and `'visual'` (rendered decoration layer). */
   setViewMode(mode: 'code' | 'visual'): void;
+  /** Toggle `\textbf{…}` around the current selection (visual mode). */
+  toggleBold(): void;
+  /** Toggle `\textit{…}` around the current selection (visual mode). */
+  toggleItalic(): void;
+  /** Promote the heading on the cursor line one level (visual mode). */
+  promoteHeading(): void;
+  /** Demote the heading on the cursor line one level (visual mode). */
+  demoteHeading(): void;
   /** Tear the editor down and release its DOM. */
   destroy(): void;
 }
@@ -899,7 +1012,7 @@ export const createLatexEditor: EditorFactory = ({
           spellCompartment,
           citations
         ),
-        visualCompartment.of(viewMode === 'visual' ? visualPlugin() : []),
+        visualCompartment.of(viewMode === 'visual' ? visualExtensions() : []),
         ...scrollExtension
       ]
     })
@@ -932,8 +1045,20 @@ export const createLatexEditor: EditorFactory = ({
     },
     setViewMode(mode) {
       view.dispatch({
-        effects: visualCompartment.reconfigure(mode === 'visual' ? visualPlugin() : [])
+        effects: visualCompartment.reconfigure(mode === 'visual' ? visualExtensions() : [])
       });
+    },
+    toggleBold() {
+      visualToggleBold(view);
+    },
+    toggleItalic() {
+      visualToggleItalic(view);
+    },
+    promoteHeading() {
+      visualHeadingPromote(view);
+    },
+    demoteHeading() {
+      visualHeadingDemote(view);
     },
     destroy() {
       view.destroy();
