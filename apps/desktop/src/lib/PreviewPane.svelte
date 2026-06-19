@@ -88,9 +88,7 @@
 
   // Derive the SVG rect position from the highlight box (in buffer pixels).
   const svgRect = $derived(
-    highlightBox !== null && highlightVisible
-      ? syncTexToCanvas(highlightBox, zoomScale)
-      : null
+    highlightBox !== null && highlightVisible ? syncTexToCanvas(highlightBox, zoomScale) : null
   );
 
   // Svelte action: scroll the proof container to mirror the editor when syncScroll is on.
@@ -164,21 +162,23 @@
         type="button"
         aria-label="Previous page"
         disabled={currentPage <= 1}
-        onclick={prevPage}
-      >‹</button>
+        onclick={prevPage}>‹</button
+      >
       <span class="pages">{pageLabel}</span>
       <button
         class="nav-btn"
         type="button"
         aria-label="Next page"
         disabled={currentPage >= pageCount}
-        onclick={nextPage}
-      >›</button>
+        onclick={nextPage}>›</button
+      >
     </div>
     <select
       class="zoom-select"
       aria-label="Zoom"
-      onchange={(e) => { zoomScale = Number((e.currentTarget as HTMLSelectElement).value); }}
+      onchange={(e) => {
+        zoomScale = Number((e.currentTarget as HTMLSelectElement).value);
+      }}
     >
       <option value="1" selected={zoomScale === 1.0}>100%</option>
       <option value="1.25" selected={zoomScale === 1.25}>125%</option>
@@ -186,13 +186,9 @@
       <option value="2" selected={zoomScale === 2.0}>200%</option>
     </select>
   </header>
-  <div
-    class="proof"
-    use:syncScroller={{ enabled: syncScroll, fraction: editorScrollFraction }}
-  >
+  <div class="proof" use:syncScroller={{ enabled: syncScroll, fraction: editorScrollFraction }}>
     {#if proofInput !== null}
       <div class="page-wrap">
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <canvas
           class="page"
           use:renderProof={proofInput}
@@ -365,9 +361,15 @@
   }
 
   @keyframes synctex-fade {
-    0% { opacity: 0.35; }
-    70% { opacity: 0.35; }
-    100% { opacity: 0; }
+    0% {
+      opacity: 0.35;
+    }
+    70% {
+      opacity: 0.35;
+    }
+    100% {
+      opacity: 0;
+    }
   }
 
   .render-error,

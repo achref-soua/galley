@@ -591,6 +591,8 @@ export interface LatexEditor {
   setKeymapMode(mode: KeymapMode): void;
   /** Swap the spell checker; pass `null` to disable spell-check. */
   setSpellChecker(checker: SpellChecker | null): void;
+  /** Insert `text` at the current cursor position, replacing any selection. */
+  insertAtCursor(text: string): void;
   /** Tear the editor down and release its DOM. */
   destroy(): void;
 }
@@ -626,7 +628,14 @@ export const createLatexEditor: EditorFactory = ({
     state: EditorState.create({
       doc,
       extensions: [
-        latexExtensions(onChange, language, keymapMode, spellChecker, keymapCompartment, spellCompartment),
+        latexExtensions(
+          onChange,
+          language,
+          keymapMode,
+          spellChecker,
+          keymapCompartment,
+          spellCompartment
+        ),
         ...scrollExtension
       ]
     })
@@ -653,6 +662,9 @@ export const createLatexEditor: EditorFactory = ({
     setSpellChecker(checker) {
       const ext = checker !== null ? makeSpellLinter(() => checker) : [];
       view.dispatch({ effects: spellCompartment.reconfigure(ext) });
+    },
+    insertAtCursor(text) {
+      view.dispatch(view.state.replaceSelection(text));
     },
     destroy() {
       view.destroy();

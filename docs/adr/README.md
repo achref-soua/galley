@@ -16,3 +16,5 @@ codebase stays legible.
 | 0009 | Language intelligence via TexLab (LSP)                                    | Accepted |
 | 0010 | Include graph, root-document compile, structure sidebar                   | Accepted |
 | 0011 | Power editing: keymap modes, spell-check, command palette, project search | Accepted |
+| 0012 | SyncTeX bidirectional source ↔ PDF navigation                             | Accepted |
+| 0013 | Assets & figures: image insertion workflow                                | Accepted |

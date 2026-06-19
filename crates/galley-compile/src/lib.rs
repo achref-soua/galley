@@ -97,7 +97,9 @@ impl<E: LatexEngine> Compiler for EmbeddedCompiler<E> {
             Err(err) => return CompileResult::failed(err.to_string()),
         };
         match self.engine.run(&plan, source) {
-            Ok(artifacts) => CompileResult::succeeded(artifacts.pdf, artifacts.synctex, artifacts.log),
+            Ok(artifacts) => {
+                CompileResult::succeeded(artifacts.pdf, artifacts.synctex, artifacts.log)
+            }
             Err(failure) => CompileResult::failed(failure.log),
         }
     }

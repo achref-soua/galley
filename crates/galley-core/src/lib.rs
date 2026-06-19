@@ -5,6 +5,7 @@
 //! exercised to full coverage with plain unit tests. As the product grows, the
 //! richer domain types (`Project`, `Document`, `BuildPlan`, …) live here too.
 
+pub mod assets;
 pub mod compile;
 pub mod diagnostics;
 pub mod document;
@@ -17,6 +18,7 @@ pub mod search;
 pub mod synctex;
 pub mod time;
 
+pub use assets::{figure_snippet, needs_graphicspath};
 pub use compile::{
     tex_job_name, BuildPlan, CompileReport, CompileRequest, CompileResult, CompileStatus, Compiler,
     Engine, PlanError,

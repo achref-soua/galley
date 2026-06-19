@@ -37,7 +37,14 @@ describe('syncTexToCanvas', () => {
   });
 
   it('scales all dimensions by the given scale factor', () => {
-    const box = { page: 1, h: SP_PER_PT * 10, v: SP_PER_PT * 20, w: SP_PER_PT * 5, d: SP_PER_PT * 1, page_height: SP_PER_PT * 100 };
+    const box = {
+      page: 1,
+      h: SP_PER_PT * 10,
+      v: SP_PER_PT * 20,
+      w: SP_PER_PT * 5,
+      d: SP_PER_PT * 1,
+      page_height: SP_PER_PT * 100
+    };
     const rect = syncTexToCanvas(box, 2.0);
     expect(rect.x).toBeCloseTo(20, 5);
     expect(rect.y).toBeCloseTo(40, 5);

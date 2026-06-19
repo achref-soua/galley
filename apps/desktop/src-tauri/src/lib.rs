@@ -178,11 +178,17 @@ fn compile_document(
     root_document: String,
 ) -> CompileDto {
     let request = CompileRequest::new(root_document, Engine::Tectonic);
-    let mut compiler = compiler_state.0.lock().expect("the compiler mutex was poisoned");
+    let mut compiler = compiler_state
+        .0
+        .lock()
+        .expect("the compiler mutex was poisoned");
     let outcome = compiler.compile(&request, &source);
     let has_synctex = outcome.result.synctex.is_some();
     if let Some(bytes) = outcome.result.synctex.clone() {
-        let mut sx = synctex_state.0.lock().expect("the synctex mutex was poisoned");
+        let mut sx = synctex_state
+            .0
+            .lock()
+            .expect("the synctex mutex was poisoned");
         *sx = Some(bytes);
     }
     let diagnostics = parse_log(&outcome.result.report.log)
@@ -497,14 +503,16 @@ fn synctex_forward(
 ) -> Option<SyncTexBoxDto> {
     let guard = state.0.lock().expect("the synctex mutex was poisoned");
     let data = guard.as_deref()?;
-    SyncTexParser.forward(data, &file, line).map(|b| SyncTexBoxDto {
-        page: b.page,
-        h: b.h,
-        v: b.v,
-        w: b.w,
-        d: b.d,
-        page_height: b.page_height,
-    })
+    SyncTexParser
+        .forward(data, &file, line)
+        .map(|b| SyncTexBoxDto {
+            page: b.page,
+            h: b.h,
+            v: b.v,
+            w: b.w,
+            d: b.d,
+            page_height: b.page_height,
+        })
 }
 
 #[tauri::command]
@@ -516,10 +524,68 @@ fn synctex_inverse(
 ) -> Option<SyncTexLocationDto> {
     let guard = state.0.lock().expect("the synctex mutex was poisoned");
     let data = guard.as_deref()?;
-    SyncTexParser.inverse(data, page, x, y).map(|loc| SyncTexLocationDto {
-        file: loc.file,
-        line: loc.line,
-    })
+    SyncTexParser
+        .inverse(data, page, x, y)
+        .map(|loc| SyncTexLocationDto {
+            file: loc.file,
+            line: loc.line,
+        })
+}
+
+/// Sanitize a user-supplied filename to a safe basename.
+///
+/// Strips any directory prefix and replaces characters that are illegal on at
+/// least one major OS (`\`, `/`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, and ASCII
+/// control characters) with underscores. The result is always a plain filename
+/// with no path separators.
+fn sanitize_filename(name: &str) -> String {
+    let base = name.split(['/', '\\']).next_back().unwrap_or_default();
+    base.chars()
+        .map(|c| {
+            if c.is_ascii_control()
+                || matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
+            {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+/// Copy binary `src_bytes` into the project's `assets/` folder as `filename`.
+///
+/// The filename is sanitized (no directory separators; illegal characters
+/// replaced). Returns the project-relative path (`assets/<filename>`).
+#[tauri::command]
+fn copy_asset(root: String, src_bytes: Vec<u8>, filename: String) -> Result<String, String> {
+    let store = SafeRoot::open(Path::new(&root)).map_err(|err| err.to_string())?;
+    let clean = sanitize_filename(&filename);
+    let rel = format!("assets/{clean}");
+    store
+        .write_bytes(&rel, &src_bytes)
+        .map_err(|err| err.to_string())?;
+    Ok(rel)
+}
+
+/// List every file in the project's `assets/` subfolder.
+///
+/// Returns project-relative paths (e.g. `"assets/figure.png"`). Returns an
+/// empty list when the project root cannot be opened or `assets/` does not
+/// exist — never returns an error to keep the UI responsive.
+#[tauri::command]
+fn list_assets(root: String) -> Vec<String> {
+    let store = match SafeRoot::open(Path::new(&root)) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let all = match store.list() {
+        Ok(files) => files,
+        Err(_) => return Vec::new(),
+    };
+    all.into_iter()
+        .filter(|f| f.starts_with("assets/"))
+        .collect()
 }
 
 /// Build and run the Galley desktop application.
@@ -549,7 +615,9 @@ pub fn run() {
             lsp_symbols,
             lsp_diagnostics,
             synctex_forward,
-            synctex_inverse
+            synctex_inverse,
+            copy_asset,
+            list_assets
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

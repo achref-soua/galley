@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/sve
 import App from '../src/App.svelte';
 import type { PdfRenderer } from '../src/lib/pdf';
 import type { EditorFactory, LanguageContext } from '../src/lib/editor';
+import type { AssetBackend } from '../src/lib/asset-backend';
 import { firePointer, fakeEditorFactory } from './setup';
 
 /** A fake PDF renderer that reports a one-page document. */
@@ -479,6 +480,180 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await waitFor(() => expect(textarea.value).toContain('test'));
   });
 
+  it('AssetPanel oninsert calls insertAtCursor on the editor', async () => {
+    let insertedText = '';
+    const spyFactory: EditorFactory = ({ parent, doc, onChange }) => {
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      return {
+        setDoc(v) {
+          if (v !== area.value) area.value = v;
+        },
+        setDiagnostics: () => {},
+        gotoLine: () => {},
+        currentLine: () => 1,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
+        insertAtCursor(text) {
+          insertedText = text;
+        },
+        destroy() {
+          area.remove();
+        }
+      };
+    };
+    const fakeAssets: AssetBackend = {
+      async copyAsset(_root, _bytes, filename) {
+        return `assets/${filename}`;
+      },
+      async listAssets() {
+        return ['assets/figure.png'];
+      }
+    };
+    render(App, {
+      props: {
+        editor: spyFactory,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        assetBackend: fakeAssets
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    await waitFor(() => expect(screen.getByText('figure.png')).toBeTruthy());
+    await fireEvent.click(screen.getByText('figure.png'));
+    expect(insertedText).toBe('\\includegraphics[width=\\linewidth]{assets/figure.png}');
+  });
+
+  it('graphicspath banner shows when content has \\includegraphics without \\graphicspath', async () => {
+    const textarea = await openDemoFolder();
+    expect(screen.queryByRole('button', { name: 'Add graphicspath' })).toBeNull();
+    await fireEvent.input(textarea, {
+      target: { value: '\\begin{document}\\includegraphics{fig}\\end{document}' }
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add graphicspath' })).toBeTruthy()
+    );
+  });
+
+  it('graphicspath banner Add button inserts \\graphicspath and hides the banner', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, {
+      target: { value: '\\begin{document}\\includegraphics{fig}\\end{document}' }
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add graphicspath' })).toBeTruthy()
+    );
+    await fireEvent.click(screen.getByRole('button', { name: 'Add graphicspath' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Add graphicspath' })).toBeNull()
+    );
+    expect(textarea.value).toContain('\\graphicspath');
+  });
+
+  it('graphicspath banner Dismiss button hides the banner', async () => {
+    const textarea = await openDemoFolder();
+    await fireEvent.input(textarea, {
+      target: { value: '\\begin{document}\\includegraphics{fig}\\end{document}' }
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy());
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull());
+  });
+
+  it('drop before project is open is a no-op', () => {
+    renderApp();
+    const editorArea = document.querySelector('.editor-area')!;
+    editorArea.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+  });
+
+  it('drop with null dataTransfer is a no-op', async () => {
+    await openDemoFolder();
+    const editorArea = document.querySelector('.editor-area')!;
+    // plain Event has no dataTransfer → dt == null → early return
+    editorArea.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+  });
+
+  it('drop with empty file list is a no-op', async () => {
+    await openDemoFolder();
+    const editorArea = document.querySelector('.editor-area')!;
+    const ev = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+    Object.defineProperty(ev, 'dataTransfer', {
+      value: { files: { length: 0 } },
+      configurable: true
+    });
+    editorArea.dispatchEvent(ev);
+  });
+
+  it('drop with a file copies the asset and inserts the snippet via insertAtCursor', async () => {
+    let insertedText = '';
+    const spyFactory: EditorFactory = ({ parent, doc, onChange }) => {
+      const area = document.createElement('textarea');
+      area.setAttribute('aria-label', 'Source');
+      area.value = doc;
+      area.addEventListener('input', () => onChange(area.value));
+      parent.appendChild(area);
+      return {
+        setDoc(v) {
+          if (v !== area.value) area.value = v;
+        },
+        setDiagnostics: () => {},
+        gotoLine: () => {},
+        currentLine: () => 1,
+        setKeymapMode: () => {},
+        setSpellChecker: () => {},
+        insertAtCursor(text) {
+          insertedText = text;
+        },
+        destroy() {
+          area.remove();
+        }
+      };
+    };
+    const fakeAssets: AssetBackend = {
+      async copyAsset(_root, _bytes, filename) {
+        return `assets/${filename}`;
+      },
+      async listAssets() {
+        return [];
+      }
+    };
+    render(App, {
+      props: {
+        editor: spyFactory,
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        assetBackend: fakeAssets
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+
+    const editorArea = document.querySelector('.editor-area')!;
+    await fireEvent.dragOver(editorArea);
+
+    const fakeFile = {
+      name: 'photo.jpg',
+      arrayBuffer: async () => new ArrayBuffer(4)
+    } as unknown as File;
+    const dropEv = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+    Object.defineProperty(dropEv, 'dataTransfer', {
+      value: { files: { 0: fakeFile, length: 1 } },
+      configurable: true
+    });
+    editorArea.dispatchEvent(dropEv);
+    await waitFor(() =>
+      expect(insertedText).toBe('\\includegraphics[width=\\linewidth]{assets/photo.jpg}')
+    );
+  });
+
   it('wires the editor to the language server and the outline', async () => {
     let captured: LanguageContext | undefined;
     const gotoLine = vi.fn();
@@ -498,6 +673,7 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        insertAtCursor: () => {},
         destroy: () => area.remove()
       };
     };
@@ -537,16 +713,34 @@ describe('App — SyncTeX forward and inverse search', () => {
   let bell: { ding: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    timer = { pending: null, set(cb) { this.pending = cb; }, clear() { this.pending = null; } };
-    clock = { times: [], now() { return 0; } };
+    timer = {
+      pending: null,
+      set(cb) {
+        this.pending = cb;
+      },
+      clear() {
+        this.pending = null;
+      }
+    };
+    clock = {
+      times: [],
+      now() {
+        return 0;
+      }
+    };
     bell = { ding: vi.fn() };
   });
 
   it('Ctrl+Enter triggers forward search via the injected backend', async () => {
     let forwardArgs: [string, number] | null = null;
     const fakeSynctex = {
-      async forward(file: string, line: number) { forwardArgs = [file, line]; return null; },
-      async inverse() { return null; }
+      async forward(file: string, line: number) {
+        forwardArgs = [file, line];
+        return null;
+      },
+      async inverse() {
+        return null;
+      }
     };
     render(App, {
       props: {
@@ -570,8 +764,13 @@ describe('App — SyncTeX forward and inverse search', () => {
   it('Ctrl+Enter is a no-op when no document is open', async () => {
     let called = false;
     const fakeSynctex = {
-      async forward() { called = true; return null; },
-      async inverse() { return null; }
+      async forward() {
+        called = true;
+        return null;
+      },
+      async inverse() {
+        return null;
+      }
     };
     render(App, {
       props: {
@@ -590,8 +789,13 @@ describe('App — SyncTeX forward and inverse search', () => {
   it('Cmd+Enter (metaKey) also triggers forward search', async () => {
     let forwardCalled = false;
     const fakeSynctex = {
-      async forward() { forwardCalled = true; return null; },
-      async inverse() { return null; }
+      async forward() {
+        forwardCalled = true;
+        return null;
+      },
+      async inverse() {
+        return null;
+      }
     };
     render(App, {
       props: {
@@ -611,26 +815,41 @@ describe('App — SyncTeX forward and inverse search', () => {
 
   it('inverse search is a no-op when synctex returns null', async () => {
     const gotoLineCalls: number[] = [];
-    const capturingFactory = (({ parent, doc, onChange }: { parent: HTMLElement; doc: string; onChange: (v: string) => void }) => {
+    const capturingFactory = (({
+      parent,
+      doc,
+      onChange
+    }: {
+      parent: HTMLElement;
+      doc: string;
+      onChange: (v: string) => void;
+    }) => {
       const area = document.createElement('textarea');
       area.setAttribute('aria-label', 'Source');
       area.value = doc;
       area.addEventListener('input', () => onChange(area.value));
       parent.appendChild(area);
       return {
-        setDoc: (v: string) => { if (v !== area.value) area.value = v; },
+        setDoc: (v: string) => {
+          if (v !== area.value) area.value = v;
+        },
         setDiagnostics: () => {},
         gotoLine: (line: number) => gotoLineCalls.push(line),
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        insertAtCursor: () => {},
         destroy: () => area.remove()
       };
     }) as unknown as EditorFactory;
 
     const fakeSynctex = {
-      async forward() { return null; },
-      async inverse() { return null; }
+      async forward() {
+        return null;
+      },
+      async inverse() {
+        return null;
+      }
     };
 
     render(App, {
@@ -656,26 +875,41 @@ describe('App — SyncTeX forward and inverse search', () => {
 
   it('inverse search calls jumpToLine when synctex returns a location', async () => {
     const gotoLineCalls: number[] = [];
-    const capturingFactory = (({ parent, doc, onChange }: { parent: HTMLElement; doc: string; onChange: (v: string) => void }) => {
+    const capturingFactory = (({
+      parent,
+      doc,
+      onChange
+    }: {
+      parent: HTMLElement;
+      doc: string;
+      onChange: (v: string) => void;
+    }) => {
       const area = document.createElement('textarea');
       area.setAttribute('aria-label', 'Source');
       area.value = doc;
       area.addEventListener('input', () => onChange(area.value));
       parent.appendChild(area);
       return {
-        setDoc: (v: string) => { if (v !== area.value) area.value = v; },
+        setDoc: (v: string) => {
+          if (v !== area.value) area.value = v;
+        },
         setDiagnostics: () => {},
         gotoLine: (line: number) => gotoLineCalls.push(line),
         currentLine: () => 1,
         setKeymapMode: () => {},
         setSpellChecker: () => {},
+        insertAtCursor: () => {},
         destroy: () => area.remove()
       };
     }) as unknown as EditorFactory;
 
     const fakeSynctex = {
-      async forward() { return null; },
-      async inverse() { return { file: 'main.tex', line: 7 }; }
+      async forward() {
+        return null;
+      },
+      async inverse() {
+        return { file: 'main.tex', line: 7 };
+      }
     };
 
     render(App, {
