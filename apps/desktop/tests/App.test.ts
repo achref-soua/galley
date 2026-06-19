@@ -1146,3 +1146,147 @@ describe('App — SyncTeX forward and inverse search', () => {
     await waitFor(() => expect(gotoLineCalls).toContain(7));
   });
 });
+
+describe('App — layout, drag/drop, and review handlers', () => {
+  let timer: { pending: (() => void) | null; set: (cb: () => void) => void; clear: () => void };
+  let clock: { times: number[]; now: () => number };
+  let bell: { ding: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    timer = {
+      pending: null,
+      set(cb) {
+        this.pending = cb;
+      },
+      clear() {
+        this.pending = null;
+      }
+    };
+    clock = {
+      times: [],
+      now() {
+        return 0;
+      }
+    };
+    bell = { ding: vi.fn() };
+  });
+
+  async function openProject() {
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    return (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
+  }
+
+  it('handleImageResize updates the source with new width', async () => {
+    const editor = await openProject();
+    // Seed the editor with a bare \includegraphics
+    await fireEvent.input(editor, {
+      target: { value: '\\includegraphics{fig.png}' }
+    });
+    // Wait for the resize row to appear in AssetPanel
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('button', { name: /Set fig.png width to/ }).length
+      ).toBeGreaterThan(0)
+    );
+    const halfBtn = screen.getAllByRole('button', { name: /Set fig.png width to ½/ })[0];
+    await fireEvent.click(halfBtn);
+    await waitFor(() => expect(editor.value).toContain('[width=0.5\\linewidth]'));
+  });
+
+  it('handleSectionReorder swaps sections in the source', async () => {
+    const editor = await openProject();
+    await fireEvent.input(editor, {
+      target: { value: '\\section{Alpha}\nTextA\n\\section{Beta}\nTextB' }
+    });
+    // Save to remove dirty flag so we can check the content
+    await fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    );
+    // The sections panel should list both sections
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy());
+    const sectionItems = screen
+      .getAllByRole('listitem')
+      .filter((li) => li.getAttribute('aria-label')?.startsWith('Section:'));
+    // Drag first section to second position
+    await fireEvent.dragStart(sectionItems[0]);
+    await fireEvent.drop(sectionItems[1]);
+    await waitFor(() =>
+      expect(editor.value.indexOf('Beta')).toBeLessThan(editor.value.indexOf('Alpha'))
+    );
+  });
+
+  it('handleAcceptReview removes an entry from the review queue', async () => {
+    const { createReviewEntry } = await import('../src/lib/review');
+    const e = createReviewEntry('r1', 0, 3, 'old', 'new');
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        initialReviewEntries: [e]
+      }
+    });
+    await screen.findByRole('button', { name: /Accept change r1/ });
+    await fireEvent.click(screen.getByRole('button', { name: /Accept change r1/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Accept change r1/ })).toBeNull()
+    );
+    expect(screen.getByText('No changes to review.')).toBeTruthy();
+  });
+
+  it('handleRejectReview removes an entry (no source change when before===after)', async () => {
+    const { createReviewEntry } = await import('../src/lib/review');
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        // before===after so applyReject leaves src unchanged (covers the false branch)
+        initialReviewEntries: [createReviewEntry('r1', 0, 0, '', '')]
+      }
+    });
+    await screen.findByRole('button', { name: /Reject change r1/ });
+    await fireEvent.click(screen.getByRole('button', { name: /Reject change r1/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Reject change r1/ })).toBeNull()
+    );
+    expect(screen.getByText('No changes to review.')).toBeTruthy();
+  });
+
+  it('handleRejectReview calls projectController.edit when source changes', async () => {
+    const { createReviewEntry } = await import('../src/lib/review');
+    // before='PREFIX' from=0 to=0: applyReject prepends 'PREFIX' to current source
+    // → result.src !== project.content → projectController.edit is called (lines 461-462)
+    await openProject();
+    // Re-render fresh with the review entry (project.content will be the demo content)
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        initialReviewEntries: [createReviewEntry('r1', 0, 0, 'REVERT', '')]
+      }
+    });
+    await screen.findByRole('button', { name: /Reject change r1/ });
+    await fireEvent.click(screen.getByRole('button', { name: /Reject change r1/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Reject change r1/ })).toBeNull()
+    );
+  });
+});

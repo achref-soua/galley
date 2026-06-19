@@ -9,6 +9,7 @@
     title,
     onclick,
     'aria-pressed': ariaPressed = undefined,
+    'aria-label': ariaLabel = undefined,
     children
   }: {
     variant?: 'primary' | 'default' | 'ghost';
@@ -18,6 +19,7 @@
     title?: string;
     onclick?: () => void;
     'aria-pressed'?: boolean;
+    'aria-label'?: string;
     children: Snippet;
   } = $props();
 </script>
@@ -32,6 +34,7 @@
   {title}
   {onclick}
   aria-pressed={ariaPressed}
+  aria-label={ariaLabel}
 >
   {@render children()}
 </button>

@@ -1,26 +1,34 @@
 <script lang="ts">
   // The document structure panel: shows the include tree (files referenced by
   // \input/\include/\subfile), the structural outline from the language server,
-  // and a search bar for jump-to-anything navigation. The flattened symbol rows
-  // come from `flattenSymbols` (pure, in language-backend.ts); filtered results
-  // are derived from the search term. LSP lines are zero-based; the parent
-  // converts to one-based when it calls the editor's `gotoLine`.
+  // a drag-to-reorder section list, and a search bar for jump-to-anything
+  // navigation. The flattened symbol rows come from `flattenSymbols` (pure, in
+  // language-backend.ts); filtered results are derived from the search term.
+  // LSP lines are zero-based; the parent converts to one-based for the editor.
   import { type DocumentSymbol, type OutlineRow, flattenSymbols } from './language-backend';
+  import { parseSectionBlocks, type SectionBlock } from './visual';
 
   let {
     symbols,
     includes,
+    content,
     onjump,
-    onopenfile
+    onopenfile,
+    onreorder
   }: {
     symbols: DocumentSymbol[];
     includes: string[];
+    content: string;
     onjump: (line: number) => void;
     onopenfile: (path: string) => void;
+    onreorder: (fromIdx: number, toIdx: number) => void;
   } = $props();
 
   let expanded = $state(true);
   let search = $state('');
+  let draggedIdx = $state<number | null>(null);
+
+  const sectionBlocks = $derived(parseSectionBlocks(content));
 
   const allRows = $derived(flattenSymbols(symbols));
 
@@ -36,14 +44,24 @@
       : includes.filter((p) => p.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const hasContent = $derived(filteredRows.length > 0 || filteredIncludes.length > 0);
-  const totalItems = $derived(allRows.length + includes.length);
+  const filteredBlocks = $derived(
+    search.trim().length === 0
+      ? sectionBlocks
+      : sectionBlocks.filter((b) => b.title.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const hasContent = $derived(
+    filteredRows.length > 0 || filteredIncludes.length > 0 || filteredBlocks.length > 0
+  );
+  const totalItems = $derived(allRows.length + includes.length + sectionBlocks.length);
 
   function summaryText(): string {
     if (totalItems === 0) return 'Empty';
     const parts: string[] = [];
     if (includes.length > 0)
       parts.push(`${includes.length} file${includes.length === 1 ? '' : 's'}`);
+    if (sectionBlocks.length > 0)
+      parts.push(`${sectionBlocks.length} section${sectionBlocks.length === 1 ? '' : 's'}`);
     if (allRows.length > 0)
       parts.push(`${allRows.length} symbol${allRows.length === 1 ? '' : 's'}`);
     return parts.join(', ');
@@ -51,6 +69,25 @@
 
   function indentStyle(row: OutlineRow): string {
     return `padding-left: ${row.depth * 16 + 16}px`;
+  }
+
+  function handleDragStart(i: number) {
+    draggedIdx = i;
+  }
+
+  function handleDrop(targetIdx: number) {
+    if (draggedIdx !== null && draggedIdx !== targetIdx) {
+      onreorder(draggedIdx, targetIdx);
+    }
+    draggedIdx = null;
+  }
+
+  function handleDragEnd() {
+    draggedIdx = null;
+  }
+
+  function sectionLabel(block: SectionBlock): string {
+    return block.title.length > 0 ? block.title : '(untitled)';
   }
 </script>
 
@@ -78,6 +115,30 @@
       />
     </div>
 
+    {#if filteredBlocks.length > 0}
+      <div class="section-label">Sections</div>
+      <ul class="list" aria-label="Document sections">
+        {#each filteredBlocks as block, i (block.from)}
+          <li
+            class="row kind-section draggable"
+            class:dragging={draggedIdx === i}
+            draggable="true"
+            aria-label={`Section: ${sectionLabel(block)}`}
+            ondragstart={() => handleDragStart(i)}
+            ondragover={(e) => e.preventDefault()}
+            ondrop={(e) => {
+              e.preventDefault();
+              handleDrop(i);
+            }}
+            ondragend={handleDragEnd}
+          >
+            <span class="drag-handle" aria-hidden="true">⠿</span>
+            <span class="name">{sectionLabel(block)}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
     {#if filteredIncludes.length > 0}
       <div class="section-label">Includes</div>
       <ul class="list">
@@ -92,7 +153,7 @@
     {/if}
 
     {#if filteredRows.length > 0}
-      {#if filteredIncludes.length > 0}
+      {#if filteredIncludes.length > 0 || filteredBlocks.length > 0}
         <div class="section-label">Outline</div>
       {/if}
       <ul class="list">
@@ -222,6 +283,31 @@
 
   .row.kind-file {
     border-left-color: var(--fg-muted);
+  }
+
+  .draggable {
+    display: flex;
+    align-items: center;
+    gap: var(--galley-space-2);
+    padding: var(--galley-space-2) var(--galley-space-4);
+    cursor: grab;
+    color: var(--fg);
+    font-family: var(--galley-font-mono);
+    font-size: var(--galley-text-sm);
+  }
+
+  .draggable:hover {
+    background: var(--bg-sunken);
+  }
+
+  .draggable.dragging {
+    opacity: 0.4;
+  }
+
+  .drag-handle {
+    color: var(--fg-faint);
+    font-size: var(--galley-text-xs);
+    flex-shrink: 0;
   }
 
   .entry {
