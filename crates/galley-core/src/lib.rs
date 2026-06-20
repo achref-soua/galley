@@ -15,6 +15,7 @@ pub mod compile;
 pub mod diagnostics;
 pub mod document;
 pub mod hash;
+pub mod import;
 pub mod include_graph;
 pub mod intel;
 pub mod manifest;
@@ -50,6 +51,11 @@ pub use document::{
     DocumentKind, RootCandidate,
 };
 pub use hash::content_hash;
+pub use import::{
+    analyze_project, clean_export_paths, detect_fonts, detect_packages, engine_from_program_comment,
+    engine_needs_latexmk, is_latexmkrc, latexmkrc_engine, tex_root_hint, BibTool, FileEntry,
+    ProjectProfile, TexEngine,
+};
 pub use include_graph::{parse_includes, resolve_include_path};
 pub use intel::{
     CompletionItem, CompletionKind, DocumentSymbol, Hover, LanguageIntelligence, Location,
