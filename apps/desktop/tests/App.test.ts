@@ -7,6 +7,7 @@ import type { AssetBackend } from '../src/lib/asset-backend';
 import type { MathFieldSetup } from '../src/lib/math-field.js';
 import { firePointer, fakeEditorFactory } from './setup';
 import { browserAiBackend } from '../src/lib/ai-backend';
+import { browserImportBackend } from '../src/lib/import-backend';
 
 /** A fake PDF renderer that reports a one-page document. */
 const onePageRenderer = (): PdfRenderer => ({ render: () => Promise.resolve({ pageCount: 1 }) });
@@ -1396,5 +1397,144 @@ describe('App — layout, drag/drop, and review handlers', () => {
     // handleAutoApply must have called projectController.edit with the new content
     const textarea = screen.getByLabelText('Source') as HTMLTextAreaElement;
     expect(textarea.value).toContain('\\section{AutoApplied}');
+  });
+
+  describe('version history (VCS) handlers', () => {
+    function makeMockVcsBackend(
+      entries: {
+        id: string;
+        name: string;
+        date: string;
+        isNamed: boolean;
+        linesAdded: number;
+        linesRemoved: number;
+      }[] = []
+    ) {
+      return {
+        autoCheckpoint: vi.fn().mockResolvedValue('cp1'),
+        createSnapshot: vi.fn().mockResolvedValue('cp2'),
+        listCheckpoints: vi.fn().mockResolvedValue(entries),
+        getContent: vi.fn().mockResolvedValue('restored content')
+      };
+    }
+
+    async function openProjectWithVcs(
+      vcsBackend: ReturnType<typeof makeMockVcsBackend>
+    ): Promise<HTMLTextAreaElement> {
+      render(App, {
+        props: {
+          editor: fakeEditorFactory(),
+          createRenderer: onePageRenderer,
+          compileTimer: timer,
+          compileClock: clock,
+          bell,
+          vcsBackend
+        }
+      });
+      await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+      return screen.findByLabelText('Source') as Promise<HTMLTextAreaElement>;
+    }
+
+    it('handleSave calls autoCheckpoint then refreshes history', async () => {
+      const vcsBackend = makeMockVcsBackend();
+      await openProjectWithVcs(vcsBackend);
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(vcsBackend.autoCheckpoint).toHaveBeenCalled());
+      expect(vcsBackend.listCheckpoints).toHaveBeenCalled();
+    });
+
+    it('handleHistorySelect fetches content for the chosen checkpoint', async () => {
+      const entry = {
+        id: 'cp1',
+        name: 'auto',
+        date: '2026-01-01T00:00:00Z',
+        isNamed: false,
+        linesAdded: 1,
+        linesRemoved: 0
+      };
+      const vcsBackend = makeMockVcsBackend([entry]);
+      await openProjectWithVcs(vcsBackend);
+      // Save so refreshHistory populates the timeline
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(screen.queryByText('auto')).not.toBeNull());
+      await fireEvent.click(screen.getByText('auto'));
+      await waitFor(() =>
+        expect(vcsBackend.getContent).toHaveBeenCalledWith(expect.any(String), 'cp1')
+      );
+    });
+
+    it('handleHistoryRevert restores the selected checkpoint content', async () => {
+      const entry = {
+        id: 'cp1',
+        name: 'auto',
+        date: '2026-01-01T00:00:00Z',
+        isNamed: false,
+        linesAdded: 2,
+        linesRemoved: 0
+      };
+      const vcsBackend = {
+        ...makeMockVcsBackend([entry]),
+        getContent: vi.fn().mockResolvedValue('restored text')
+      };
+      const textarea = await openProjectWithVcs(vcsBackend);
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(screen.queryByText('auto')).not.toBeNull());
+      await fireEvent.click(screen.getByText('auto'));
+      await waitFor(() => expect(screen.queryByLabelText('Diff viewer')).not.toBeNull());
+      await fireEvent.click(screen.getByRole('button', { name: 'Revert' }));
+      await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toBe('restored text'));
+    });
+
+    it('handleCreateSnapshot creates a named snapshot and refreshes history', async () => {
+      const vcsBackend = makeMockVcsBackend();
+      await openProjectWithVcs(vcsBackend);
+      const nameInput = screen.getByLabelText('Snapshot name');
+      await fireEvent.input(nameInput, { target: { value: 'milestone v1' } });
+      await fireEvent.submit(screen.getByText('Save named').closest('form')!);
+      await waitFor(() =>
+        expect(vcsBackend.createSnapshot).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          'milestone v1'
+        )
+      );
+      expect(vcsBackend.listCheckpoints).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('App — import wizard', () => {
+  it('opens the import wizard when Import… is clicked and closes on cancel', async () => {
+    render(App, { importBackend: browserImportBackend() });
+    await fireEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    expect(screen.getByRole('dialog', { name: 'Import project' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+    expect(screen.queryByRole('dialog', { name: 'Import project' })).toBeNull();
+  });
+
+  it('opens a project after a completed import', async () => {
+    const importBackend = browserImportBackend();
+    // Patch pickFolder to return a path so analyzeFolder gets called.
+    importBackend.pickFolder = async () => '/demo/my-thesis';
+    render(App, { importBackend });
+    await fireEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    // Step 1: click the Local folder card.
+    await fireEvent.click(screen.getByRole('button', { name: /Local folder/i }));
+    // Step 2: preview — click Continue.
+    await waitFor(() => screen.getByRole('button', { name: /Continue/i }));
+    await fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    // Step 3: fill in parent dir then submit.
+    await waitFor(() => screen.getByLabelText('Save inside folder'));
+    importBackend.pickFolder = async () => '/home/user/projects';
+    await fireEvent.click(screen.getByRole('button', { name: 'Browse…' }));
+    await waitFor(() => {
+      const input = screen.getByLabelText('Save inside folder') as HTMLInputElement;
+      expect(input.value).toBe('/home/user/projects');
+    });
+    await fireEvent.submit(screen.getByLabelText('Save inside folder').closest('form')!);
+    // Wizard closes after a successful import.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Import project' })).toBeNull()
+    );
   });
 });

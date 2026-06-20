@@ -10,3 +10,16 @@ rust-version.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+# Enable to compile the real git2/libgit2 backend (used by the Tauri shell).
+# Off by default so `cargo test/llvm-cov` in the root workspace need no system
+# libgit2. The real backend is exercised by `just vcs-itest`.
+real-vcs = ["dep:git2"]
+
+[dependencies]
+galley-core = { workspace = true }
+git2 = { version = "0.19", optional = true, default-features = false, features = ["https"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -15,6 +15,7 @@ pub mod compile;
 pub mod diagnostics;
 pub mod document;
 pub mod hash;
+pub mod import;
 pub mod include_graph;
 pub mod intel;
 pub mod manifest;
@@ -24,6 +25,7 @@ pub mod search;
 pub mod synctex;
 pub mod table;
 pub mod time;
+pub mod vcs;
 
 pub use agents::{parse_plan_response, plan_goal, AgentPlan, AgentRole, AgentTask};
 pub use ai::{
@@ -49,6 +51,11 @@ pub use document::{
     DocumentKind, RootCandidate,
 };
 pub use hash::content_hash;
+pub use import::{
+    analyze_project, clean_export_paths, detect_fonts, detect_packages, engine_from_program_comment,
+    engine_needs_latexmk, is_latexmkrc, latexmkrc_engine, tex_root_hint, BibTool, FileEntry,
+    ProjectProfile, TexEngine,
+};
 pub use include_graph::{parse_includes, resolve_include_path};
 pub use intel::{
     CompletionItem, CompletionKind, DocumentSymbol, Hover, LanguageIntelligence, Location,
@@ -61,6 +68,7 @@ pub use search::{search_in_content, SearchMatch, SearchQuery};
 pub use synctex::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 pub use table::{build_booktabs, build_tabular, Align};
 pub use time::iso8601_utc;
+pub use vcs::{compute_diff, snapshot_stats, DiffKind, DiffLine, SnapshotEntry};
 
 /// Product name, as shown in the UI and the window title.
 pub const NAME: &str = "Galley";

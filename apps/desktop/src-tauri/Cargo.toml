@@ -1,7 +1,7 @@
 [package]
 name = "galley-desktop"
 description = "Galley desktop shell (Tauri 2)."
-version = "0.5.3"
+version = "0.6.0"
 edition = "2021"
 license = "MIT"
 authors = ["Achref Soua <achref.soua@outlook.com>"]
@@ -31,6 +31,7 @@ galley-compile = { path = "../../../crates/galley-compile", features = ["real-co
 galley-intel = { path = "../../../crates/galley-intel", features = ["real-lsp"] }
 galley-import = { path = "../../../crates/galley-import" }
 galley-security = { path = "../../../crates/galley-security" }
+galley-vcs = { path = "../../../crates/galley-vcs", features = ["real-vcs"] }
 
 [lints.rust]
 unsafe_code = "deny"

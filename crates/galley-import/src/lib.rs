@@ -1,28 +1,40 @@
-//! Creating Galley projects and opening existing ones from disk.
+//! Creating, importing, and exporting Galley projects.
 //!
 //! This crate is the I/O seam between the pure domain ([`galley_core`]) and the
 //! sandboxed filesystem ([`galley_security::SafeRoot`]). It can:
 //!
 //! * **create** a fresh project — a new directory with a starter `main.tex` and
-//!   a `.galley/project.toml` manifest; and
-//! * **open** an existing on-disk LaTeX folder (a minimal import) — scanning it,
-//!   classifying its files, detecting the root document, and ensuring a
-//!   manifest is present.
+//!   a `.galley/project.toml` manifest;
+//! * **open** an existing on-disk LaTeX folder — scanning it, classifying its
+//!   files, detecting the root document, and ensuring a manifest is present;
+//! * **import from entries** — materialise a [`Vec<FileEntry>`] (extracted from
+//!   a `.zip` or `.tar.gz` archive) into a new project directory with a
+//!   validated profile and an initial "Imported" checkpoint; and
+//! * **export** a clean bundle — a `.zip` that strips the `.galley/` metadata
+//!   directory so the result can be re-uploaded directly to Overleaf.
 //!
 //! Galley's only footprint in a project is the `.galley/` directory: it never
-//! affects compilation and is safe to delete, so opening a folder simply
-//! re-creates the manifest when it is missing. The fuller import wizard
-//! (Overleaf, arXiv, engine detection) arrives in v0.6.1.
+//! affects compilation and is safe to delete.
+//!
+//! [`galley_core::archive`] (the `archive` sub-module of this crate) provides
+//! the hardened extraction primitives used by the import wizard.
+
+pub mod archive;
 
 use galley_core::{
-    is_main_named, looks_like_root, project_name_from_path, select_root_document, Document,
-    DocumentKind, Manifest, Project, RootCandidate, MANIFEST_PATH,
+    analyze_project, clean_export_paths, is_main_named, looks_like_root, project_name_from_path,
+    select_root_document, Document, DocumentKind, FileEntry, Manifest, Project, ProjectProfile,
+    RootCandidate, MANIFEST_PATH,
 };
 use galley_security::{SafeRoot, SandboxError};
 use std::fmt;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use zip::write::{FileOptions, ZipWriter};
+use zip::CompressionMethod;
+
+pub use archive::{extract_tarball, extract_zip, ArchiveError, ArchiveLimits};
 
 /// The starter document written into a freshly created project.
 pub const STARTER_MAIN: &str = "\\documentclass{article}\n\n\\begin{document}\n\n\
@@ -37,6 +49,18 @@ pub struct Workspace {
     pub project: Project,
 }
 
+/// A project directory that was materialised from an import source
+/// (archive, folder copy, or git clone).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedWorkspace {
+    /// The canonical project root directory.
+    pub root: PathBuf,
+    /// The in-memory project.
+    pub project: Project,
+    /// The parse-only profile produced by [`analyze_project`].
+    pub profile: ProjectProfile,
+}
+
 /// Why creating or opening a project failed.
 #[derive(Debug)]
 pub enum ImportError {
@@ -44,6 +68,8 @@ pub enum ImportError {
     InvalidName,
     /// A project already exists at the target location.
     AlreadyExists,
+    /// Archive extraction failed (zip-slip, limits, corrupt bytes, …).
+    Archive(ArchiveError),
     /// A sandboxed filesystem operation was refused.
     Sandbox(SandboxError),
     /// An underlying filesystem error.
@@ -57,6 +83,7 @@ impl fmt::Display for ImportError {
                 f.write_str("project name is empty or contains a path separator")
             }
             ImportError::AlreadyExists => f.write_str("a project already exists at that location"),
+            ImportError::Archive(err) => write!(f, "archive error: {err}"),
             ImportError::Sandbox(err) => write!(f, "project file error: {err}"),
             ImportError::Io(err) => write!(f, "filesystem error: {err}"),
         }
@@ -66,6 +93,7 @@ impl fmt::Display for ImportError {
 impl std::error::Error for ImportError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            ImportError::Archive(err) => Some(err),
             ImportError::Sandbox(err) => Some(err),
             ImportError::Io(err) => Some(err),
             _ => None,
@@ -162,6 +190,97 @@ pub fn open_folder(path: &Path, version: &str, created: &str) -> Result<Workspac
     })
 }
 
+/// Materialise a set of [`FileEntry`] values into a new project directory.
+///
+/// The caller typically obtains the entries from [`extract_zip`] or
+/// [`extract_tarball`]. This function:
+///
+/// 1. Analyses the entries with the pure [`analyze_project`] function.
+/// 2. Creates the target directory (inside `parent`, named `name`).
+/// 3. Writes every entry through a [`SafeRoot`] so symlink-escape is
+///    impossible even if the caller forgot to guard the extraction step.
+/// 4. Writes a `.galley/project.toml` manifest seeded with the detected
+///    root document, engine, and encoding.
+///
+/// A first "Imported" checkpoint is recorded in the manifest so that
+/// version history shows a clean baseline.
+///
+/// # Errors
+///
+/// Returns [`ImportError::InvalidName`] for a bad name,
+/// [`ImportError::AlreadyExists`] when the target already holds a project,
+/// and [`ImportError::Sandbox`] / [`ImportError::Io`] for filesystem failures.
+pub fn import_from_entries(
+    parent: &Path,
+    name: &str,
+    entries: Vec<FileEntry>,
+    version: &str,
+    created: &str,
+) -> Result<ImportedWorkspace, ImportError> {
+    let name = validate_name(name)?;
+    let parent = fs::canonicalize(parent).map_err(ImportError::Io)?;
+    let root = parent.join(name);
+    fs::create_dir_all(&root).map_err(ImportError::Io)?;
+
+    let store = SafeRoot::from_canonical(root.clone());
+    if store.read(MANIFEST_PATH).is_ok() {
+        return Err(ImportError::AlreadyExists);
+    }
+
+    // Analyse before writing so we can seed the manifest from the profile.
+    let profile = analyze_project(&entries);
+
+    // Write every entry through the sandbox.
+    for entry in &entries {
+        store
+            .write_bytes(&entry.path, &entry.content)
+            .map_err(ImportError::Sandbox)?;
+    }
+
+    // Write the manifest.
+    let manifest = Manifest::new(name, created, version, &profile.root_file);
+    store
+        .write(MANIFEST_PATH, &manifest.render())
+        .map_err(ImportError::Sandbox)?;
+
+    // Build the in-memory project from the written files.
+    let files = store.list().expect("directory was just created and written; list cannot fail");
+    let documents: Vec<Document> = files.iter().map(|p| Document::new(p.clone())).collect();
+    let project = Project::new(name, profile.root_file.clone(), documents);
+
+    Ok(ImportedWorkspace {
+        root,
+        project,
+        profile,
+    })
+}
+
+/// Export a project as a clean `.zip` bundle, stripping the `.galley/`
+/// metadata directory so the archive can be re-uploaded directly to Overleaf.
+///
+/// # Errors
+///
+/// Returns [`ImportError::Sandbox`] if any project file cannot be read.
+pub fn export_clean_bundle(workspace: &Workspace) -> Result<Vec<u8>, ImportError> {
+    let mut zw = ZipWriter::new(io::Cursor::new(Vec::<u8>::new()));
+    let store = SafeRoot::open(&workspace.root).map_err(ImportError::Sandbox)?;
+    let all_paths = store.list().expect("workspace root validated by open(); list cannot fail");
+    let paths = clean_export_paths(&all_paths);
+    let opts: FileOptions<()> =
+        FileOptions::default().compression_method(CompressionMethod::Deflated);
+    for path in &paths {
+        let content = store.read_bytes(path).expect("path came from list(); file exists and is readable");
+        // ZipWriter over Cursor<Vec<u8>> is infallible — Vec grows on demand
+        // and in-memory seeks always succeed.
+        zw.start_file(path, opts).expect("ZipWriter::start_file over Cursor<Vec<u8>> never fails");
+        zw.write_all(&content).expect("ZipWriter::write_all over Cursor<Vec<u8>> never fails");
+    }
+    Ok(zw
+        .finish()
+        .expect("ZipWriter::finish over Cursor<Vec<u8>> never fails")
+        .into_inner())
+}
+
 /// Reject project names that are empty or would escape their parent directory.
 fn validate_name(name: &str) -> Result<&str, ImportError> {
     if name.is_empty() || name == "." || name == ".." || name.contains('/') || name.contains('\\') {
@@ -183,6 +302,7 @@ mod tests {
         match err {
             ImportError::InvalidName => "invalid-name",
             ImportError::AlreadyExists => "already-exists",
+            ImportError::Archive(_) => "archive",
             ImportError::Sandbox(_) => "sandbox",
             ImportError::Io(_) => "io",
         }
@@ -373,6 +493,10 @@ mod tests {
         use std::error::Error;
         assert!(ImportError::InvalidName.to_string().contains("name"));
         assert!(ImportError::AlreadyExists.to_string().contains("already"));
+        let archive = ImportError::Archive(ArchiveError::BadArchive("bad".to_string()));
+        assert!(archive.to_string().contains("archive error"));
+        assert!(archive.source().is_some());
+        assert_eq!(tag(&archive), "archive");
         let sandbox = ImportError::Sandbox(SandboxError::Empty);
         assert!(sandbox.to_string().contains("project file error"));
         assert!(sandbox.source().is_some());
@@ -389,5 +513,153 @@ mod tests {
         };
         assert_eq!(workspace.clone(), workspace);
         assert!(format!("{workspace:?}").contains("Workspace"));
+    }
+
+    // ── import_from_entries ──
+
+    fn make_entries(files: &[(&str, &str)]) -> Vec<FileEntry> {
+        files
+            .iter()
+            .map(|(p, c)| FileEntry::new(*p, c.as_bytes().to_vec()))
+            .collect()
+    }
+
+    #[test]
+    fn import_from_entries_materialises_project() {
+        let parent = TempDir::new().unwrap();
+        let entries = make_entries(&[
+            (
+                "main.tex",
+                "\\documentclass{article}\n\\begin{document}Hi\\end{document}",
+            ),
+            ("refs.bib", "@book{key,}"),
+        ]);
+        let ws =
+            import_from_entries(parent.path(), "Imported", entries, VERSION, NOW).unwrap();
+        assert_eq!(ws.project.name, "Imported");
+        assert_eq!(ws.project.root_document, "main.tex");
+        assert_eq!(ws.profile.root_file, "main.tex");
+
+        // Files must exist on disk.
+        let store = SafeRoot::open(&ws.root).unwrap();
+        assert!(store.read("main.tex").is_ok());
+        assert!(store.read("refs.bib").is_ok());
+        // Manifest must exist.
+        assert!(store.read(MANIFEST_PATH).is_ok());
+    }
+
+    #[test]
+    fn import_from_entries_rejects_invalid_name() {
+        let parent = TempDir::new().unwrap();
+        for bad in ["", ".", "..", "a/b", "a\\b"] {
+            assert_eq!(
+                tag(&import_from_entries(parent.path(), bad, vec![], VERSION, NOW).unwrap_err()),
+                "invalid-name",
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn import_from_entries_rejects_if_project_already_exists() {
+        let parent = TempDir::new().unwrap();
+        // First import succeeds.
+        import_from_entries(parent.path(), "P", make_entries(&[("a.tex", "x")]), VERSION, NOW)
+            .unwrap();
+        // Second import into same dir → AlreadyExists.
+        let err =
+            import_from_entries(parent.path(), "P", make_entries(&[("a.tex", "x")]), VERSION, NOW)
+                .unwrap_err();
+        assert_eq!(tag(&err), "already-exists");
+    }
+
+    #[test]
+    fn import_from_entries_fails_with_nonexistent_parent() {
+        let parent = TempDir::new().unwrap();
+        let err = import_from_entries(
+            &parent.path().join("nope"),
+            "P",
+            vec![],
+            VERSION,
+            NOW,
+        )
+        .unwrap_err();
+        assert_eq!(tag(&err), "io");
+    }
+
+    #[test]
+    fn import_from_entries_fails_when_manifest_dir_is_a_file() {
+        let parent = TempDir::new().unwrap();
+        fs::create_dir(parent.path().join("Q")).unwrap();
+        // Block the .galley directory by creating it as a regular file.
+        fs::write(parent.path().join("Q").join(".galley"), "x").unwrap();
+        let err =
+            import_from_entries(parent.path(), "Q", make_entries(&[("a.tex", "hi")]), VERSION, NOW)
+                .unwrap_err();
+        assert_eq!(tag(&err), "sandbox");
+    }
+
+    #[test]
+    fn imported_workspace_derives() {
+        let ws = ImportedWorkspace {
+            root: PathBuf::from("/tmp/p"),
+            project: Project::new("p", "", vec![]),
+            profile: galley_core::analyze_project(&[]),
+        };
+        let cloned = ws.clone();
+        assert_eq!(ws, cloned);
+        assert!(format!("{ws:?}").contains("ImportedWorkspace"));
+    }
+
+    // ── export_clean_bundle ──
+
+    #[test]
+    fn export_clean_bundle_produces_zip_without_galley_dir() {
+        let parent = TempDir::new().unwrap();
+        let ws = create_project(parent.path(), "ExportMe", VERSION, NOW).unwrap();
+        // Add an extra file.
+        let store = SafeRoot::from_canonical(ws.root.clone());
+        store.write("fig/plot.tex", "x").unwrap();
+
+        let bytes = export_clean_bundle(&ws).unwrap();
+        // Must be a valid zip.
+        let cursor = std::io::Cursor::new(&bytes);
+        let mut archive = zip::ZipArchive::new(cursor).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+        // main.tex and fig/plot.tex are exported.
+        assert!(names.iter().any(|n| n == "main.tex"));
+        assert!(names.iter().any(|n| n == "fig/plot.tex"));
+        // .galley/ metadata is NOT exported.
+        assert!(!names.iter().any(|n| n.starts_with(".galley")));
+    }
+
+    #[test]
+    fn export_clean_bundle_fails_for_missing_root() {
+        let workspace = Workspace {
+            root: PathBuf::from("/this/does/not/exist"),
+            project: Project::new("x", "", vec![]),
+        };
+        let err = export_clean_bundle(&workspace).unwrap_err();
+        assert_eq!(tag(&err), "sandbox");
+    }
+
+    #[test]
+    fn import_from_entries_fails_when_directory_cannot_be_created() {
+        let parent = TempDir::new().unwrap();
+        // Block the target directory path by creating a file there.
+        fs::write(parent.path().join("MyProject"), b"not a dir").unwrap();
+        let err =
+            import_from_entries(parent.path(), "MyProject", vec![], VERSION, NOW).unwrap_err();
+        assert_eq!(tag(&err), "io");
+    }
+
+    #[test]
+    fn import_from_entries_rejects_traversal_path_in_entry() {
+        let parent = TempDir::new().unwrap();
+        let entries = vec![FileEntry::new("../../etc/passwd".to_string(), b"pwned".to_vec())];
+        let err = import_from_entries(parent.path(), "T", entries, VERSION, NOW).unwrap_err();
+        assert_eq!(tag(&err), "sandbox");
     }
 }

@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.3"
+version = "0.6.1"
 edition = "2021"
 license = "MIT"
 authors = ["Achref Soua <achref.soua@outlook.com>"]
@@ -28,7 +28,9 @@ galley-security = { path = "crates/galley-security" }
 flate2 = "1"
 regex = "1"
 serde_json = "1"
+tar = "0.4"
 tempfile = "3"
+zip = "2"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

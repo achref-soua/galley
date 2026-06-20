@@ -9,8 +9,11 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+flate2 = { workspace = true }
 galley-core = { workspace = true }
 galley-security = { workspace = true }
+tar = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

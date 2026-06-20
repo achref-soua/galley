@@ -4,6 +4,60 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-20
+
+Project import wizard: ZIP, tarball, and folder ingestion.
+
+### Added
+
+- **`galley-import` crate** — hardened archive extraction (`extract_zip`, `extract_tarball`) plus
+  project-level operations (`create_project`, `open_folder`, `import_from_entries`,
+  `export_clean_bundle`). Security: zip-slip, symlinks, hard-links, path traversal, file-count,
+  per-file size, and total-size limits all enforced before anything touches disk. 100 % LLVM
+  region / function / line coverage (57 unit tests, crafted archive fuzzers, `FailAfterHeaderRead`
+  mock reader).
+- **`galley-core::import`** — pure analysis layer: `analyze_project` detects root document,
+  compile engine (`pdflatex`, `xelatex`, `lualatex`), bibtool (`bibtex`, `biber`), encoding,
+  packages, and fonts from a `Vec<FileEntry>` without I/O. `clean_export_paths` strips `.galley/`
+  from export bundles. 43 unit tests, 100 % covered.
+- **Tauri commands** — `analyze_archive`, `analyze_folder`, `import_from_archive`,
+  `import_from_folder`, `export_bundle_to` wired in `src-tauri/src/lib.rs`.
+- **`import-backend.ts`** — `ImportBackend` interface with `tauriImportBackend()` (production),
+  `browserImportBackend()` (tests), and `selectImportBackend()`. 100 % Vitest covered (22 tests).
+- **`ImportWizard.svelte`** — three-step modal (choose source → preview analysis → confirm name
+  and destination). Handles ZIP, `.tar.gz`, and local folder sources; pre-fills project name from
+  filename; shows engine, bibliography tool, encoding, packages, fonts, and warnings. 100 % Vitest
+  covered (21 tests).
+- **`Sidebar.svelte`** — "Import project" button opens the wizard; `onimport` callback triggers
+  `loadProject` in `App.svelte`.
+- **ADR-0024** — documents the `Box<dyn Read>` / concrete-Cursor approach to 100 % LLVM region
+  coverage in generic extraction functions, the `ImportBackend` seam, and the Svelte 5
+  phantom-branch avoidance pattern.
+
+## [0.6.0] - 2026-06-20
+
+Git-backed version history.
+
+### Added
+
+- **`galley-core::vcs`** — pure LCS-based diff algorithm (`compute_diff`, `snapshot_stats`,
+  `DiffKind`, `DiffLine`, `SnapshotEntry`). 100 % llvm-cov covered (30+ tests).
+- **`galley-vcs`** — new crate: `CheckpointHistory` trait + `InMemoryHistory` (always compiled,
+  100 % covered) + `Git2History` (behind `real-vcs` feature, `#[ignore]`d integration tests via
+  `just vcs-itest`). Commits to `refs/galley/checkpoints` inside the project repo using `git2`.
+- **Tauri commands** — `vcs_auto_checkpoint`, `vcs_create_snapshot`, `vcs_list_checkpoints`,
+  `vcs_get_content` expose git-backed history to the frontend.
+- **`vcs.ts`** — TypeScript port of the LCS diff (`computeDiff`, `diffStats`, `SnapshotEntry`).
+  100 % Vitest covered (17 tests).
+- **`vcs-backend.ts`** — `VcsBackend` interface with `tauriVcsBackend()` (production),
+  `browserVcsBackend()` (tests / Playwright), and `selectVcsBackend()`. 100 % covered.
+- **`HistoryPanel.svelte`** — sidebar panel: checkpoint timeline (most-recent first), compact
+  added/removed diff viewer, Revert button, named-snapshot form. 100 % covered.
+- **Auto-checkpoint on save** — `handleSave` in `App.svelte` creates a checkpoint on every
+  successful document save; `refreshHistory` updates the panel.
+- **ADR-0023** — documents the `refs/galley/checkpoints` design and the `CheckpointHistory`
+  trait-seam pattern.
+
 ## [0.5.3] - 2026-06-20
 
 Autonomous agent mode with in-memory checkpoints and revert.
