@@ -24,6 +24,7 @@ pub mod search;
 pub mod synctex;
 pub mod table;
 pub mod time;
+pub mod vcs;
 
 pub use agents::{parse_plan_response, plan_goal, AgentPlan, AgentRole, AgentTask};
 pub use ai::{
@@ -61,6 +62,7 @@ pub use search::{search_in_content, SearchMatch, SearchQuery};
 pub use synctex::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 pub use table::{build_booktabs, build_tabular, Align};
 pub use time::iso8601_utc;
+pub use vcs::{compute_diff, snapshot_stats, DiffKind, DiffLine, SnapshotEntry};
 
 /// Product name, as shown in the UI and the window title.
 pub const NAME: &str = "Galley";

@@ -1397,4 +1397,107 @@ describe('App — layout, drag/drop, and review handlers', () => {
     const textarea = screen.getByLabelText('Source') as HTMLTextAreaElement;
     expect(textarea.value).toContain('\\section{AutoApplied}');
   });
+
+  describe('version history (VCS) handlers', () => {
+    function makeMockVcsBackend(
+      entries: {
+        id: string;
+        name: string;
+        date: string;
+        isNamed: boolean;
+        linesAdded: number;
+        linesRemoved: number;
+      }[] = []
+    ) {
+      return {
+        autoCheckpoint: vi.fn().mockResolvedValue('cp1'),
+        createSnapshot: vi.fn().mockResolvedValue('cp2'),
+        listCheckpoints: vi.fn().mockResolvedValue(entries),
+        getContent: vi.fn().mockResolvedValue('restored content')
+      };
+    }
+
+    async function openProjectWithVcs(
+      vcsBackend: ReturnType<typeof makeMockVcsBackend>
+    ): Promise<HTMLTextAreaElement> {
+      render(App, {
+        props: {
+          editor: fakeEditorFactory(),
+          createRenderer: onePageRenderer,
+          compileTimer: timer,
+          compileClock: clock,
+          bell,
+          vcsBackend
+        }
+      });
+      await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+      return screen.findByLabelText('Source') as Promise<HTMLTextAreaElement>;
+    }
+
+    it('handleSave calls autoCheckpoint then refreshes history', async () => {
+      const vcsBackend = makeMockVcsBackend();
+      await openProjectWithVcs(vcsBackend);
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(vcsBackend.autoCheckpoint).toHaveBeenCalled());
+      expect(vcsBackend.listCheckpoints).toHaveBeenCalled();
+    });
+
+    it('handleHistorySelect fetches content for the chosen checkpoint', async () => {
+      const entry = {
+        id: 'cp1',
+        name: 'auto',
+        date: '2026-01-01T00:00:00Z',
+        isNamed: false,
+        linesAdded: 1,
+        linesRemoved: 0
+      };
+      const vcsBackend = makeMockVcsBackend([entry]);
+      await openProjectWithVcs(vcsBackend);
+      // Save so refreshHistory populates the timeline
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(screen.queryByText('auto')).not.toBeNull());
+      await fireEvent.click(screen.getByText('auto'));
+      await waitFor(() =>
+        expect(vcsBackend.getContent).toHaveBeenCalledWith(expect.any(String), 'cp1')
+      );
+    });
+
+    it('handleHistoryRevert restores the selected checkpoint content', async () => {
+      const entry = {
+        id: 'cp1',
+        name: 'auto',
+        date: '2026-01-01T00:00:00Z',
+        isNamed: false,
+        linesAdded: 2,
+        linesRemoved: 0
+      };
+      const vcsBackend = {
+        ...makeMockVcsBackend([entry]),
+        getContent: vi.fn().mockResolvedValue('restored text')
+      };
+      const textarea = await openProjectWithVcs(vcsBackend);
+      await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(screen.queryByText('auto')).not.toBeNull());
+      await fireEvent.click(screen.getByText('auto'));
+      await waitFor(() => expect(screen.queryByLabelText('Diff viewer')).not.toBeNull());
+      await fireEvent.click(screen.getByRole('button', { name: 'Revert' }));
+      await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toBe('restored text'));
+    });
+
+    it('handleCreateSnapshot creates a named snapshot and refreshes history', async () => {
+      const vcsBackend = makeMockVcsBackend();
+      await openProjectWithVcs(vcsBackend);
+      const nameInput = screen.getByLabelText('Snapshot name');
+      await fireEvent.input(nameInput, { target: { value: 'milestone v1' } });
+      await fireEvent.submit(screen.getByText('Save named').closest('form')!);
+      await waitFor(() =>
+        expect(vcsBackend.createSnapshot).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          'milestone v1'
+        )
+      );
+      expect(vcsBackend.listCheckpoints).toHaveBeenCalled();
+    });
+  });
 });

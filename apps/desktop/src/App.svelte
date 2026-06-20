@@ -53,11 +53,14 @@
     type ImageSpec
   } from './lib/visual';
   import { acceptEntries, rejectEntries, type ReviewEntry } from './lib/review';
+  import { selectVcsBackend, type VcsBackend } from './lib/vcs-backend';
+  import type { SnapshotEntry } from './lib/vcs';
   import Titlebar from './lib/Titlebar.svelte';
   import FormatBar from './lib/FormatBar.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import AssetPanel from './lib/AssetPanel.svelte';
   import BibPanel from './lib/BibPanel.svelte';
+  import HistoryPanel from './lib/HistoryPanel.svelte';
   import SymbolPalette from './lib/SymbolPalette.svelte';
   import MathEditor from './lib/MathEditor.svelte';
   import TableBuilder from './lib/TableBuilder.svelte';
@@ -90,7 +93,8 @@
     agentBackend = selectAgentToolBackend('') as AgentToolBackend,
     mathFieldSetup = realMathFieldSetup,
     initialReviewEntries = [] as ReviewEntry[],
-    agentAutonomous = false
+    agentAutonomous = false,
+    vcsBackend = selectVcsBackend() as VcsBackend
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -106,6 +110,7 @@
     mathFieldSetup?: MathFieldSetup;
     initialReviewEntries?: ReviewEntry[];
     agentAutonomous?: boolean;
+    vcsBackend?: VcsBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -166,6 +171,31 @@
     chatProjectRoot = project.project != null ? project.project.root : '';
     agentProjectTitle = project.project != null ? project.project.name : '';
   });
+
+  // Version history state.
+  let historyEntries = $state<SnapshotEntry[]>([]);
+  let historySelectedId = $state<string | null>(null);
+  let historySelectedContent = $state<string | null>(null);
+
+  async function refreshHistory() {
+    historyEntries = await vcsBackend.listCheckpoints(project.project!.root);
+  }
+
+  async function handleHistorySelect(id: string) {
+    historySelectedId = id;
+    historySelectedContent = await vcsBackend.getContent(project.project!.root, id);
+  }
+
+  function handleHistoryRevert(restored: string) {
+    projectController.edit(restored);
+    historySelectedId = null;
+    historySelectedContent = null;
+  }
+
+  async function handleCreateSnapshot(name: string) {
+    await vcsBackend.createSnapshot(project.project!.root, project.content, name);
+    await refreshHistory();
+  }
 
   let resizeBaseline = 0;
   // A monotonic stamp so clicking the same problem twice still re-jumps.
@@ -239,7 +269,7 @@
       label: 'Save',
       shortcut: 'Ctrl+S',
       run() {
-        void projectController.save();
+        void handleSave();
       }
     },
     {
@@ -371,10 +401,19 @@
     editorPrefsStore.setSpellCheck(enabled);
   }
 
+  async function handleSave() {
+    await projectController.save();
+    const root = project.project != null ? project.project.root : null;
+    if (root !== null && project.error === null) {
+      await vcsBackend.autoCheckpoint(root, project.content);
+      await refreshHistory();
+    }
+  }
+
   function onWindowKeydown(event: KeyboardEvent) {
     if (isSaveShortcut(event)) {
       event.preventDefault();
-      void projectController.save();
+      void handleSave();
     } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       void handleForwardSearch();
@@ -518,7 +557,7 @@
     previewCollapsed={layout.previewCollapsed}
     {viewMode}
     oncompile={() => void projectController.compile()}
-    onsave={() => void projectController.save()}
+    onsave={() => void handleSave()}
     ontogglesidebar={toggleSidebar}
     ontogglepreview={togglePreview}
     onopensettings={() => (settingsOpen = true)}
@@ -554,6 +593,16 @@
             oninsert={(cite) => editorRef!.insertAtCursor(cite)}
             onlookup={(query, kind) => projectController.addReference(query, kind)}
             onimport={(content) => projectController.importBibText(content)}
+          />
+          <HistoryPanel
+            root={project.project.root}
+            content={project.content}
+            entries={historyEntries}
+            selectedId={historySelectedId}
+            selectedContent={historySelectedContent}
+            onselect={(id) => void handleHistorySelect(id)}
+            onrevert={handleHistoryRevert}
+            oncreatesnapshot={(name) => void handleCreateSnapshot(name)}
           />
           <SymbolPalette oninsert={(code) => editorRef!.insertAtCursor(code)} />
         {/if}

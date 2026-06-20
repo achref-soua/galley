@@ -25,6 +25,7 @@ use galley_core::{
 use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
 use galley_intel::{SyncTexParser, TexLabClient};
 use galley_security::SafeRoot;
+use galley_vcs::{CheckpointHistory, Git2History};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -849,6 +850,64 @@ fn send_ai_completion(
         .map_err(|e| e.to_string())
 }
 
+/// A single entry in the history timeline, serialised for the frontend.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SnapshotDto {
+    id: String,
+    name: String,
+    date: String,
+    is_named: bool,
+    lines_added: usize,
+    lines_removed: usize,
+}
+
+/// Record an automatic checkpoint on every save.
+#[tauri::command]
+fn vcs_auto_checkpoint(project_root: String, content: String) -> Result<String, String> {
+    let mut h = Git2History::init_or_open(Path::new(&project_root)).map_err(|e| e.to_string())?;
+    h.commit(&content, "auto").map_err(|e| e.to_string())
+}
+
+/// Create a user-named snapshot from the current document content.
+#[tauri::command]
+fn vcs_create_snapshot(
+    project_root: String,
+    content: String,
+    name: String,
+) -> Result<String, String> {
+    let mut h = Git2History::init_or_open(Path::new(&project_root)).map_err(|e| e.to_string())?;
+    h.commit(&content, &name).map_err(|e| e.to_string())
+}
+
+/// Return the history timeline for the active document, most-recent first.
+#[tauri::command]
+fn vcs_list_checkpoints(project_root: String) -> Vec<SnapshotDto> {
+    let h = match Git2History::init_or_open(Path::new(&project_root)) {
+        Ok(h) => h,
+        Err(_) => return Vec::new(),
+    };
+    h.list()
+        .into_iter()
+        .map(|e| SnapshotDto {
+            id: e.id,
+            name: e.name,
+            date: e.date,
+            is_named: e.is_named,
+            lines_added: e.lines_added,
+            lines_removed: e.lines_removed,
+        })
+        .collect()
+}
+
+/// Retrieve the document content stored at the given checkpoint id.
+#[tauri::command]
+fn vcs_get_content(project_root: String, checkpoint_id: String) -> Option<String> {
+    Git2History::init_or_open(Path::new(&project_root))
+        .ok()
+        .and_then(|h| h.get_content(&checkpoint_id))
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
@@ -887,7 +946,11 @@ pub fn run() {
             get_project_consent,
             set_project_consent,
             test_ai_provider,
-            send_ai_completion
+            send_ai_completion,
+            vcs_auto_checkpoint,
+            vcs_create_snapshot,
+            vcs_list_checkpoints,
+            vcs_get_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

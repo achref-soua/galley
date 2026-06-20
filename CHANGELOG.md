@@ -4,6 +4,30 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-20
+
+Git-backed version history.
+
+### Added
+
+- **`galley-core::vcs`** — pure LCS-based diff algorithm (`compute_diff`, `snapshot_stats`,
+  `DiffKind`, `DiffLine`, `SnapshotEntry`). 100 % llvm-cov covered (30+ tests).
+- **`galley-vcs`** — new crate: `CheckpointHistory` trait + `InMemoryHistory` (always compiled,
+  100 % covered) + `Git2History` (behind `real-vcs` feature, `#[ignore]`d integration tests via
+  `just vcs-itest`). Commits to `refs/galley/checkpoints` inside the project repo using `git2`.
+- **Tauri commands** — `vcs_auto_checkpoint`, `vcs_create_snapshot`, `vcs_list_checkpoints`,
+  `vcs_get_content` expose git-backed history to the frontend.
+- **`vcs.ts`** — TypeScript port of the LCS diff (`computeDiff`, `diffStats`, `SnapshotEntry`).
+  100 % Vitest covered (17 tests).
+- **`vcs-backend.ts`** — `VcsBackend` interface with `tauriVcsBackend()` (production),
+  `browserVcsBackend()` (tests / Playwright), and `selectVcsBackend()`. 100 % covered.
+- **`HistoryPanel.svelte`** — sidebar panel: checkpoint timeline (most-recent first), compact
+  added/removed diff viewer, Revert button, named-snapshot form. 100 % covered.
+- **Auto-checkpoint on save** — `handleSave` in `App.svelte` creates a checkpoint on every
+  successful document save; `refreshHistory` updates the panel.
+- **ADR-0023** — documents the `refs/galley/checkpoints` design and the `CheckpointHistory`
+  trait-seam pattern.
+
 ## [0.5.3] - 2026-06-20
 
 Autonomous agent mode with in-memory checkpoints and revert.
