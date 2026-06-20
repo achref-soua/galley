@@ -1359,4 +1359,42 @@ describe('App — layout, drag/drop, and review handlers', () => {
       expect(screen.queryAllByRole('button', { name: /Accept change/ }).length).toBeGreaterThan(0)
     );
   });
+
+  it('handleAutoApply writes agent patches directly to the document in autonomous mode', async () => {
+    let call = 0;
+    const aiBackend = {
+      ...browserAiBackend(),
+      async complete() {
+        if (call++ === 0) return '[AGENT:writer] [TASK:draft]';
+        return '```latex\n\\section{AutoApplied}\n```';
+      }
+    };
+    render(App, {
+      props: {
+        editor: fakeEditorFactory(),
+        createRenderer: onePageRenderer,
+        compileTimer: timer,
+        compileClock: clock,
+        bell,
+        aiBackend,
+        agentAutonomous: true
+      }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await screen.findByLabelText('Source');
+    // Open the agent orchestrator panel via the command palette
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Toggle Agent Orchestrator'));
+    expect(screen.getByLabelText('Agent orchestrator')).toBeTruthy();
+    // Run an agent goal — the backend returns a writer step with a latex patch
+    const goalInput = screen.getByLabelText('Goal') as HTMLInputElement;
+    await fireEvent.input(goalInput, { target: { value: 'draft section' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    // Wait for the autonomous run to complete and auto-apply the content
+    await waitFor(() => expect(screen.getByLabelText('Agent log').textContent).toContain('[Done]'));
+    // handleAutoApply must have called projectController.edit with the new content
+    const textarea = screen.getByLabelText('Source') as HTMLTextAreaElement;
+    expect(textarea.value).toContain('\\section{AutoApplied}');
+  });
 });

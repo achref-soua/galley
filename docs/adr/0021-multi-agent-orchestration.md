@@ -31,11 +31,11 @@ The design must satisfy the same hard constraints as the rest of Galley:
 
 A single, legible text protocol serves both the orchestration and tool layers:
 
-```
+````
 Orchestrator output:   [AGENT:<role>] [TASK:<description>]
 Agent tool call:       [TOOL:<name> <argument>]
 Agent patch:           ```latex … ```
-```
+````
 
 No JSON, no function-calling schema, no streaming — just pattern-matched plain text. This
 works with any LLM backend (including local models) and is trivially testable with fixed
@@ -60,15 +60,15 @@ the LLM output format — it is an independent, local-only affordance.
 The tool surface mirrors the MCP `tools/call` convention and is implemented as a pure enum
 (`McpTool`) with a single `McpToolResult` output type — no serde. Seven tools:
 
-| Name | Rust variant |
-|------|-------------|
-| `read_file` | `ReadFile` |
-| `search_project` | `SearchProject` |
-| `compile` | `Compile` |
+| Name               | Rust variant      |
+| ------------------ | ----------------- |
+| `read_file`        | `ReadFile`        |
+| `search_project`   | `SearchProject`   |
+| `compile`          | `Compile`         |
 | `read_diagnostics` | `ReadDiagnostics` |
 | `lookup_reference` | `LookupReference` |
-| `apply_patch` | `ApplyPatch` |
-| `list_assets` | `ListAssets` |
+| `apply_patch`      | `ApplyPatch`      |
+| `list_assets`      | `ListAssets`      |
 
 `ToolPermissions::for_role(AgentRole)` returns the allowed `HashSet<McpTool>` for each role.
 Read-only roles (Reviewer, Stylist) exclude `Compile` and `ApplyPatch`. The Tauri command
@@ -113,30 +113,35 @@ every other backend selector in the codebase.
 ## Alternatives considered
 
 ### LLM-driven planner
+
 Using the LLM itself as the planner (without `plan_goal`) is the obvious choice for production
 use — and it is in fact what the runtime does. `plan_goal` is not a replacement; it is an
 additional local affordance that requires zero network I/O and is fully covered by deterministic
 unit tests. Both paths coexist.
 
 ### JSON function-calling schema
+
 Using a structured schema (OpenAI tool-calling, Anthropic tool-use) would make parsing more
 robust but couples the protocol to specific provider APIs. The plain-text markup works with
 every provider including local Ollama/LM Studio models, and is already proven by the chat
 panel's ` ```latex ``` ` convention.
 
 ### Single orchestrator call returning a full plan + all tool calls
+
 Tempting for latency, but requires a large context window and makes stop-in-flight trivial to
 the point of uselessness (the plan would already be complete before the author can intervene).
 Incremental step-by-step execution keeps each agent call small and lets the author stop between
 steps.
 
 ### Exposing `dispatchTool` as a Tauri command
+
 Would add unnecessary IPC overhead for a pure routing decision. The Tauri boundary is already
 crossed by each individual tool method; the dispatch layer belongs in TypeScript.
 
 ## Consequences
 
 **Good:**
+
 - Every layer (Rust domain, TS helpers, Svelte component, App wiring) is independently tested
   at 100 % coverage with no mocks leaking across boundaries.
 - The markup protocol is backend-agnostic; any provider can participate.
@@ -145,6 +150,7 @@ crossed by each individual tool method; the dispatch layer belongs in TypeScript
 - Stop-in-flight is zero-overhead (integer compare) and proven by three dedicated test cases.
 
 **Accepted trade-offs:**
+
 - `plan_goal` in Rust will diverge from what the LLM actually produces; it exists for testing
   only and is documented as such.
 - The single-tool-call-per-step constraint limits agents to one tool invocation; multi-turn
