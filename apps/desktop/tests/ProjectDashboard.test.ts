@@ -37,6 +37,7 @@ const baseProps = () => ({
   onopen: vi.fn(),
   onopennewwindow: vi.fn(),
   onnew: vi.fn(),
+  ontemplate: vi.fn(),
   onimport: vi.fn()
 });
 
@@ -54,11 +55,19 @@ describe('ProjectDashboard empty state', () => {
     expect(getByText('All Projects')).toBeTruthy();
   });
 
-  it('renders New project, Import, and New window buttons', () => {
+  it('renders New project, From template, Import, and New window buttons', () => {
     const { getByText } = render(ProjectDashboard, { props: baseProps() });
     expect(getByText('New project…')).toBeTruthy();
+    expect(getByText('From template…')).toBeTruthy();
     expect(getByText('Import…')).toBeTruthy();
     expect(getByText('New window')).toBeTruthy();
+  });
+
+  it('calls ontemplate when From template… is clicked', async () => {
+    const ontemplate = vi.fn();
+    const { getByText } = render(ProjectDashboard, { props: { ...baseProps(), ontemplate } });
+    await fireEvent.click(getByText('From template…'));
+    expect(ontemplate).toHaveBeenCalledOnce();
   });
 });
 

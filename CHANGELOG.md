@@ -4,6 +4,32 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-06-20
+
+Template gallery: curated starters and user-saved templates.
+
+### Added
+
+- **`templates.ts`** — 12 curated built-in templates covering the most common LaTeX document
+  types: Article, IEEE Conference Paper, ACM Conference Paper (acmart), Springer LNCS, Beamer
+  presentation, moderncv résumé, Cover Letter, Report, PhD Thesis, Book, tikzposter Poster, and
+  Exam. Each is a complete, compilable document. 100 % Vitest covered; correctness asserted at the
+  structural level (every body has `\documentclass`, `\begin{document}`, `\end{document}`).
+- **`TemplateGallery.svelte`** — full-screen modal gallery with a category sidebar, search field,
+  template cards ("Use template" + per-custom "Delete"), and a footer save-form for committing the
+  currently open document as a new custom template. All branches covered (100 %).
+- **`CustomTemplateStore`** — localStorage-backed store for user-saved templates, following the
+  same pure-helper + class pattern as `ProjectRegistry`. `parseCustomTemplates` validates every
+  field with short-circuit guards, all covered. Persisted under `galley:custom-templates`.
+- **`ProjectController.pickAndCreateFromTemplate`** — new method that presents the folder picker,
+  creates the project, seeds `main.tex` with the template body, and loads the result. Tested with
+  null-cancel and happy-path cases.
+- **`ProjectDashboard` "From template…" button** — opens the gallery; wired alongside the
+  existing New project… / Import… / New window actions.
+- **Command palette "New from Template" action** — opens the gallery from anywhere.
+- **ADR-0026** documenting the gallery design, data model, entry points, and the "new from
+  template" flow.
+
 ## [0.6.2] - 2026-06-20
 
 Project organization: registry, multi-window backend, and dashboard.

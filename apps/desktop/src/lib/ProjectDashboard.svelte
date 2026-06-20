@@ -9,6 +9,7 @@
     onopen,
     onopennewwindow,
     onnew,
+    ontemplate,
     onimport
   }: {
     /** The project registry to read from and mutate tags/removal on. */
@@ -21,6 +22,8 @@
     onopennewwindow: () => void;
     /** Create a new project (pick parent + name). */
     onnew: () => void;
+    /** Open the template gallery. */
+    ontemplate: () => void;
     /** Open the import wizard. */
     onimport: () => void;
   } = $props();
@@ -126,6 +129,7 @@
     <h2 class="dash-title">All Projects</h2>
     <div class="dash-actions">
       <Button variant="primary" size="sm" onclick={onnew}>New project…</Button>
+      <Button variant="ghost" size="sm" onclick={ontemplate}>From template…</Button>
       <Button variant="ghost" size="sm" onclick={onimport}>Import…</Button>
       <Button variant="ghost" size="sm" onclick={handleNewWindow}>New window</Button>
     </div>

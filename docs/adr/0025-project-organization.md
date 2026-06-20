@@ -85,12 +85,12 @@ within the card and avoids z-index stacking issues with a modal-on-modal approac
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| IPC to a Tauri command for project list | Unnecessary round-trip; no persistence need beyond the current webview profile. |
-| A dedicated route / navigation | Heavier than a toggled overlay; breaks the single-window, keyboard-first feel. |
-| Svelte 5 `$state` on the registry list | Would require exposing `#list` or converting it to a Svelte store; more invasive than the generation counter pattern. |
-| Tags in `.galley/` config | Tags are personal, not collaborative; storing them in the project directory would pollute shared repositories. |
+| Alternative                             | Why rejected                                                                                                          |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| IPC to a Tauri command for project list | Unnecessary round-trip; no persistence need beyond the current webview profile.                                       |
+| A dedicated route / navigation          | Heavier than a toggled overlay; breaks the single-window, keyboard-first feel.                                        |
+| Svelte 5 `$state` on the registry list  | Would require exposing `#list` or converting it to a Svelte store; more invasive than the generation counter pattern. |
+| Tags in `.galley/` config               | Tags are personal, not collaborative; storing them in the project directory would pollute shared repositories.        |
 
 ## Consequences
 

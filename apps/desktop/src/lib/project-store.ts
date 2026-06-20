@@ -375,6 +375,22 @@ export class ProjectController {
   }
 
   /**
+   * Pick a parent directory, create a new project named `name`, seed `main.tex`
+   * with `body`, and open it. This is the "New from template" flow.
+   */
+  async pickAndCreateFromTemplate(name: string, body: string): Promise<void> {
+    await this.#run(async () => {
+      const parent = await this.#backend.pickFolder('Choose where to create the project');
+      if (parent === null) {
+        return;
+      }
+      const snapshot = await this.#backend.createProject(parent, name);
+      await this.#backend.saveDocument(snapshot.root, 'main.tex', body);
+      await this.#load(snapshot);
+    });
+  }
+
+  /**
    * Request to open `path`. If the open document has unsaved edits, this raises
    * the guard instead and remembers the request; otherwise it opens immediately.
    */
