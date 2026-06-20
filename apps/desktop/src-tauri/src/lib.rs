@@ -23,8 +23,8 @@ use galley_core::{
     SyncTexMapper, TextDocument, VERSION,
 };
 use galley_import::{
-    create_project as import_create, export_clean_bundle, extract_tarball, extract_zip,
-    import_from_entries, open_folder as import_open, ArchiveLimits, Workspace,
+    create_project as import_create, export_clean_bundle, export_share_bundle, extract_tarball,
+    extract_zip, import_from_entries, open_folder as import_open, ArchiveLimits, Workspace,
 };
 use galley_intel::{SyncTexParser, TexLabClient};
 use galley_security::SafeRoot;
@@ -990,6 +990,66 @@ fn export_bundle_to(root: String, dest: String) -> Result<u64, String> {
     Ok(n)
 }
 
+/// Save raw PDF bytes to an absolute path chosen by the user.
+///
+/// The bytes come directly from the last compile result (held in the frontend)
+/// so no re-compilation is needed.
+#[tauri::command]
+fn export_pdf_to(pdf_bytes: Vec<u8>, dest: String) -> Result<(), String> {
+    std::fs::write(Path::new(&dest), &pdf_bytes).map_err(|e| e.to_string())
+}
+
+/// Run Pandoc to convert the project's root document to `format` and write the
+/// output to `dest`.
+///
+/// `format` is a Pandoc `--to` target such as `"html5"`, `"docx"`, or
+/// `"markdown"`. Returns an error when Pandoc is not found in `PATH` or exits
+/// with a non-zero code (Pandoc's stderr is included in the error message).
+#[tauri::command]
+fn export_pandoc(
+    root: String,
+    root_document: String,
+    format: String,
+    dest: String,
+) -> Result<(), String> {
+    let input = Path::new(&root).join(&root_document);
+    let output = std::process::Command::new("pandoc")
+        .arg(&input)
+        .arg("--to")
+        .arg(&format)
+        .arg("-o")
+        .arg(&dest)
+        .current_dir(&root)
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "Pandoc is not installed — install it to enable HTML, Word, and Markdown export."
+                    .to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Pandoc failed: {stderr}"))
+    }
+}
+
+/// Export a read-only share bundle (clean source + compiled PDF) to `dest`.
+///
+/// Strips `.galley/` metadata just like the source bundle and appends the
+/// `pdf_bytes` as `<project-name>.pdf`. Returns the number of bytes written.
+#[tauri::command]
+fn export_share_bundle_to(root: String, pdf_bytes: Vec<u8>, dest: String) -> Result<u64, String> {
+    let ws = import_open(Path::new(&root), VERSION, &now_iso()).map_err(|e| e.to_string())?;
+    let bytes = export_share_bundle(&ws, &pdf_bytes).map_err(|e| e.to_string())?;
+    let n = bytes.len() as u64;
+    std::fs::write(Path::new(&dest), &bytes).map_err(|e| e.to_string())?;
+    Ok(n)
+}
+
 /// A single entry in the history timeline, serialised for the frontend.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1095,7 +1155,10 @@ pub fn run() {
             import_from_archive,
             import_analyze_folder,
             import_from_folder,
-            export_bundle_to
+            export_bundle_to,
+            export_pdf_to,
+            export_pandoc,
+            export_share_bundle_to
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

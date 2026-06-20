@@ -1730,4 +1730,14 @@ describe('App — project dashboard', () => {
       expect(screen.queryByRole('dialog', { name: 'Template gallery' })).toBeNull()
     );
   });
+
+  it('palette Export… action opens and closes the export panel', async () => {
+    render(App);
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('Export…'));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Export' })).toBeTruthy());
+    await fireEvent.click(screen.getByRole('button', { name: 'Close export panel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Export' })).toBeNull());
+  });
 });
