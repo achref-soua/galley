@@ -429,6 +429,17 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   });
 
+  it('palette All Projects action toggles the project dashboard', async () => {
+    renderApp();
+    // Dashboard starts open (no project). Close it via the palette.
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('All Projects'));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
   it('changes the keymap mode via Settings > Editor section', async () => {
     renderApp();
     await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
@@ -1535,6 +1546,122 @@ describe('App — import wizard', () => {
     // Wizard closes after a successful import.
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Import project' })).toBeNull()
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dashboard integration tests
+// ---------------------------------------------------------------------------
+describe('App — project dashboard', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('shows the dashboard overlay when no project is open', () => {
+    render(App);
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+  });
+
+  it('hides the dashboard when a project opens via Open a folder…', async () => {
+    render(App, { props: { editor: fakeEditorFactory() } });
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
+  it('registers the opened project in the registry', async () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      }
+    };
+    const { ProjectRegistry } = await import('../src/lib/project-registry');
+    const registry = new ProjectRegistry(storage as unknown as Storage);
+    render(App, { props: { editor: fakeEditorFactory(), projectRegistry: registry } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await waitFor(() => expect(registry.all().length).toBeGreaterThan(0));
+    expect(registry.all()[0].name).toBe('galley-project');
+  });
+
+  it('toggles the dashboard with the "All projects" titlebar button when a project is open', async () => {
+    render(App, { props: { editor: fakeEditorFactory() } });
+    // Open a project to close the dashboard.
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+    // Toggle dashboard open via "All projects" button.
+    await fireEvent.click(screen.getByRole('button', { name: 'All projects' }));
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    // Toggle it closed again.
+    await fireEvent.click(screen.getByRole('button', { name: 'All projects' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
+  it('shows a close button for the dashboard when a project is open', async () => {
+    render(App, { props: { editor: fakeEditorFactory() } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+    await fireEvent.click(screen.getByRole('button', { name: 'All projects' }));
+    expect(screen.getByRole('button', { name: 'Close project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close project dashboard' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
+  it('opens the import wizard from the dashboard Import… button', async () => {
+    render(App, { props: { importBackend: browserImportBackend() } });
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Import project' })).toBeTruthy();
+  });
+
+  it('opens a registered project from the dashboard card', async () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      }
+    };
+    const { ProjectRegistry } = await import('../src/lib/project-registry');
+    const registry = new ProjectRegistry(storage as unknown as Storage);
+    registry.upsert({ root: '/demo', name: 'demo', tags: [], lastOpened: Date.now() });
+    render(App, { props: { editor: fakeEditorFactory(), projectRegistry: registry } });
+    // Dashboard is showing; click the Open button on the card.
+    await waitFor(() => expect(screen.getByText('demo')).toBeTruthy());
+    await fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
+  it('closes the dashboard when New window is clicked', async () => {
+    render(App);
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'New window' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+  });
+
+  it('closes the dashboard and begins project creation when New project… is clicked', async () => {
+    render(App, { props: { editor: fakeEditorFactory() } });
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'New project…' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
     );
   });
 });

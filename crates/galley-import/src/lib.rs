@@ -244,7 +244,9 @@ pub fn import_from_entries(
         .map_err(ImportError::Sandbox)?;
 
     // Build the in-memory project from the written files.
-    let files = store.list().expect("directory was just created and written; list cannot fail");
+    let files = store
+        .list()
+        .expect("directory was just created and written; list cannot fail");
     let documents: Vec<Document> = files.iter().map(|p| Document::new(p.clone())).collect();
     let project = Project::new(name, profile.root_file.clone(), documents);
 
@@ -264,16 +266,22 @@ pub fn import_from_entries(
 pub fn export_clean_bundle(workspace: &Workspace) -> Result<Vec<u8>, ImportError> {
     let mut zw = ZipWriter::new(io::Cursor::new(Vec::<u8>::new()));
     let store = SafeRoot::open(&workspace.root).map_err(ImportError::Sandbox)?;
-    let all_paths = store.list().expect("workspace root validated by open(); list cannot fail");
+    let all_paths = store
+        .list()
+        .expect("workspace root validated by open(); list cannot fail");
     let paths = clean_export_paths(&all_paths);
     let opts: FileOptions<()> =
         FileOptions::default().compression_method(CompressionMethod::Deflated);
     for path in &paths {
-        let content = store.read_bytes(path).expect("path came from list(); file exists and is readable");
+        let content = store
+            .read_bytes(path)
+            .expect("path came from list(); file exists and is readable");
         // ZipWriter over Cursor<Vec<u8>> is infallible — Vec grows on demand
         // and in-memory seeks always succeed.
-        zw.start_file(path, opts).expect("ZipWriter::start_file over Cursor<Vec<u8>> never fails");
-        zw.write_all(&content).expect("ZipWriter::write_all over Cursor<Vec<u8>> never fails");
+        zw.start_file(path, opts)
+            .expect("ZipWriter::start_file over Cursor<Vec<u8>> never fails");
+        zw.write_all(&content)
+            .expect("ZipWriter::write_all over Cursor<Vec<u8>> never fails");
     }
     Ok(zw
         .finish()
@@ -534,8 +542,7 @@ mod tests {
             ),
             ("refs.bib", "@book{key,}"),
         ]);
-        let ws =
-            import_from_entries(parent.path(), "Imported", entries, VERSION, NOW).unwrap();
+        let ws = import_from_entries(parent.path(), "Imported", entries, VERSION, NOW).unwrap();
         assert_eq!(ws.project.name, "Imported");
         assert_eq!(ws.project.root_document, "main.tex");
         assert_eq!(ws.profile.root_file, "main.tex");
@@ -564,26 +571,31 @@ mod tests {
     fn import_from_entries_rejects_if_project_already_exists() {
         let parent = TempDir::new().unwrap();
         // First import succeeds.
-        import_from_entries(parent.path(), "P", make_entries(&[("a.tex", "x")]), VERSION, NOW)
-            .unwrap();
+        import_from_entries(
+            parent.path(),
+            "P",
+            make_entries(&[("a.tex", "x")]),
+            VERSION,
+            NOW,
+        )
+        .unwrap();
         // Second import into same dir → AlreadyExists.
-        let err =
-            import_from_entries(parent.path(), "P", make_entries(&[("a.tex", "x")]), VERSION, NOW)
-                .unwrap_err();
+        let err = import_from_entries(
+            parent.path(),
+            "P",
+            make_entries(&[("a.tex", "x")]),
+            VERSION,
+            NOW,
+        )
+        .unwrap_err();
         assert_eq!(tag(&err), "already-exists");
     }
 
     #[test]
     fn import_from_entries_fails_with_nonexistent_parent() {
         let parent = TempDir::new().unwrap();
-        let err = import_from_entries(
-            &parent.path().join("nope"),
-            "P",
-            vec![],
-            VERSION,
-            NOW,
-        )
-        .unwrap_err();
+        let err = import_from_entries(&parent.path().join("nope"), "P", vec![], VERSION, NOW)
+            .unwrap_err();
         assert_eq!(tag(&err), "io");
     }
 
@@ -593,9 +605,14 @@ mod tests {
         fs::create_dir(parent.path().join("Q")).unwrap();
         // Block the .galley directory by creating it as a regular file.
         fs::write(parent.path().join("Q").join(".galley"), "x").unwrap();
-        let err =
-            import_from_entries(parent.path(), "Q", make_entries(&[("a.tex", "hi")]), VERSION, NOW)
-                .unwrap_err();
+        let err = import_from_entries(
+            parent.path(),
+            "Q",
+            make_entries(&[("a.tex", "hi")]),
+            VERSION,
+            NOW,
+        )
+        .unwrap_err();
         assert_eq!(tag(&err), "sandbox");
     }
 
@@ -658,7 +675,10 @@ mod tests {
     #[test]
     fn import_from_entries_rejects_traversal_path_in_entry() {
         let parent = TempDir::new().unwrap();
-        let entries = vec![FileEntry::new("../../etc/passwd".to_string(), b"pwned".to_vec())];
+        let entries = vec![FileEntry::new(
+            "../../etc/passwd".to_string(),
+            b"pwned".to_vec(),
+        )];
         let err = import_from_entries(parent.path(), "T", entries, VERSION, NOW).unwrap_err();
         assert_eq!(tag(&err), "sandbox");
     }

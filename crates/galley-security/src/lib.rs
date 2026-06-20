@@ -455,14 +455,14 @@ mod tests {
         assert_eq!(tag(&store.read_bytes("missing.bin").unwrap_err()), "io");
 
         // Invalid relative path → sandbox error via resolve().
-        assert_eq!(tag(&store.read_bytes("../escape").unwrap_err()), "traversal");
+        assert_eq!(
+            tag(&store.read_bytes("../escape").unwrap_err()),
+            "traversal"
+        );
 
         // Symlink escaping the root → escape error.
         symlink(&secret, dir.path().join("link.bin")).unwrap();
-        assert_eq!(
-            tag(&store.read_bytes("link.bin").unwrap_err()),
-            "escape"
-        );
+        assert_eq!(tag(&store.read_bytes("link.bin").unwrap_err()), "escape");
     }
 
     #[test]

@@ -77,6 +77,9 @@
   import SearchPanel from './lib/SearchPanel.svelte';
   import StatusBar from './lib/StatusBar.svelte';
   import { selectImportBackend, type ImportBackend } from './lib/import-backend';
+  import { ProjectRegistry } from './lib/project-registry';
+  import { selectWindowBackend, type WindowBackend } from './lib/window-backend';
+  import ProjectDashboard from './lib/ProjectDashboard.svelte';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -97,7 +100,9 @@
     initialReviewEntries = [] as ReviewEntry[],
     agentAutonomous = false,
     vcsBackend = selectVcsBackend() as VcsBackend,
-    importBackend = selectImportBackend()
+    importBackend = selectImportBackend(),
+    projectRegistry = new ProjectRegistry(window.localStorage),
+    windowBackend = selectWindowBackend()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -115,6 +120,8 @@
     agentAutonomous?: boolean;
     vcsBackend?: VcsBackend;
     importBackend?: ImportBackend;
+    projectRegistry?: ProjectRegistry;
+    windowBackend?: WindowBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -171,10 +178,25 @@
   const reduceMotion = prefersReducedMotion();
   let searchRoot = $state<string | null>(null);
   let graphicspathBannerDismissed = $state(false);
+  // Dashboard is shown when no project is open, or when manually toggled.
+  let dashboardOpen = $state(true);
   $effect(() => {
     searchRoot = project.project == null ? null : project.project.root;
     chatProjectRoot = project.project != null ? project.project.root : '';
     agentProjectTitle = project.project != null ? project.project.name : '';
+    // Auto-show dashboard when no project is open; close when one opens.
+    if (project.project === null) {
+      dashboardOpen = true;
+    } else {
+      dashboardOpen = false;
+      // Register the newly opened project so the dashboard can list it.
+      projectRegistry.upsert({
+        root: project.project.root,
+        name: project.project.name,
+        tags: [],
+        lastOpened: Date.now()
+      });
+    }
   });
 
   // Version history state.
@@ -333,6 +355,13 @@
       label: 'Toggle Agent Orchestrator',
       run() {
         agentsOpen = !agentsOpen;
+      }
+    },
+    {
+      id: 'all-projects',
+      label: 'All Projects',
+      run() {
+        dashboardOpen = !dashboardOpen;
       }
     },
     {
@@ -571,6 +600,7 @@
     ontogglechat={() => (chatOpen = !chatOpen)}
     {chatOpen}
     ontoggleviewmode={toggleViewMode}
+    ondashboard={() => (dashboardOpen = !dashboardOpen)}
   />
 
   <main class="workspace">
@@ -584,7 +614,6 @@
           onnewproject={(name) => void projectController.pickAndCreate(name)}
           onopenfolder={() => void projectController.pickAndOpen()}
           onopenrecent={(root) => void projectController.openFolder(root)}
-          onimport={() => (importOpen = true)}
         />
         {#if project.project !== null}
           <AssetPanel
@@ -802,6 +831,38 @@
   {#if tableOpen}
     <TableBuilder oninsert={insertTable} oncancel={() => (tableOpen = false)} />
   {/if}
+
+  {#if dashboardOpen}
+    <div class="overlay" role="presentation">
+      <div class="dashboard-modal">
+        <ProjectDashboard
+          registry={projectRegistry}
+          {windowBackend}
+          onopen={(root) => {
+            void projectController.openFolder(root);
+          }}
+          onopennewwindow={() => {
+            dashboardOpen = false;
+          }}
+          onnew={() => {
+            dashboardOpen = false;
+            void projectController.pickAndCreate('Untitled');
+          }}
+          onimport={() => {
+            dashboardOpen = false;
+            importOpen = true;
+          }}
+        />
+        {#if project.project !== null}
+          <button
+            class="dashboard-close"
+            aria-label="Close project dashboard"
+            onclick={() => (dashboardOpen = false)}>✕ Close</button
+          >
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -888,6 +949,38 @@
   }
 
   .graphicspath-banner button:hover {
+    color: var(--fg);
+    border-color: var(--fg-faint);
+  }
+
+  .dashboard-modal {
+    position: relative;
+    width: 100%;
+    max-width: 960px;
+    max-height: 90vh;
+    background: var(--bg);
+    border: var(--galley-border-thin) solid var(--border);
+    border-radius: var(--galley-radius-md);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dashboard-close {
+    position: absolute;
+    top: var(--galley-space-4);
+    right: var(--galley-space-4);
+    background: transparent;
+    border: var(--galley-border-thin) solid var(--border);
+    border-radius: var(--galley-radius-sm);
+    color: var(--fg-muted);
+    cursor: pointer;
+    font-family: var(--galley-font-mono);
+    font-size: var(--galley-text-xs);
+    padding: var(--galley-space-1) var(--galley-space-3);
+  }
+
+  .dashboard-close:hover {
     color: var(--fg);
     border-color: var(--fg-faint);
   }

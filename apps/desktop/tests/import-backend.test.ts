@@ -257,7 +257,7 @@ describe('selectImportBackend', () => {
       total_bytes: 0
     });
     const p = backend.analyzeArchive('/some/path.zip');
-    delete (window as Record<string, unknown>)['__TAURI_INTERNALS__'];
+    delete (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'];
     return expect(p).resolves.toHaveProperty('rootFile', 'main.tex');
   });
 });

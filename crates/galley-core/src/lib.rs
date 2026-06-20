@@ -52,9 +52,9 @@ pub use document::{
 };
 pub use hash::content_hash;
 pub use import::{
-    analyze_project, clean_export_paths, detect_fonts, detect_packages, engine_from_program_comment,
-    engine_needs_latexmk, is_latexmkrc, latexmkrc_engine, tex_root_hint, BibTool, FileEntry,
-    ProjectProfile, TexEngine,
+    analyze_project, clean_export_paths, detect_fonts, detect_packages,
+    engine_from_program_comment, engine_needs_latexmk, is_latexmkrc, latexmkrc_engine,
+    tex_root_hint, BibTool, FileEntry, ProjectProfile, TexEngine,
 };
 pub use include_graph::{parse_includes, resolve_include_path};
 pub use intel::{

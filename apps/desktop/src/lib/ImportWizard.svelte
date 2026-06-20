@@ -11,11 +11,7 @@
 -->
 <script lang="ts">
   import { Button } from '@galley/ui-kit';
-  import {
-    selectImportBackend,
-    type ImportBackend,
-    type ProjectAnalysis
-  } from './import-backend';
+  import { selectImportBackend, type ImportBackend, type ProjectAnalysis } from './import-backend';
   import { type ProjectSnapshot } from './project-backend';
 
   let {
@@ -182,8 +178,8 @@
     <!-- ── Step 1: choose source ─────────────────────────────────────── -->
     {#if step === 'choose'}
       <p class="hint">
-        Import a LaTeX project from a ZIP archive, a .tar.gz tarball (e.g. from arXiv or
-        Overleaf), or an existing local folder.
+        Import a LaTeX project from a ZIP archive, a .tar.gz tarball (e.g. from arXiv or Overleaf),
+        or an existing local folder.
       </p>
 
       <div class="source-grid">
@@ -260,9 +256,7 @@
 
       <div class="step-actions">
         <Button size="sm" onclick={back}>Back</Button>
-        <Button size="sm" variant="primary" onclick={() => (step = 'confirm')}>
-          Continue →
-        </Button>
+        <Button size="sm" variant="primary" onclick={() => (step = 'confirm')}>Continue →</Button>
       </div>
     {/if}
 

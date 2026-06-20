@@ -19,7 +19,8 @@
     onopenmatch,
     onopentable,
     ontogglechat = undefined,
-    ontoggleviewmode = undefined
+    ontoggleviewmode = undefined,
+    ondashboard = undefined
   }: {
     documentName: string;
     dirty: boolean;
@@ -39,6 +40,8 @@
     onopentable: () => void;
     ontogglechat?: () => void;
     ontoggleviewmode?: () => void;
+    /** Open / close the project dashboard. */
+    ondashboard?: () => void;
   } = $props();
 </script>
 
@@ -114,6 +117,9 @@
       onclick={ontogglechat}
     >
       <Icon name="chat" />
+    </IconButton>
+    <IconButton label="All projects" title="All projects" onclick={ondashboard}>
+      <Icon name="folder" />
     </IconButton>
     <IconButton label="Settings" onclick={onopensettings}>
       <Icon name="settings" />

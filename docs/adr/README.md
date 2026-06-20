@@ -21,3 +21,12 @@ codebase stays legible.
 | 0014 | Math & tables: MathLive editor, symbol palette, table builder             | Accepted |
 | 0015 | Bibliography: `.bib` management, reference lookup, citation completion    | Accepted |
 | 0016 | Visual editor: CM6 decoration layer for rich-text view                    | Accepted |
+| 0017 | Review mode: inline comment annotations and resolution workflow           | Accepted |
+| 0018 | Autonomous mode: background multi-agent orchestration                     | Accepted |
+| 0019 | VCS: git-backed version history                                           | Accepted |
+| 0020 | AI backends: provider abstraction and model selection                     | Accepted |
+| 0021 | Multi-agent orchestration roles and tool gates                            | Accepted |
+| 0022 | Autonomous mode revert and safety constraints                             | Accepted |
+| 0023 | Git-backed version history (VCS store)                                    | Accepted |
+| 0024 | Migration import: ZIP/tarball/folder ingestion pipeline                   | Accepted |
+| 0025 | Project organization: registry, window backend, and dashboard             | Accepted |
