@@ -14,6 +14,7 @@ pub mod checkpoint;
 pub mod compile;
 pub mod diagnostics;
 pub mod document;
+pub mod export;
 pub mod hash;
 pub mod import;
 pub mod include_graph;
@@ -50,6 +51,7 @@ pub use document::{
     basename, classify, is_main_named, looks_like_root, select_root_document, Document,
     DocumentKind, RootCandidate,
 };
+pub use export::ExportFormat;
 pub use hash::content_hash;
 pub use import::{
     analyze_project, clean_export_paths, detect_fonts, detect_packages,

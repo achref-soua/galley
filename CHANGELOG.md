@@ -4,6 +4,35 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-06-21
+
+Export & interop: PDF save, clean source ZIP, share bundle, Pandoc (HTML/Word/Markdown), and print.
+
+### Added
+
+- **`ExportFormat` (galley-core)** — pure enum (`Pdf`, `SourceBundle`, `ShareBundle`, `Html`,
+  `Word`, `Markdown`) with `label()`, `file_extension()`, `default_filename()`, and
+  `pandoc_format()` helpers. 100 % Rust region/line/function coverage.
+- **`export_share_bundle` (galley-import)** — builds a clean source ZIP that also embeds the
+  compiled PDF, mirroring the existing `export_clean_bundle`. Strips `.galley/` metadata. 100 %
+  covered.
+- **Tauri commands** `export_pdf_to`, `export_share_bundle_to`, `export_pandoc` — three new
+  commands in the desktop shell. `export_pandoc` maps `ErrorKind::NotFound` to a friendly
+  "Pandoc is not installed" message so the UI can surface a clear error without crashing.
+- **`ExportBackend` interface and adapters** (`apps/desktop/src/lib/export-backend.ts`) —
+  `tauriExportBackend()` invokes the Tauri commands; `browserExportBackend()` is a no-op stub;
+  `selectExportBackend()` picks the right one at runtime. `print()` creates a temporary `blob:`
+  URL, opens a new window, and triggers the system print dialog. 100 % Vitest covered
+  (15 tests including `null` window-open guard).
+- **`ExportPanel.svelte`** — modal panel with seven export cards: PDF, Source Bundle, Share
+  Bundle, Print, HTML, Word, Markdown. PDF/Share Bundle/Print are disabled when no compile
+  result is available. Status line reports success or the error message from the backend.
+  Dismisses on Escape or the close button. Accessible (`role="dialog"`, `tabindex="-1"`,
+  `aria-modal`, `aria-label`, per-button `aria-label`). 24 Vitest tests; 100 % TS coverage.
+- **Command palette "Export…" action** — opens the export panel from anywhere in the app.
+- **ADR-0027** documenting the `ExportFormat` placement, `ExportBackend` seam, save-dialog
+  reuse, Pandoc degradation strategy, and print-via-Blob approach.
+
 ## [0.6.3] - 2026-06-20
 
 Template gallery: curated starters and user-saved templates.

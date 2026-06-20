@@ -77,11 +77,13 @@
   import SearchPanel from './lib/SearchPanel.svelte';
   import StatusBar from './lib/StatusBar.svelte';
   import { selectImportBackend, type ImportBackend } from './lib/import-backend';
+  import { selectExportBackend, type ExportBackend } from './lib/export-backend';
   import { ProjectRegistry } from './lib/project-registry';
   import { selectWindowBackend, type WindowBackend } from './lib/window-backend';
   import ProjectDashboard from './lib/ProjectDashboard.svelte';
   import { CustomTemplateStore, type TemplateDefinition } from './lib/templates';
   import TemplateGallery from './lib/TemplateGallery.svelte';
+  import ExportPanel from './lib/ExportPanel.svelte';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -105,7 +107,8 @@
     importBackend = selectImportBackend(),
     projectRegistry = new ProjectRegistry(window.localStorage),
     windowBackend = selectWindowBackend(),
-    customTemplateStore = new CustomTemplateStore(window.localStorage)
+    customTemplateStore = new CustomTemplateStore(window.localStorage),
+    exportBackend = selectExportBackend() as ExportBackend
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -126,6 +129,7 @@
     projectRegistry?: ProjectRegistry;
     windowBackend?: WindowBackend;
     customTemplateStore?: CustomTemplateStore;
+    exportBackend?: ExportBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -156,6 +160,7 @@
   let settingsOpen = $state(false);
   let importOpen = $state(false);
   let templateGalleryOpen = $state(false);
+  let exportOpen = $state(false);
   let chatOpen = $state(false);
   let agentsOpen = $state(false);
   let chatProjectRoot = $state('');
@@ -375,6 +380,13 @@
       run() {
         dashboardOpen = false;
         templateGalleryOpen = true;
+      }
+    },
+    {
+      id: 'open-export',
+      label: 'Export…',
+      run() {
+        exportOpen = true;
       }
     },
     {
@@ -819,6 +831,19 @@
         />
       </div>
     </div>
+  {/if}
+
+  {#if exportOpen}
+    <ExportPanel
+      open={exportOpen}
+      projectRoot={project.project?.root ?? ''}
+      projectName={project.project?.name ?? ''}
+      rootDocument={project.project?.rootDocument ?? ''}
+      pdfBytes={project.compile.pdf}
+      {importBackend}
+      {exportBackend}
+      onclose={() => (exportOpen = false)}
+    />
   {/if}
 
   {#if settingsOpen}
