@@ -108,6 +108,9 @@ palette is checked against WCAG contrast ratios in both themes on every build.
   and round-trip back out — no lock-in, either direction.
 - **AI you control.** Bring your own key for any provider, cloud or local. No vendor lock-in,
   nothing branded or default-enabled, every change reversible.
+- **Git-backed version history.** Every save auto-checkpoints. A sidebar panel shows the
+  timeline, a compact diff, and a one-click Revert — stored in `refs/galley/checkpoints` inside
+  the project's own repo so history travels with the document.
 
 ## Architecture
 
@@ -122,7 +125,7 @@ galley/
 │  ├─ galley-core/      # pure, I/O-free domain: Project, Document, Manifest, compile, diagnostics, intel
 │  ├─ galley-compile/   # embedded Tectonic behind the Compiler port
 │  ├─ galley-intel/     # TexLab (LSP) client behind the LanguageIntelligence port
-│  ├─ galley-vcs/       # git2 history / snapshots / revert  (placeholder)
+│  ├─ galley-vcs/       # git-backed version history: CheckpointHistory trait, InMemoryHistory, Git2History
 │  ├─ galley-import/    # create/open projects; folder importer
 │  ├─ galley-ai/        # provider-agnostic AI + MCP host    (placeholder)
 │  └─ galley-security/  # sandboxed file store + keychain (sandbox policy)
