@@ -10,6 +10,7 @@ pub mod ai;
 pub mod assets;
 pub mod assistant;
 pub mod bibliography;
+pub mod checkpoint;
 pub mod compile;
 pub mod diagnostics;
 pub mod document;
@@ -37,6 +38,7 @@ pub use bibliography::{
     arxiv_atom_to_entry, entry_summary, parse_bib, serialize_bib, serialize_entry,
     suggest_cite_key, BibEntry, BibField,
 };
+pub use checkpoint::{Checkpoint, CheckpointStore};
 pub use compile::{
     tex_job_name, BuildPlan, CompileReport, CompileRequest, CompileResult, CompileStatus, Compiler,
     Engine, PlanError,

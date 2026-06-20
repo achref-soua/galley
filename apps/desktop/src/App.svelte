@@ -89,7 +89,8 @@
     aiBackend = selectAiBackend(),
     agentBackend = selectAgentToolBackend('') as AgentToolBackend,
     mathFieldSetup = realMathFieldSetup,
-    initialReviewEntries = [] as ReviewEntry[]
+    initialReviewEntries = [] as ReviewEntry[],
+    agentAutonomous = false
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -104,6 +105,7 @@
     agentBackend?: AgentToolBackend;
     mathFieldSetup?: MathFieldSetup;
     initialReviewEntries?: ReviewEntry[];
+    agentAutonomous?: boolean;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -135,6 +137,7 @@
   let chatOpen = $state(false);
   let agentsOpen = $state(false);
   let chatProjectRoot = $state('');
+  let agentProjectTitle = $state('');
   let paletteOpen = $state(false);
   let searchOpen = $state(false);
   let mathOpen = $state(false);
@@ -161,6 +164,7 @@
   $effect(() => {
     searchRoot = project.project == null ? null : project.project.root;
     chatProjectRoot = project.project != null ? project.project.root : '';
+    agentProjectTitle = project.project != null ? project.project.name : '';
   });
 
   let resizeBaseline = 0;
@@ -495,6 +499,10 @@
     const id = String(reviewCounter++);
     reviewEntries = [...reviewEntries, locatePatch(id, project.content, before, after)];
   }
+
+  function handleAutoApply(newContent: string) {
+    projectController.edit(newContent);
+  }
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
@@ -646,9 +654,11 @@
             backend={aiBackend}
             {agentBackend}
             projectRoot={chatProjectRoot}
-            projectTitle={project.project?.name ?? ''}
+            projectTitle={agentProjectTitle}
             content={project.content}
             onpatch={handleAiPatch}
+            autonomous={agentAutonomous}
+            onautonapply={handleAutoApply}
           />
         {/if}
       </div>

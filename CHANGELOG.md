@@ -4,6 +4,41 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-06-20
+
+Autonomous agent mode with in-memory checkpoints and revert.
+
+### Added
+
+- **`autonomous.ts`** — pure, I/O-free helpers for autonomous sessions: `createCheckpoint`,
+  `applyCheckpoint` (reverse-scan, returns most-recent match), `newLoopState`, `canContinueLoop`,
+  `advanceLoop` (immutable loop-bounding state), `isNetworkTool`, and `networkPermissionMessage`.
+  100 % Vitest covered (21 tests).
+- **`galley-core::checkpoint`** — Rust domain mirror: `Checkpoint { name, content }` and
+  `CheckpointStore` (`push`, `revert_to`, `names`, `len`, `is_empty`). 100 % llvm-cov covered.
+- **`AgentPanel.svelte` — autonomous mode** — opt-in via `autonomous?: boolean` prop:
+  - Patches applied directly to `runningContent` (local variable, not the Svelte prop) and
+    emitted via `onautonapply?(newContent)` instead of queueing a review entry.
+  - `CheckpointEntry[]` state tracks each successful patch; a checkpoints panel renders below
+    the log with a "Revert" button per entry.
+  - "Autonomous" badge shown in the panel header.
+  - **Compile-fix loop bounding**: `LoopState` counts compile-fixer iterations; breaks and logs
+    `[Limit]` when `iteration >= maxFixIterations` (default 3, configurable via prop).
+  - **Network permission prompts**: `lookup_reference` gated behind `networkrequest(tool, arg)`
+    callback; call skipped and `[Denied]` logged when callback returns `false`.
+  - Stop-in-flight guard extended to the tool-dispatch `await` site (line 101 branch).
+- **`App.svelte`** — `agentAutonomous?: boolean` prop (injectable for test coverage),
+  `agentProjectTitle` `$state` computed in the project `$effect`, `handleAutoApply` wired to
+  `projectController.edit`, and `onautonapply={handleAutoApply}` on `AgentPanel`.
+- **ADR-0022** — documents the in-memory checkpoint model, `runningContent` tracking,
+  loop-bounding design, network permission gate, and deferred git-backed persistence.
+
+### Changed
+
+- All version touchpoints bumped to 0.5.3 (workspace `Cargo.toml`,
+  `apps/desktop/src-tauri/Cargo.toml`, `tauri.conf.json`, `apps/desktop/package.json`,
+  `packages/ui-kit/package.json`).
+
 ## [0.5.2] - 2026-06-20
 
 Specialized agents and MCP tool host.
