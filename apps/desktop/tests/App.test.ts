@@ -1664,4 +1664,70 @@ describe('App — project dashboard', () => {
       expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
     );
   });
+
+  it('opens the template gallery when From template… is clicked on the dashboard', async () => {
+    render(App);
+    expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'From template…' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
+    );
+    expect(screen.getByRole('dialog', { name: 'Template gallery' })).toBeTruthy();
+  });
+
+  it('closes the template gallery when the Close button is clicked', async () => {
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: 'From template…' }));
+    await screen.findByRole('dialog', { name: 'Template gallery' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Template gallery' })).toBeNull()
+    );
+  });
+
+  it('palette new-from-template action opens the template gallery', async () => {
+    render(App);
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('New from Template'));
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Template gallery' })).toBeTruthy()
+    );
+    // Close so no state leaks to other tests.
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Template gallery' })).toBeNull()
+    );
+  });
+
+  it('opens the template gallery with currentContent set when a project is open', async () => {
+    render(App, { props: { editor: fakeEditorFactory() } });
+    // Create a project so project.project is non-null.
+    await fireEvent.input(screen.getByLabelText('New project name'), {
+      target: { value: 'TemplateTest' }
+    });
+    await fireEvent.submit(screen.getByLabelText('New project name').closest('form')!);
+    await screen.findByLabelText('Source');
+    // Open the gallery via palette.
+    await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+    await fireEvent.click(within(palette).getByText('New from Template'));
+    await screen.findByRole('dialog', { name: 'Template gallery' });
+    // A project is open → currentContent is non-null → save button is visible.
+    expect(screen.getByText('Save current document as template…')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('clicking Use template closes the gallery and fires the create flow', async () => {
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: 'From template…' }));
+    await screen.findByRole('dialog', { name: 'Template gallery' });
+    // Click the first "Use template" button — this invokes handleUseTemplate,
+    // which closes the gallery synchronously before the async pick resolves.
+    const useButtons = screen.getAllByText('Use template');
+    await fireEvent.click(useButtons[0]);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Template gallery' })).toBeNull()
+    );
+  });
 });

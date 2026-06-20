@@ -236,6 +236,25 @@ describe('ProjectController — picking', () => {
     expect(controller.state.project?.root).toBe('/parent/New');
   });
 
+  it('pickAndCreateFromTemplate does nothing when cancelled', async () => {
+    backend.pick = null;
+    await controller.pickAndCreateFromTemplate('My Doc', '\\documentclass{article}\\end{document}');
+    expect(controller.state.project).toBeNull();
+  });
+
+  it('pickAndCreateFromTemplate creates a project and writes the template body', async () => {
+    backend.pick = '/templates-parent';
+    const body = '\\documentclass{beamer}\\begin{document}\\end{document}';
+    // The FakeBackend's readDocument reads from files; saveDocument writes there.
+    // After createProject the snapshot has root '/templates-parent/My Pres';
+    // pickAndCreateFromTemplate calls saveDocument(root, 'main.tex', body),
+    // which updates files; then #load reads it back.
+    backend.files.set('main.tex', 'initial');
+    await controller.pickAndCreateFromTemplate('My Pres', body);
+    expect(controller.state.project?.name).toBe('My Pres');
+    expect(controller.state.content).toBe(body);
+  });
+
   it('pickAndCreate does nothing when cancelled', async () => {
     backend.pick = null;
     await controller.pickAndCreate('New');
