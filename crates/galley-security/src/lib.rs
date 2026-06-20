@@ -115,6 +115,24 @@ impl SafeRoot {
         fs::read_to_string(&canonical).map_err(SandboxError::Io)
     }
 
+    /// Read a project-relative file to a byte vector.
+    ///
+    /// Identical to [`read`] but returns raw bytes, so binary files (images,
+    /// PDFs) are preserved exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SandboxError`] if the path is invalid, resolves outside the
+    /// root, or cannot be read.
+    pub fn read_bytes(&self, rel: &str) -> Result<Vec<u8>, SandboxError> {
+        let target = self.resolve(rel)?;
+        let canonical = fs::canonicalize(&target).map_err(SandboxError::Io)?;
+        if !canonical.starts_with(&self.root) {
+            return Err(SandboxError::Escape);
+        }
+        fs::read(&canonical).map_err(SandboxError::Io)
+    }
+
     /// Write a project-relative file, creating parent directories as needed.
     ///
     /// Writing through a symlink (final component or any parent) is refused.
@@ -419,6 +437,32 @@ mod tests {
         // Restore permissions so the TempDir can be cleaned up.
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
         assert_eq!(tag(&result.unwrap_err()), "io");
+    }
+
+    #[test]
+    fn read_bytes_returns_exact_bytes_and_rejects_escape() {
+        use std::os::unix::fs::symlink;
+        let outside = TempDir::new().unwrap();
+        let secret = outside.path().join("secret.bin");
+        let data: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE];
+        fs::write(&secret, data).unwrap();
+
+        let (dir, store) = temp();
+        store.write_bytes("binary.bin", data).unwrap();
+        assert_eq!(store.read_bytes("binary.bin").unwrap(), data);
+
+        // Missing file → io error.
+        assert_eq!(tag(&store.read_bytes("missing.bin").unwrap_err()), "io");
+
+        // Invalid relative path → sandbox error via resolve().
+        assert_eq!(tag(&store.read_bytes("../escape").unwrap_err()), "traversal");
+
+        // Symlink escaping the root → escape error.
+        symlink(&secret, dir.path().join("link.bin")).unwrap();
+        assert_eq!(
+            tag(&store.read_bytes("link.bin").unwrap_err()),
+            "escape"
+        );
     }
 
     #[test]

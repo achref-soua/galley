@@ -11,7 +11,8 @@
     onopenfile,
     onnewproject,
     onopenfolder,
-    onopenrecent
+    onopenrecent,
+    onimport = undefined
   }: {
     project: ProjectSnapshot | null;
     activePath: string | null;
@@ -20,6 +21,8 @@
     onnewproject: (name: string) => void;
     onopenfolder: () => void;
     onopenrecent: (root: string) => void;
+    /** Open the import wizard. Optional — omitted in tests / browser mode. */
+    onimport?: () => void;
   } = $props();
 
   let newName = $state('');
@@ -85,6 +88,9 @@
         <Button type="submit" variant="primary" size="sm">Create</Button>
       </form>
       <Button size="sm" onclick={onopenfolder}>Open a folder…</Button>
+      {#if onimport}
+        <Button size="sm" onclick={onimport}>Import…</Button>
+      {/if}
     </div>
 
     {#if recent.length > 0}

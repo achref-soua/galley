@@ -71,10 +71,12 @@
   import PreviewPane from './lib/PreviewPane.svelte';
   import Resizer from './lib/Resizer.svelte';
   import Settings from './lib/Settings.svelte';
+  import ImportWizard from './lib/ImportWizard.svelte';
   import UnsavedGuard from './lib/UnsavedGuard.svelte';
   import CommandPalette from './lib/CommandPalette.svelte';
   import SearchPanel from './lib/SearchPanel.svelte';
   import StatusBar from './lib/StatusBar.svelte';
+  import { selectImportBackend, type ImportBackend } from './lib/import-backend';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -94,7 +96,8 @@
     mathFieldSetup = realMathFieldSetup,
     initialReviewEntries = [] as ReviewEntry[],
     agentAutonomous = false,
-    vcsBackend = selectVcsBackend() as VcsBackend
+    vcsBackend = selectVcsBackend() as VcsBackend,
+    importBackend = selectImportBackend()
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -111,6 +114,7 @@
     initialReviewEntries?: ReviewEntry[];
     agentAutonomous?: boolean;
     vcsBackend?: VcsBackend;
+    importBackend?: ImportBackend;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -139,6 +143,7 @@
   let preference = $state<ThemePreference>(theme.preference);
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
+  let importOpen = $state(false);
   let chatOpen = $state(false);
   let agentsOpen = $state(false);
   let chatProjectRoot = $state('');
@@ -579,6 +584,7 @@
           onnewproject={(name) => void projectController.pickAndCreate(name)}
           onopenfolder={() => void projectController.pickAndOpen()}
           onopenrecent={(root) => void projectController.openFolder(root)}
+          onimport={() => (importOpen = true)}
         />
         {#if project.project !== null}
           <AssetPanel
@@ -742,6 +748,19 @@
     <CommandPalette actions={paletteActions} onclose={() => (paletteOpen = false)} />
   {/if}
 
+  {#if importOpen}
+    <div class="overlay" role="presentation">
+      <ImportWizard
+        backend={importBackend}
+        onimport={(snapshot) => {
+          importOpen = false;
+          void projectController.openFolder(snapshot.root);
+        }}
+        oncancel={() => (importOpen = false)}
+      />
+    </div>
+  {/if}
+
   {#if settingsOpen}
     <Settings
       themePreference={preference}
@@ -803,6 +822,20 @@
   .pane {
     min-height: 0;
     overflow: hidden;
+  }
+
+  .overlay {
+    align-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    left: 0;
+    padding: 24px;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 200;
   }
 
   .pane.sidebar,

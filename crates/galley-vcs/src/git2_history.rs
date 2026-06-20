@@ -209,8 +209,9 @@ mod tests {
 
     #[test]
     fn format_timestamp_known_date() {
-        // 2026-06-20T12:34:56Z = 1750423696 seconds since epoch
-        let ts = 1_750_423_696i64;
+        // 2026-06-20T12:34:56Z = 1781959696 seconds since Unix epoch.
+        // (= 1750423696 + 365*86400; 2025 is not a leap year.)
+        let ts = 1_781_959_696i64;
         let s = format_timestamp(ts);
         assert!(s.starts_with("2026-06-20T"), "got {s}");
     }

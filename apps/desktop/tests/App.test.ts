@@ -7,6 +7,7 @@ import type { AssetBackend } from '../src/lib/asset-backend';
 import type { MathFieldSetup } from '../src/lib/math-field.js';
 import { firePointer, fakeEditorFactory } from './setup';
 import { browserAiBackend } from '../src/lib/ai-backend';
+import { browserImportBackend } from '../src/lib/import-backend';
 
 /** A fake PDF renderer that reports a one-page document. */
 const onePageRenderer = (): PdfRenderer => ({ render: () => Promise.resolve({ pageCount: 1 }) });
@@ -1499,5 +1500,41 @@ describe('App — layout, drag/drop, and review handlers', () => {
       );
       expect(vcsBackend.listCheckpoints).toHaveBeenCalled();
     });
+  });
+});
+
+describe('App — import wizard', () => {
+  it('opens the import wizard when Import… is clicked and closes on cancel', async () => {
+    render(App, { importBackend: browserImportBackend() });
+    await fireEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    expect(screen.getByRole('dialog', { name: 'Import project' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+    expect(screen.queryByRole('dialog', { name: 'Import project' })).toBeNull();
+  });
+
+  it('opens a project after a completed import', async () => {
+    const importBackend = browserImportBackend();
+    // Patch pickFolder to return a path so analyzeFolder gets called.
+    importBackend.pickFolder = async () => '/demo/my-thesis';
+    render(App, { importBackend });
+    await fireEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    // Step 1: click the Local folder card.
+    await fireEvent.click(screen.getByRole('button', { name: /Local folder/i }));
+    // Step 2: preview — click Continue.
+    await waitFor(() => screen.getByRole('button', { name: /Continue/i }));
+    await fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    // Step 3: fill in parent dir then submit.
+    await waitFor(() => screen.getByLabelText('Save inside folder'));
+    importBackend.pickFolder = async () => '/home/user/projects';
+    await fireEvent.click(screen.getByRole('button', { name: 'Browse…' }));
+    await waitFor(() => {
+      const input = screen.getByLabelText('Save inside folder') as HTMLInputElement;
+      expect(input.value).toBe('/home/user/projects');
+    });
+    await fireEvent.submit(screen.getByLabelText('Save inside folder').closest('form')!);
+    // Wizard closes after a successful import.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Import project' })).toBeNull()
+    );
   });
 });

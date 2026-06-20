@@ -18,11 +18,14 @@ use galley_core::ai::LlmProvider;
 use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
-    arxiv_atom_to_entry, parse_bib, BibEntry, CompileRequest, CompletionItem, DocumentKind,
-    DocumentSymbol, Engine, LanguageIntelligence, Location, Position, SyncTexMapper, TextDocument,
-    VERSION,
+    analyze_project, arxiv_atom_to_entry, parse_bib, BibEntry, CompileRequest, CompletionItem,
+    DocumentKind, DocumentSymbol, Engine, FileEntry, LanguageIntelligence, Location, Position,
+    SyncTexMapper, TextDocument, VERSION,
 };
-use galley_import::{create_project as import_create, open_folder as import_open, Workspace};
+use galley_import::{
+    create_project as import_create, export_clean_bundle, extract_tarball, extract_zip,
+    import_from_entries, open_folder as import_open, ArchiveLimits, Workspace,
+};
 use galley_intel::{SyncTexParser, TexLabClient};
 use galley_security::SafeRoot;
 use galley_vcs::{CheckpointHistory, Git2History};
@@ -850,6 +853,141 @@ fn send_ai_completion(
         .map_err(|e| e.to_string())
 }
 
+// ── Import / export commands ──────────────────────────────────────────────────
+
+/// Parse-only analysis of an import source, sent to the wizard UI.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectAnalysisDto {
+    root_file: String,
+    engine: String,
+    bib_tool: String,
+    encoding: String,
+    packages: Vec<String>,
+    fonts: Vec<String>,
+    warnings: Vec<String>,
+    file_count: usize,
+    total_bytes: u64,
+}
+
+impl ProjectAnalysisDto {
+    fn from_entries(entries: &[FileEntry]) -> Self {
+        let profile = analyze_project(entries);
+        let total_bytes = entries.iter().map(|e| e.content.len() as u64).sum();
+        Self {
+            root_file: profile.root_file,
+            engine: profile.engine.label().to_string(),
+            bib_tool: profile.bib_tool.label().to_string(),
+            encoding: profile.encoding,
+            packages: profile.packages,
+            fonts: profile.fonts,
+            warnings: profile.warnings,
+            file_count: entries.len(),
+            total_bytes,
+        }
+    }
+}
+
+/// Limits applied to archive extraction: 512 MiB total / 64 MiB per file / 8 000 files.
+fn import_limits() -> ArchiveLimits {
+    ArchiveLimits {
+        max_files: 8_000,
+        max_file_bytes: 64 * 1024 * 1024,
+        max_total_bytes: 512 * 1024 * 1024,
+    }
+}
+
+/// Read an archive at `path` and extract its entries.
+///
+/// The archive type is inferred from the file extension (`.zip` → ZIP;
+/// everything else is treated as a `.tar.gz` tarball).
+fn read_archive_entries(path: &Path) -> Result<Vec<FileEntry>, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("zip"))
+        .unwrap_or(false)
+    {
+        extract_zip(&bytes, import_limits()).map_err(|e| e.to_string())
+    } else {
+        extract_tarball(&bytes, import_limits()).map_err(|e| e.to_string())
+    }
+}
+
+/// Analyse an archive at `path` (`.zip` or `.tar.gz`) without writing to disk.
+#[tauri::command]
+fn import_analyze_archive(path: String) -> Result<ProjectAnalysisDto, String> {
+    let entries = read_archive_entries(Path::new(&path))?;
+    Ok(ProjectAnalysisDto::from_entries(&entries))
+}
+
+/// Materialise an archive at `path` as a new project directory.
+#[tauri::command]
+fn import_from_archive(
+    path: String,
+    parent: String,
+    name: String,
+) -> Result<ProjectDto, String> {
+    let entries = read_archive_entries(Path::new(&path))?;
+    import_from_entries(Path::new(&parent), &name, entries, VERSION, &now_iso())
+        .map(|iw| ProjectDto::from_workspace(Workspace { root: iw.root, project: iw.project }))
+        .map_err(|e| e.to_string())
+}
+
+/// Analyse an existing on-disk folder without modifying it.
+#[tauri::command]
+fn import_analyze_folder(path: String) -> Result<ProjectAnalysisDto, String> {
+    let store = SafeRoot::open(Path::new(&path)).map_err(|e| e.to_string())?;
+    let files = store.list().map_err(|e| e.to_string())?;
+    let entries: Vec<FileEntry> = files
+        .into_iter()
+        .filter_map(|rel| {
+            store
+                .read_bytes(&rel)
+                .ok()
+                .map(|content| FileEntry::new(rel, content))
+        })
+        .collect();
+    Ok(ProjectAnalysisDto::from_entries(&entries))
+}
+
+/// Copy an existing folder into a new Galley project directory.
+#[tauri::command]
+fn import_from_folder(
+    parent: String,
+    name: String,
+    src: String,
+) -> Result<ProjectDto, String> {
+    let store = SafeRoot::open(Path::new(&src)).map_err(|e| e.to_string())?;
+    let files = store.list().map_err(|e| e.to_string())?;
+    let entries: Vec<FileEntry> = files
+        .into_iter()
+        .filter_map(|rel| {
+            store
+                .read_bytes(&rel)
+                .ok()
+                .map(|content| FileEntry::new(rel, content))
+        })
+        .collect();
+    import_from_entries(Path::new(&parent), &name, entries, VERSION, &now_iso())
+        .map(|iw| ProjectDto::from_workspace(Workspace { root: iw.root, project: iw.project }))
+        .map_err(|e| e.to_string())
+}
+
+/// Export the current project as a clean `.zip` bundle (strips `.galley/`).
+///
+/// Writes the archive to `dest` (an absolute path chosen by the user via the
+/// save-file dialog). Returns the number of bytes written.
+#[tauri::command]
+fn export_bundle_to(root: String, dest: String) -> Result<u64, String> {
+    let ws = import_open(Path::new(&root), VERSION, &now_iso()).map_err(|e| e.to_string())?;
+    let bytes = export_clean_bundle(&ws).map_err(|e| e.to_string())?;
+    let n = bytes.len() as u64;
+    std::fs::write(Path::new(&dest), &bytes).map_err(|e| e.to_string())?;
+    Ok(n)
+}
+
 /// A single entry in the history timeline, serialised for the frontend.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -950,7 +1088,12 @@ pub fn run() {
             vcs_auto_checkpoint,
             vcs_create_snapshot,
             vcs_list_checkpoints,
-            vcs_get_content
+            vcs_get_content,
+            import_analyze_archive,
+            import_from_archive,
+            import_analyze_folder,
+            import_from_folder,
+            export_bundle_to
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");

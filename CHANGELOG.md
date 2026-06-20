@@ -4,6 +4,36 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-20
+
+Project import wizard: ZIP, tarball, and folder ingestion.
+
+### Added
+
+- **`galley-import` crate** — hardened archive extraction (`extract_zip`, `extract_tarball`) plus
+  project-level operations (`create_project`, `open_folder`, `import_from_entries`,
+  `export_clean_bundle`). Security: zip-slip, symlinks, hard-links, path traversal, file-count,
+  per-file size, and total-size limits all enforced before anything touches disk. 100 % LLVM
+  region / function / line coverage (57 unit tests, crafted archive fuzzers, `FailAfterHeaderRead`
+  mock reader).
+- **`galley-core::import`** — pure analysis layer: `analyze_project` detects root document,
+  compile engine (`pdflatex`, `xelatex`, `lualatex`), bibtool (`bibtex`, `biber`), encoding,
+  packages, and fonts from a `Vec<FileEntry>` without I/O. `clean_export_paths` strips `.galley/`
+  from export bundles. 43 unit tests, 100 % covered.
+- **Tauri commands** — `analyze_archive`, `analyze_folder`, `import_from_archive`,
+  `import_from_folder`, `export_bundle_to` wired in `src-tauri/src/lib.rs`.
+- **`import-backend.ts`** — `ImportBackend` interface with `tauriImportBackend()` (production),
+  `browserImportBackend()` (tests), and `selectImportBackend()`. 100 % Vitest covered (22 tests).
+- **`ImportWizard.svelte`** — three-step modal (choose source → preview analysis → confirm name
+  and destination). Handles ZIP, `.tar.gz`, and local folder sources; pre-fills project name from
+  filename; shows engine, bibliography tool, encoding, packages, fonts, and warnings. 100 % Vitest
+  covered (21 tests).
+- **`Sidebar.svelte`** — "Import project" button opens the wizard; `onimport` callback triggers
+  `loadProject` in `App.svelte`.
+- **ADR-0024** — documents the `Box<dyn Read>` / concrete-Cursor approach to 100 % LLVM region
+  coverage in generic extraction functions, the `ImportBackend` seam, and the Svelte 5
+  phantom-branch avoidance pattern.
+
 ## [0.6.0] - 2026-06-20
 
 Git-backed version history.
