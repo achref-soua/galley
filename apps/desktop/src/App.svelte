@@ -80,6 +80,8 @@
   import { ProjectRegistry } from './lib/project-registry';
   import { selectWindowBackend, type WindowBackend } from './lib/window-backend';
   import ProjectDashboard from './lib/ProjectDashboard.svelte';
+  import { CustomTemplateStore, type TemplateDefinition } from './lib/templates';
+  import TemplateGallery from './lib/TemplateGallery.svelte';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -102,7 +104,8 @@
     vcsBackend = selectVcsBackend() as VcsBackend,
     importBackend = selectImportBackend(),
     projectRegistry = new ProjectRegistry(window.localStorage),
-    windowBackend = selectWindowBackend()
+    windowBackend = selectWindowBackend(),
+    customTemplateStore = new CustomTemplateStore(window.localStorage)
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -122,6 +125,7 @@
     importBackend?: ImportBackend;
     projectRegistry?: ProjectRegistry;
     windowBackend?: WindowBackend;
+    customTemplateStore?: CustomTemplateStore;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -151,6 +155,7 @@
   let layout = $state(layoutController.state);
   let settingsOpen = $state(false);
   let importOpen = $state(false);
+  let templateGalleryOpen = $state(false);
   let chatOpen = $state(false);
   let agentsOpen = $state(false);
   let chatProjectRoot = $state('');
@@ -365,6 +370,14 @@
       }
     },
     {
+      id: 'new-from-template',
+      label: 'New from Template',
+      run() {
+        dashboardOpen = false;
+        templateGalleryOpen = true;
+      }
+    },
+    {
       id: 'insert-equation',
       label: 'Insert Equation',
       shortcut: '∑',
@@ -575,6 +588,11 @@
 
   function handleAutoApply(newContent: string) {
     projectController.edit(newContent);
+  }
+
+  function handleUseTemplate(template: TemplateDefinition) {
+    templateGalleryOpen = false;
+    void projectController.pickAndCreateFromTemplate(template.name, template.body);
   }
 </script>
 
@@ -790,6 +808,19 @@
     </div>
   {/if}
 
+  {#if templateGalleryOpen}
+    <div class="overlay" role="presentation">
+      <div class="dashboard-modal">
+        <TemplateGallery
+          customStore={customTemplateStore}
+          currentContent={project.project !== null ? project.content : null}
+          onuse={handleUseTemplate}
+          onclose={() => (templateGalleryOpen = false)}
+        />
+      </div>
+    </div>
+  {/if}
+
   {#if settingsOpen}
     <Settings
       themePreference={preference}
@@ -847,6 +878,10 @@
           onnew={() => {
             dashboardOpen = false;
             void projectController.pickAndCreate('Untitled');
+          }}
+          ontemplate={() => {
+            dashboardOpen = false;
+            templateGalleryOpen = true;
           }}
           onimport={() => {
             dashboardOpen = false;

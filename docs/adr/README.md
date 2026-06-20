@@ -30,3 +30,4 @@ codebase stays legible.
 | 0023 | Git-backed version history (VCS store)                                    | Accepted |
 | 0024 | Migration import: ZIP/tarball/folder ingestion pipeline                   | Accepted |
 | 0025 | Project organization: registry, window backend, and dashboard             | Accepted |
+| 0026 | Template gallery: curated starters and user-saved templates               | Accepted |
