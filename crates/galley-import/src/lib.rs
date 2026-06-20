@@ -289,6 +289,48 @@ pub fn export_clean_bundle(workspace: &Workspace) -> Result<Vec<u8>, ImportError
         .into_inner())
 }
 
+/// Export a read-only share bundle: a clean source ZIP with `.galley/` stripped
+/// **plus** the compiled `pdf_bytes` stored as `<project-name>.pdf`.
+///
+/// This gives recipients both the editable source and a pre-rendered PDF in a
+/// single archive, without the Galley-internal metadata cluttering the download.
+///
+/// # Errors
+///
+/// Returns [`ImportError::Sandbox`] if any project file cannot be read.
+pub fn export_share_bundle(
+    workspace: &Workspace,
+    pdf_bytes: &[u8],
+) -> Result<Vec<u8>, ImportError> {
+    let mut zw = ZipWriter::new(io::Cursor::new(Vec::<u8>::new()));
+    let store = SafeRoot::open(&workspace.root).map_err(ImportError::Sandbox)?;
+    let all_paths = store
+        .list()
+        .expect("workspace root validated by open(); list cannot fail");
+    let paths = clean_export_paths(&all_paths);
+    let opts: FileOptions<()> =
+        FileOptions::default().compression_method(CompressionMethod::Deflated);
+    for path in &paths {
+        let content = store
+            .read_bytes(path)
+            .expect("path came from list(); file exists and is readable");
+        zw.start_file(path, opts)
+            .expect("ZipWriter::start_file over Cursor<Vec<u8>> never fails");
+        zw.write_all(&content)
+            .expect("ZipWriter::write_all over Cursor<Vec<u8>> never fails");
+    }
+    // Add the compiled PDF.
+    let pdf_name = format!("{}.pdf", workspace.project.name);
+    zw.start_file(&pdf_name, opts)
+        .expect("ZipWriter::start_file over Cursor<Vec<u8>> never fails");
+    zw.write_all(pdf_bytes)
+        .expect("ZipWriter::write_all over Cursor<Vec<u8>> never fails");
+    Ok(zw
+        .finish()
+        .expect("ZipWriter::finish over Cursor<Vec<u8>> never fails")
+        .into_inner())
+}
+
 /// Reject project names that are empty or would escape their parent directory.
 fn validate_name(name: &str) -> Result<&str, ImportError> {
     if name.is_empty() || name == "." || name == ".." || name.contains('/') || name.contains('\\') {
@@ -650,6 +692,56 @@ mod tests {
         assert!(names.iter().any(|n| n == "fig/plot.tex"));
         // .galley/ metadata is NOT exported.
         assert!(!names.iter().any(|n| n.starts_with(".galley")));
+    }
+
+    // ── export_share_bundle ──
+
+    #[test]
+    fn share_bundle_includes_source_and_pdf_without_galley() {
+        let parent = TempDir::new().unwrap();
+        let ws = create_project(parent.path(), "MyPaper", VERSION, NOW).unwrap();
+        let store = SafeRoot::from_canonical(ws.root.clone());
+        store
+            .write("chapters/intro.tex", "\\section{Intro}")
+            .unwrap();
+
+        let pdf_bytes = b"%PDF-1.4 fake";
+        let bytes = export_share_bundle(&ws, pdf_bytes).unwrap();
+
+        let cursor = std::io::Cursor::new(&bytes);
+        let mut archive = zip::ZipArchive::new(cursor).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+        // Source files present.
+        assert!(
+            names.iter().any(|n| n == "main.tex"),
+            "main.tex missing: {names:?}"
+        );
+        assert!(
+            names.iter().any(|n| n == "chapters/intro.tex"),
+            "subdir missing: {names:?}"
+        );
+        // PDF included.
+        assert!(
+            names.iter().any(|n| n == "MyPaper.pdf"),
+            "PDF missing: {names:?}"
+        );
+        // .galley/ metadata NOT included.
+        assert!(
+            !names.iter().any(|n| n.starts_with(".galley")),
+            ".galley/ leaked: {names:?}"
+        );
+    }
+
+    #[test]
+    fn share_bundle_fails_for_missing_root() {
+        let workspace = Workspace {
+            root: PathBuf::from("/this/does/not/exist"),
+            project: Project::new("x", "", vec![]),
+        };
+        let err = export_share_bundle(&workspace, b"%PDF-1.4").unwrap_err();
+        assert_eq!(tag(&err), "sandbox");
     }
 
     #[test]
