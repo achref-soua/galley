@@ -287,9 +287,14 @@ pub fn latexmkrc_engine(content: &str) -> Option<TexEngine> {
 #[must_use]
 pub fn engine_needs_latexmk(packages: &[String]) -> bool {
     const LATEXMK_PACKAGES: &[&str] = &[
-        "fontspec", "xltxtra", "xunicode", "polyglossia",
-        "luatexja", "luatexja-fontspec",
-        "pstricks", "pst-all",
+        "fontspec",
+        "xltxtra",
+        "xunicode",
+        "polyglossia",
+        "luatexja",
+        "luatexja-fontspec",
+        "pstricks",
+        "pst-all",
     ];
     packages
         .iter()
@@ -572,7 +577,10 @@ mod tests {
 
     #[test]
     fn program_comment_absent() {
-        assert_eq!(engine_from_program_comment("\\documentclass{article}"), None);
+        assert_eq!(
+            engine_from_program_comment("\\documentclass{article}"),
+            None
+        );
     }
 
     // ── is_latexmkrc ──
@@ -639,7 +647,12 @@ mod tests {
             "main.tex",
             "\\usepackage{amsmath}\n\\usepackage{geometry}\n",
         )];
-        let pkgs = detect_packages(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let pkgs = detect_packages(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert!(pkgs.contains(&"amsmath".to_string()));
         assert!(pkgs.contains(&"geometry".to_string()));
     }
@@ -650,7 +663,12 @@ mod tests {
             "main.tex",
             "\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath,amssymb}\n",
         )];
-        let pkgs = detect_packages(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let pkgs = detect_packages(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert!(pkgs.contains(&"inputenc".to_string()));
         assert!(pkgs.contains(&"amsmath".to_string()));
         assert!(pkgs.contains(&"amssymb".to_string()));
@@ -659,7 +677,12 @@ mod tests {
     #[test]
     fn skips_non_tex_files_for_packages() {
         let entries = [text_entry("readme.md", "\\usepackage{notreal}\n")];
-        let pkgs = detect_packages(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let pkgs = detect_packages(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert!(pkgs.is_empty());
     }
 
@@ -669,7 +692,12 @@ mod tests {
             text_entry("a.tex", "\\usepackage{amsmath}\n"),
             text_entry("b.tex", "\\usepackage{amsmath}\n"),
         ];
-        let pkgs = detect_packages(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let pkgs = detect_packages(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(pkgs.iter().filter(|p| p.as_str() == "amsmath").count(), 1);
     }
 
@@ -681,7 +709,12 @@ mod tests {
             "main.tex",
             "\\setmainfont{Linux Libertine O}\n\\setsansfont{Linux Biolinum O}\n",
         )];
-        let fonts = detect_fonts(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let fonts = detect_fonts(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert!(fonts.contains(&"Linux Libertine O".to_string()));
         assert!(fonts.contains(&"Linux Biolinum O".to_string()));
     }
@@ -689,7 +722,12 @@ mod tests {
     #[test]
     fn no_font_commands_returns_empty() {
         let entries = [text_entry("main.tex", "\\documentclass{article}\n")];
-        let fonts = detect_fonts(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let fonts = detect_fonts(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert!(fonts.is_empty());
     }
 
@@ -697,11 +735,13 @@ mod tests {
 
     #[test]
     fn detects_utf8_encoding() {
-        let entries = [text_entry(
-            "main.tex",
-            "\\usepackage[utf8]{inputenc}\n",
-        )];
-        let enc = detect_encoding(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let entries = [text_entry("main.tex", "\\usepackage[utf8]{inputenc}\n")];
+        let enc = detect_encoding(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(enc, "utf8");
     }
 
@@ -709,7 +749,12 @@ mod tests {
     fn encoding_line_no_brackets_returns_empty() {
         // \usepackage{inputenc} — no options → no encoding extracted.
         let entries = [text_entry("main.tex", "\\usepackage{inputenc}\n")];
-        let enc = detect_encoding(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let enc = detect_encoding(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(enc, "");
     }
 
@@ -717,14 +762,24 @@ mod tests {
     fn encoding_unclosed_bracket_returns_empty() {
         // malformed: [utf8 with no closing ]
         let entries = [text_entry("main.tex", "\\usepackage[utf8{inputenc}\n")];
-        let enc = detect_encoding(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let enc = detect_encoding(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(enc, "");
     }
 
     #[test]
     fn no_inputenc_returns_empty() {
         let entries = [text_entry("main.tex", "\\usepackage{amsmath}\n")];
-        let enc = detect_encoding(&entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>());
+        let enc = detect_encoding(
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(enc, "");
     }
 
@@ -919,7 +974,10 @@ mod tests {
             "\\usepackage\n\\usepackage{amsmath}\n",
         )];
         let pkgs = detect_packages(
-            &entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>(),
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
         );
         // Only the second line contributes a package.
         assert_eq!(pkgs, vec!["amsmath".to_string()]);
@@ -934,7 +992,10 @@ mod tests {
             "\\setmainfont\n\\setmainfont{Linux Libertine O}\n",
         )];
         let fonts = detect_fonts(
-            &entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>(),
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
         );
         assert_eq!(fonts, vec!["Linux Libertine O".to_string()]);
     }
@@ -945,7 +1006,10 @@ mod tests {
         // comma; the `if !name.is_empty()` guard must reject it without panic.
         let entries = [text_entry("main.tex", "\\usepackage{amsmath,}\n")];
         let pkgs = detect_packages(
-            &entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>(),
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
         );
         assert_eq!(pkgs, vec!["amsmath".to_string()]);
     }
@@ -958,7 +1022,10 @@ mod tests {
             "\\setmainfont{}\n\\setmainfont{Latin Modern Roman}\n",
         )];
         let fonts = detect_fonts(
-            &entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>(),
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
         );
         assert_eq!(fonts, vec!["Latin Modern Roman".to_string()]);
     }
@@ -972,7 +1039,10 @@ mod tests {
             "\\usepackage{amsmath\n\\usepackage{geometry}\n",
         )];
         let pkgs = detect_packages(
-            &entries.iter().map(|e| (e, e.as_text().unwrap())).collect::<Vec<_>>(),
+            &entries
+                .iter()
+                .map(|e| (e, e.as_text().unwrap()))
+                .collect::<Vec<_>>(),
         );
         assert_eq!(pkgs, vec!["geometry".to_string()]);
     }

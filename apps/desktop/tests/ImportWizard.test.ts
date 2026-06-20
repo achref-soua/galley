@@ -58,9 +58,7 @@ describe('ImportWizard — step 1 (choose)', () => {
 });
 
 describe('ImportWizard — archive path', () => {
-  async function goToPreviewViaArchive(
-    backendOverrides: Partial<ImportBackend> = {}
-  ): Promise<ReturnType<typeof render>> {
+  async function goToPreviewViaArchive(backendOverrides: Partial<ImportBackend> = {}) {
     const backend = makeBackend({
       pickFile: async () => ({ path: '/home/user/thesis.zip', name: 'thesis.zip' }),
       ...backendOverrides

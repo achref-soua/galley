@@ -153,4 +153,16 @@ describe('Titlebar', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Open assistant' }));
     expect(ontogglechat).toHaveBeenCalledOnce();
   });
+
+  it('renders an "All projects" button', () => {
+    render(Titlebar, { props: { ...base } });
+    expect(screen.getByRole('button', { name: 'All projects' })).toBeTruthy();
+  });
+
+  it('fires ondashboard when the "All projects" button is clicked', async () => {
+    const ondashboard = vi.fn();
+    render(Titlebar, { props: { ...base, ondashboard } });
+    await fireEvent.click(screen.getByRole('button', { name: 'All projects' }));
+    expect(ondashboard).toHaveBeenCalledOnce();
+  });
 });

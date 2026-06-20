@@ -65,6 +65,15 @@ describe('Sidebar — no project', () => {
     setup();
     expect(screen.queryByLabelText('Recent projects')).toBeNull();
   });
+
+  it('shows the Import… button and fires onimport when provided', async () => {
+    const onimport = vi.fn();
+    setup({ onimport });
+    const btn = screen.getByRole('button', { name: 'Import…' });
+    expect(btn).toBeTruthy();
+    await fireEvent.click(btn);
+    expect(onimport).toHaveBeenCalledOnce();
+  });
 });
 
 describe('Sidebar — with a project', () => {

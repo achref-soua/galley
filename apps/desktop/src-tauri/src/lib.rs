@@ -924,14 +924,15 @@ fn import_analyze_archive(path: String) -> Result<ProjectAnalysisDto, String> {
 
 /// Materialise an archive at `path` as a new project directory.
 #[tauri::command]
-fn import_from_archive(
-    path: String,
-    parent: String,
-    name: String,
-) -> Result<ProjectDto, String> {
+fn import_from_archive(path: String, parent: String, name: String) -> Result<ProjectDto, String> {
     let entries = read_archive_entries(Path::new(&path))?;
     import_from_entries(Path::new(&parent), &name, entries, VERSION, &now_iso())
-        .map(|iw| ProjectDto::from_workspace(Workspace { root: iw.root, project: iw.project }))
+        .map(|iw| {
+            ProjectDto::from_workspace(Workspace {
+                root: iw.root,
+                project: iw.project,
+            })
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -954,11 +955,7 @@ fn import_analyze_folder(path: String) -> Result<ProjectAnalysisDto, String> {
 
 /// Copy an existing folder into a new Galley project directory.
 #[tauri::command]
-fn import_from_folder(
-    parent: String,
-    name: String,
-    src: String,
-) -> Result<ProjectDto, String> {
+fn import_from_folder(parent: String, name: String, src: String) -> Result<ProjectDto, String> {
     let store = SafeRoot::open(Path::new(&src)).map_err(|e| e.to_string())?;
     let files = store.list().map_err(|e| e.to_string())?;
     let entries: Vec<FileEntry> = files
@@ -971,7 +968,12 @@ fn import_from_folder(
         })
         .collect();
     import_from_entries(Path::new(&parent), &name, entries, VERSION, &now_iso())
-        .map(|iw| ProjectDto::from_workspace(Workspace { root: iw.root, project: iw.project }))
+        .map(|iw| {
+            ProjectDto::from_workspace(Workspace {
+                root: iw.root,
+                project: iw.project,
+            })
+        })
         .map_err(|e| e.to_string())
 }
 
