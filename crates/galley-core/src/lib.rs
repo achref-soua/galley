@@ -22,6 +22,7 @@ pub mod intel;
 pub mod manifest;
 pub mod math;
 pub mod project;
+pub mod sandbox;
 pub mod search;
 pub mod synctex;
 pub mod table;
@@ -66,6 +67,10 @@ pub use intel::{
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
 pub use math::{wrap_display, wrap_inline};
 pub use project::{project_name_from_path, Project};
+pub use sandbox::{
+    is_traversal_input, scan_input_paths, scan_shell_escape, scan_source, SandboxReport,
+    ShellEscapePolicy,
+};
 pub use search::{search_in_content, SearchMatch, SearchQuery};
 pub use synctex::{SyncTexBox, SyncTexLocation, SyncTexMapper};
 pub use table::{build_booktabs, build_tabular, Align};

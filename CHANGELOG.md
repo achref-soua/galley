@@ -4,6 +4,39 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-21
+
+Security hardening: compile sandbox finalised, shell-escape guarded, archive hardened, threat model documented.
+
+### Added
+
+- **`galley-core::sandbox` module** — pure, I/O-free `scan_source(source: &str) -> SandboxReport`
+  that reports shell-escape occurrences (`\write18`, `\immediate\write18`, `\ShellEscape`,
+  `\directlua`, `\luaexec`, `\input|`) and `\input`/`\include`/`\subfile` traversal paths.
+  100 % Rust region/line/function coverage including the empty-argument fast-path.
+- **`ShellEscapePolicy` enum** in `galley-core::sandbox` — `Off` | `PerProjectOptIn`. Threads the
+  shell-escape intent through the type system; `CompileRequest` carries it explicitly.
+- **`CompileRequest::shell_escape` field and `with_shell_escape` builder** — the type system now
+  makes the no-shell-escape guarantee visible rather than implicit. Default: `ShellEscapePolicy::Off`.
+- **`scan_document_source` Tauri command** — exposes the sandbox scanner to the frontend via a typed
+  `SandboxReportDto`; mapped without serde in `galley-core`.
+- **`ScanBackend` interface + adapters** (`apps/desktop/src/lib/scan-backend.ts`) —
+  `tauriScanBackend()` invokes the Tauri command; `browserScanBackend()` is a no-op stub;
+  `selectScanBackend()` picks the right one at runtime. 100 % Vitest covered (5 tests).
+- **ADR-0028** documenting seven security decisions: shell-escape always off, pre-compile scanner,
+  archive hardening, `CompileRequest` policy field, update signatures, supply chain, secrets.
+- **`docs/security/threat-model.md`** — full threat model with trust boundary diagram and eight
+  threat categories (T1–T8) including residual-risk ratings.
+- **`SECURITY.md`** — updated to document the complete v0.7.0 posture (compile sandbox, input
+  confinement, archive hardening, config execution prevention, secrets, update integrity, Tauri
+  capability surface, supply chain, and link to the threat model).
+
+### Changed
+
+- **`galley-import::archive::reject_traversal`** — hardened with three additional guards: null
+  bytes in entry paths, Unix absolute paths (`/`), and Windows absolute paths (`\`) / drive
+  letters (`C:`). All new cases surface as `ArchiveError::ZipSlip`. 100 % covered by two new tests.
+
 ## [0.6.4] - 2026-06-21
 
 Export & interop: PDF save, clean source ZIP, share bundle, Pandoc (HTML/Word/Markdown), and print.

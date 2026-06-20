@@ -31,3 +31,5 @@ codebase stays legible.
 | 0024 | Migration import: ZIP/tarball/folder ingestion pipeline                   | Accepted |
 | 0025 | Project organization: registry, window backend, and dashboard             | Accepted |
 | 0026 | Template gallery: curated starters and user-saved templates               | Accepted |
+| 0027 | Export formats and the ExportBackend seam                                 | Accepted |
+| 0028 | Security hardening: sandbox, shell-escape, archive, secrets, updater      | Accepted |

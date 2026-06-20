@@ -267,6 +267,17 @@ fn extract_from_archive<'a>(
 // ── Path-traversal guard ────────────────────────────────────────────────────
 
 fn reject_traversal(path: &str) -> Result<(), ArchiveError> {
+    // Null bytes can confuse C string handling in some extractors downstream.
+    if path.contains('\0') {
+        return Err(ArchiveError::ZipSlip(path.to_string()));
+    }
+    // Absolute paths (Unix `/…`, Windows `\…`, or drive letters `C:\…`/`C:/…`).
+    if path.starts_with('/') || path.starts_with('\\') {
+        return Err(ArchiveError::ZipSlip(path.to_string()));
+    }
+    if path.len() >= 2 && path.as_bytes()[1] == b':' {
+        return Err(ArchiveError::ZipSlip(path.to_string()));
+    }
     // Split on both forward and back-slash separators.
     for component in path.split('/').flat_map(|p| p.split('\\')) {
         if component == ".." {
@@ -964,5 +975,24 @@ mod tests {
         assert!(reject_traversal("../../etc/passwd").is_err());
         assert!(reject_traversal("sub/../secret").is_err());
         assert!(reject_traversal("..\\windows\\system32").is_err());
+    }
+
+    #[test]
+    fn reject_traversal_blocks_null_byte() {
+        // Null bytes in archive paths can confuse downstream C string handling.
+        assert!(reject_traversal("file\0.tex").is_err());
+        assert!(reject_traversal("\0hidden").is_err());
+    }
+
+    #[test]
+    fn reject_traversal_blocks_absolute_paths() {
+        // Unix absolute paths.
+        assert!(reject_traversal("/etc/passwd").is_err());
+        assert!(reject_traversal("/root/.ssh/id_rsa").is_err());
+        // Windows absolute paths (backslash).
+        assert!(reject_traversal("\\Windows\\System32\\cmd.exe").is_err());
+        // Windows drive letters.
+        assert!(reject_traversal("C:\\Users\\secret").is_err());
+        assert!(reject_traversal("c:/documents/file.tex").is_err());
     }
 }

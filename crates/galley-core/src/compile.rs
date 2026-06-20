@@ -9,6 +9,7 @@
 //! buildable, and how a result is shaped.
 
 use crate::document::{basename, classify, DocumentKind};
+use crate::sandbox::ShellEscapePolicy;
 use std::fmt;
 
 /// The TeX engine a build should be driven with.
@@ -65,17 +66,26 @@ pub struct CompileRequest {
     /// images — so a multi-file document renders fully. `None` compiles only the
     /// supplied source against the bundled packages, with no disk access.
     pub project_root: Option<String>,
+    /// Whether the TeX engine may execute OS commands through shell-escape.
+    ///
+    /// Defaults to [`ShellEscapePolicy::Off`], which is safe for all documents.
+    /// The engine adapter must honour this field; for embedded Tectonic
+    /// shell-escape is always off regardless of this setting (Tectonic does not
+    /// implement `\write18`). The field is meaningful for the future opt-in
+    /// system-latexmk fallback.
+    pub shell_escape: ShellEscapePolicy,
 }
 
 impl CompileRequest {
     /// Build a request for `root_document` using `engine`, with no project root
-    /// (the source compiles in isolation).
+    /// (the source compiles in isolation) and shell-escape disabled.
     #[must_use]
     pub fn new(root_document: impl Into<String>, engine: Engine) -> Self {
         Self {
             root_document: root_document.into(),
             engine,
             project_root: None,
+            shell_escape: ShellEscapePolicy::Off,
         }
     }
 
@@ -83,6 +93,16 @@ impl CompileRequest {
     #[must_use]
     pub fn with_project_root(mut self, root: impl Into<String>) -> Self {
         self.project_root = Some(root.into());
+        self
+    }
+
+    /// Override the shell-escape policy for this request.
+    ///
+    /// Should only be called with [`ShellEscapePolicy::PerProjectOptIn`] after
+    /// explicit user confirmation. The default is [`ShellEscapePolicy::Off`].
+    #[must_use]
+    pub fn with_shell_escape(mut self, policy: ShellEscapePolicy) -> Self {
+        self.shell_escape = policy;
         self
     }
 }
@@ -284,6 +304,19 @@ mod tests {
     }
 
     #[test]
+    fn shell_escape_defaults_to_off_and_can_be_overridden() {
+        use crate::sandbox::ShellEscapePolicy;
+        let default_req = CompileRequest::new("main.tex", Engine::Tectonic);
+        assert_eq!(default_req.shell_escape, ShellEscapePolicy::Off);
+
+        let opted_in = CompileRequest::new("main.tex", Engine::Tectonic)
+            .with_shell_escape(ShellEscapePolicy::PerProjectOptIn);
+        assert_eq!(opted_in.shell_escape, ShellEscapePolicy::PerProjectOptIn);
+        // Requests differ only in the shell-escape field.
+        assert_ne!(default_req, opted_in);
+    }
+
+    #[test]
     fn rejects_an_empty_root_document() {
         let request = CompileRequest::new("", Engine::Tectonic);
         assert_eq!(
@@ -368,6 +401,7 @@ mod tests {
         let request = CompileRequest::new("main.tex", Engine::Tectonic);
         assert_eq!(request.clone(), request);
         assert!(format!("{request:?}").contains("CompileRequest"));
+        assert!(format!("{request:?}").contains("shell_escape"));
 
         let plan = BuildPlan::from_request(&request).unwrap();
         assert_eq!(plan.clone(), plan);
