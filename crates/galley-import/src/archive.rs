@@ -11,8 +11,8 @@
 
 use flate2::read::GzDecoder;
 use galley_core::FileEntry;
-use std::io::{self, Read};
 use std::fmt;
+use std::io::{self, Read};
 use tar::Archive;
 use zip::ZipArchive;
 
@@ -34,7 +34,7 @@ impl Default for ArchiveLimits {
         Self {
             max_files: 2_000,
             max_file_bytes: 50 * 1024 * 1024,   // 50 MiB per file
-            max_total_bytes: 256 * 1024 * 1024,  // 256 MiB total
+            max_total_bytes: 256 * 1024 * 1024, // 256 MiB total
         }
     }
 }
@@ -111,10 +111,7 @@ impl std::error::Error for ArchiveError {
 ///
 /// Returns [`ArchiveError`] on any security violation, oversized content, or
 /// format error.
-pub fn extract_zip(
-    bytes: &[u8],
-    limits: ArchiveLimits,
-) -> Result<Vec<FileEntry>, ArchiveError> {
+pub fn extract_zip(bytes: &[u8], limits: ArchiveLimits) -> Result<Vec<FileEntry>, ArchiveError> {
     let cursor = io::Cursor::new(bytes);
     let mut archive =
         ZipArchive::new(cursor).map_err(|e| ArchiveError::BadArchive(e.to_string()))?;
@@ -130,9 +127,9 @@ pub fn extract_zip(
     for i in 0..file_count {
         // zip 2.4.2+ validates all local file headers during ZipArchive::new();
         // by_index on any valid index in an in-memory archive cannot fail.
-        let mut zf = archive
-            .by_index(i)
-            .expect("all local headers validated by ZipArchive::new; by_index on a valid index cannot fail");
+        let mut zf = archive.by_index(i).expect(
+            "all local headers validated by ZipArchive::new; by_index on a valid index cannot fail",
+        );
 
         // Reject symlinks.
         if zf.is_symlink() {
@@ -217,7 +214,9 @@ fn extract_from_archive<'a>(
         let entry_type = header.entry_type();
         if entry_type.is_symlink() || entry_type.is_hard_link() {
             // OsStr::from_bytes accepts any byte sequence on POSIX; never fails.
-            let raw = entry.path().expect("tar entry path is raw bytes on POSIX; never fails");
+            let raw = entry
+                .path()
+                .expect("tar entry path is raw bytes on POSIX; never fails");
             let path = raw.to_string_lossy().to_string();
             return Err(ArchiveError::Symlink(path));
         }
@@ -233,13 +232,17 @@ fn extract_from_archive<'a>(
         }
 
         // OsStr::from_bytes accepts any byte sequence on POSIX; never fails.
-        let raw_path = entry.path().expect("tar entry path is raw bytes on POSIX; never fails");
+        let raw_path = entry
+            .path()
+            .expect("tar entry path is raw bytes on POSIX; never fails");
         let name = raw_path.to_string_lossy().to_string();
         reject_traversal(&name)?;
 
         // The tar iterator validates the size field when creating the Entry; if
         // iteration succeeded, this call on the same raw bytes also succeeds.
-        let size = header.size().expect("size field already validated by tar iterator");
+        let size = header
+            .size()
+            .expect("size field already validated by tar iterator");
         if size > limits.max_file_bytes {
             return Err(ArchiveError::FileTooLarge {
                 path: name.clone(),
@@ -372,16 +375,16 @@ mod tests {
 
         // Local file header
         zip.extend_from_slice(&[0x50, 0x4b, 0x03, 0x04]); // signature
-        zip.extend_from_slice(&20u16.to_le_bytes());        // version needed
-        zip.extend_from_slice(&0u16.to_le_bytes());         // flags
-        zip.extend_from_slice(&8u16.to_le_bytes());         // compression = DEFLATE
-        zip.extend_from_slice(&0u16.to_le_bytes());         // mod time
-        zip.extend_from_slice(&0u16.to_le_bytes());         // mod date
-        zip.extend_from_slice(&0u32.to_le_bytes());         // CRC-32
+        zip.extend_from_slice(&20u16.to_le_bytes()); // version needed
+        zip.extend_from_slice(&0u16.to_le_bytes()); // flags
+        zip.extend_from_slice(&8u16.to_le_bytes()); // compression = DEFLATE
+        zip.extend_from_slice(&0u16.to_le_bytes()); // mod time
+        zip.extend_from_slice(&0u16.to_le_bytes()); // mod date
+        zip.extend_from_slice(&0u32.to_le_bytes()); // CRC-32
         zip.extend_from_slice(&compressed_len.to_le_bytes());
         zip.extend_from_slice(&uncompressed_len.to_le_bytes());
         zip.extend_from_slice(&fname_len.to_le_bytes());
-        zip.extend_from_slice(&0u16.to_le_bytes());         // extra length
+        zip.extend_from_slice(&0u16.to_le_bytes()); // extra length
         zip.extend_from_slice(filename);
         zip.extend_from_slice(bad_data);
 
@@ -391,31 +394,31 @@ mod tests {
         zip.extend_from_slice(&20u16.to_le_bytes());
         zip.extend_from_slice(&20u16.to_le_bytes());
         zip.extend_from_slice(&0u16.to_le_bytes());
-        zip.extend_from_slice(&8u16.to_le_bytes());         // compression = DEFLATE
+        zip.extend_from_slice(&8u16.to_le_bytes()); // compression = DEFLATE
         zip.extend_from_slice(&0u16.to_le_bytes());
         zip.extend_from_slice(&0u16.to_le_bytes());
-        zip.extend_from_slice(&0u32.to_le_bytes());         // CRC-32
+        zip.extend_from_slice(&0u32.to_le_bytes()); // CRC-32
         zip.extend_from_slice(&compressed_len.to_le_bytes());
         zip.extend_from_slice(&uncompressed_len.to_le_bytes());
         zip.extend_from_slice(&fname_len.to_le_bytes());
-        zip.extend_from_slice(&0u16.to_le_bytes());         // extra length
-        zip.extend_from_slice(&0u16.to_le_bytes());         // comment length
-        zip.extend_from_slice(&0u16.to_le_bytes());         // disk number start
-        zip.extend_from_slice(&0u16.to_le_bytes());         // internal attrs
-        zip.extend_from_slice(&0u32.to_le_bytes());         // external attrs
+        zip.extend_from_slice(&0u16.to_le_bytes()); // extra length
+        zip.extend_from_slice(&0u16.to_le_bytes()); // comment length
+        zip.extend_from_slice(&0u16.to_le_bytes()); // disk number start
+        zip.extend_from_slice(&0u16.to_le_bytes()); // internal attrs
+        zip.extend_from_slice(&0u32.to_le_bytes()); // external attrs
         zip.extend_from_slice(&lfh_offset.to_le_bytes());
         zip.extend_from_slice(filename);
 
         // End of central directory
         let cd_size = (zip.len() as u32) - cd_offset;
         zip.extend_from_slice(&[0x50, 0x4b, 0x05, 0x06]); // EOCD signature
-        zip.extend_from_slice(&0u16.to_le_bytes());         // disk number
-        zip.extend_from_slice(&0u16.to_le_bytes());         // disk with CD start
-        zip.extend_from_slice(&1u16.to_le_bytes());         // entries on this disk
-        zip.extend_from_slice(&1u16.to_le_bytes());         // total entries
+        zip.extend_from_slice(&0u16.to_le_bytes()); // disk number
+        zip.extend_from_slice(&0u16.to_le_bytes()); // disk with CD start
+        zip.extend_from_slice(&1u16.to_le_bytes()); // entries on this disk
+        zip.extend_from_slice(&1u16.to_le_bytes()); // total entries
         zip.extend_from_slice(&cd_size.to_le_bytes());
         zip.extend_from_slice(&cd_offset.to_le_bytes());
-        zip.extend_from_slice(&0u16.to_le_bytes());         // comment length
+        zip.extend_from_slice(&0u16.to_le_bytes()); // comment length
 
         zip
     }
@@ -472,7 +475,8 @@ mod tests {
         header.set_size(0);
         header.set_mode(0o755);
         header.set_cksum();
-        tar.append_data(&mut header, dir_name, &[] as &[u8]).unwrap();
+        tar.append_data(&mut header, dir_name, &[] as &[u8])
+            .unwrap();
         for (name, data) in entries {
             let mut h = tar::Header::new_gnu();
             h.set_size(data.len() as u64);
@@ -508,12 +512,12 @@ mod tests {
         block[100..107].copy_from_slice(b"0000644"); // mode
         block[108..115].copy_from_slice(b"0000000"); // uid
         block[116..123].copy_from_slice(b"0000000"); // gid
-        // Size field at bytes 124–135: fill with 'X', not a valid octal digit.
+                                                     // Size field at bytes 124–135: fill with 'X', not a valid octal digit.
         block[124..135].fill(b'X');
         block[135] = 0;
         block[136..147].copy_from_slice(b"00000000000"); // mtime
-        block[148..156].fill(b' ');  // checksum placeholder (spaces for sum)
-        block[156] = b'0';           // typeflag = regular file
+        block[148..156].fill(b' '); // checksum placeholder (spaces for sum)
+        block[156] = b'0'; // typeflag = regular file
         block[257..263].copy_from_slice(b"ustar\0");
         block[263..265].copy_from_slice(b"00");
         let sum: u32 = block.iter().map(|&b| b as u32).sum();
@@ -537,18 +541,28 @@ mod tests {
 
     impl FailAfterHeaderRead {
         fn new(data: Vec<u8>, fail_after: usize) -> Self {
-            Self { inner: io::Cursor::new(data), read_so_far: 0, fail_after }
+            Self {
+                inner: io::Cursor::new(data),
+                read_so_far: 0,
+                fail_after,
+            }
         }
     }
 
     impl io::Read for FailAfterHeaderRead {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
             if self.read_so_far >= self.fail_after {
-                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "injected failure"));
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "injected failure",
+                ));
             }
             let available = self.fail_after - self.read_so_far;
             let limit = buf.len().min(available);
-            let n = self.inner.read(&mut buf[..limit]).expect("Cursor<Vec<u8>> read never fails");
+            let n = self
+                .inner
+                .read(&mut buf[..limit])
+                .expect("Cursor<Vec<u8>> read never fails");
             self.read_so_far += n;
             Ok(n)
         }
@@ -635,10 +649,7 @@ mod tests {
 
     #[test]
     fn extract_zip_skips_directory_entries() {
-        let zip = make_zip_dir(
-            &[("sub/file.tex", b"hello")],
-            &["sub/"],
-        );
+        let zip = make_zip_dir(&[("sub/file.tex", b"hello")], &["sub/"]);
         let entries = extract_zip(&zip, ArchiveLimits::default()).unwrap();
         // Only the file, not the directory.
         assert!(entries.iter().all(|e| !e.path.ends_with('/')));
@@ -672,8 +683,10 @@ mod tests {
         let entries: Vec<(String, Vec<u8>)> = (0..5)
             .map(|i| (format!("f{i}.tex"), b"x".to_vec()))
             .collect();
-        let ref_entries: Vec<(&str, &[u8])> =
-            entries.iter().map(|(n, d)| (n.as_str(), d.as_slice())).collect();
+        let ref_entries: Vec<(&str, &[u8])> = entries
+            .iter()
+            .map(|(n, d)| (n.as_str(), d.as_slice()))
+            .collect();
         let zip = make_zip(&ref_entries);
         let limits = ArchiveLimits {
             max_files: 3,
@@ -830,8 +843,10 @@ mod tests {
         let entries: Vec<(String, Vec<u8>)> = (0..5)
             .map(|i| (format!("f{i}.tex"), b"x".to_vec()))
             .collect();
-        let ref_entries: Vec<(&str, &[u8])> =
-            entries.iter().map(|(n, d)| (n.as_str(), d.as_slice())).collect();
+        let ref_entries: Vec<(&str, &[u8])> = entries
+            .iter()
+            .map(|(n, d)| (n.as_str(), d.as_slice()))
+            .collect();
         let tar = make_tarball(&ref_entries);
         let limits = ArchiveLimits {
             max_files: 3,

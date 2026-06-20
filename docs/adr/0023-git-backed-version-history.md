@@ -16,12 +16,14 @@ Store version history as commits inside the project's own git repository, under 
 ### Design
 
 **Trait seam** (`galley-vcs::CheckpointHistory`) mirrors the `galley-compile::LatexEngine` pattern:
+
 - `InMemoryHistory` — always compiled, drives 100 % unit-test coverage at zero I/O cost.
 - `Git2History` — compiled only under `features = ["real-vcs"]`, backed by `libgit2` (the `git2` crate). Its tests are `#[ignore]`d (integration) and run via `just vcs-itest`.
 
 **Tauri commands** (`vcs_auto_checkpoint`, `vcs_create_snapshot`, `vcs_list_checkpoints`, `vcs_get_content`) expose the history to the frontend.
 
 **TypeScript layer** (`vcs.ts`, `vcs-backend.ts`, `HistoryPanel.svelte`):
+
 - `computeDiff` / `diffStats` — LCS-based pure diff identical in semantics to the Rust implementation in `galley-core::vcs`.
 - `VcsBackend` interface with `tauriVcsBackend()` (production) and `browserVcsBackend()` (tests, Playwright) selected at runtime via `selectVcsBackend()`.
 - `HistoryPanel.svelte` — sidebar panel showing the checkpoint timeline, a compact diff viewer (added/removed lines only, no context), revert button, and a named-snapshot form.
@@ -31,12 +33,14 @@ Store version history as commits inside the project's own git repository, under 
 ## Consequences
 
 **Good:**
+
 - Zero-dependency history for every project, stored portably inside the project folder.
 - Named snapshots let users mark important milestones (pre-submission, before major restructure).
 - The diff viewer gives instant visual feedback without opening an external diff tool.
 - The trait seam keeps the Rust workspace at 100 % line/region/function coverage without mocking I/O.
 
 **Trade-offs:**
+
 - `refs/galley/checkpoints` is a non-standard ref; external git tools show it only if the user explicitly fetches it. This is intentional isolation, not a bug.
 - `git2` adds ~3 MB to the Tauri binary (statically linked). Acceptable for the feature value.
 - The LCS diff is O(m×n) in the number of lines. Documents with thousands of lines will have perceptible diff latency in the panel; a future optimization can cap the diff at N lines or switch to a streaming approach.

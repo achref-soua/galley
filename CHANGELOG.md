@@ -4,6 +4,31 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-06-20
+
+Project organization: registry, multi-window backend, and dashboard.
+
+### Added
+
+- **`ProjectRegistry`** — localStorage-backed store for all known projects. Persists name, root
+  path, tags, and last-opened timestamp. Supports upsert, remove, full-text search, tag-based
+  filtering, `addTag` / `removeTag`, and returns projects sorted by recency. 100 % Vitest covered.
+- **`WindowBackend` interface** — injectable abstraction over `tauriWindowBackend` (opens a new
+  Tauri window) and `browserWindowBackend` (no-op for tests). `selectWindowBackend()` picks the
+  correct implementation at runtime. 100 % Vitest covered including the Tauri branch.
+- **`ProjectDashboard.svelte`** — full-screen overlay showing all registered projects as cards with
+  name, last-opened date, root path, and per-card tag chips. Supports live search, tag-filter pills,
+  tag add/remove inline, open/remove actions, and header buttons (New project…, Import…, New
+  window). Reactive via `generation` counter pattern. 100 % Vitest covered (32 tests).
+- **`App.svelte` wiring** — command palette action "All Projects" toggles the dashboard; opening a
+  project registers it in the registry; dashboard callbacks dispatch to existing open/new/import
+  flows. Sidebar gains an optional `onimport` prop to surface the Import… entry.
+
+### Fixed
+
+- Bumped `galley-desktop` crate version (`apps/desktop/src-tauri/Cargo.toml`) from 0.6.0 to 0.6.2
+  (the 0.6.1 release had inadvertently left this file at 0.6.0).
+
 ## [0.6.1] - 2026-06-20
 
 Project import wizard: ZIP, tarball, and folder ingestion.
