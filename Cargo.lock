@@ -900,14 +900,14 @@ dependencies = [
 
 [[package]]
 name = "galley-ai"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "galley-core",
 ]
 
 [[package]]
 name = "galley-compile"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "galley-core",
  "tectonic",
@@ -916,14 +916,14 @@ dependencies = [
 
 [[package]]
 name = "galley-core"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "regex",
 ]
 
 [[package]]
 name = "galley-import"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "flate2",
  "galley-core",
@@ -935,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "galley-intel"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "flate2",
  "galley-core",
@@ -945,14 +945,14 @@ dependencies = [
 
 [[package]]
 name = "galley-security"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "galley-vcs"
-version = "0.6.3"
+version = "0.7.0"
 dependencies = [
  "galley-core",
  "git2",

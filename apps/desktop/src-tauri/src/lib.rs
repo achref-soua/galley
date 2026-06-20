@@ -18,9 +18,9 @@ use galley_core::ai::LlmProvider;
 use galley_core::diagnostics::{parse_log, Diagnostic};
 use galley_core::search::{search_in_content, SearchQuery};
 use galley_core::{
-    analyze_project, arxiv_atom_to_entry, parse_bib, BibEntry, CompileRequest, CompletionItem,
-    DocumentKind, DocumentSymbol, Engine, FileEntry, LanguageIntelligence, Location, Position,
-    SyncTexMapper, TextDocument, VERSION,
+    analyze_project, arxiv_atom_to_entry, parse_bib, scan_source, BibEntry, CompileRequest,
+    CompletionItem, DocumentKind, DocumentSymbol, Engine, FileEntry, LanguageIntelligence,
+    Location, Position, ShellEscapePolicy, SyncTexMapper, TextDocument, VERSION,
 };
 use galley_import::{
     create_project as import_create, export_clean_bundle, export_share_bundle, extract_tarball,
@@ -190,8 +190,9 @@ fn compile_document(
     root_document: String,
     project_root: String,
 ) -> CompileDto {
-    let request =
-        CompileRequest::new(root_document, Engine::Tectonic).with_project_root(project_root);
+    let request = CompileRequest::new(root_document, Engine::Tectonic)
+        .with_project_root(project_root)
+        .with_shell_escape(ShellEscapePolicy::Off);
     let mut compiler = compiler_state
         .0
         .lock()
@@ -1108,6 +1109,27 @@ fn vcs_get_content(project_root: String, checkpoint_id: String) -> Option<String
         .and_then(|h| h.get_content(&checkpoint_id))
 }
 
+/// A sandbox report as sent to the UI.
+#[derive(Serialize)]
+struct SandboxReportDto {
+    shell_escape: Vec<String>,
+    traversal_inputs: Vec<String>,
+}
+
+/// Scan `source` for shell-escape and `\input` path traversal patterns.
+///
+/// Returns a report the UI can display as a pre-compile warning. Findings do
+/// not block compilation — the embedded Tectonic engine already disables
+/// shell-escape — but they surface suspicious constructs to the author.
+#[tauri::command]
+fn scan_document_source(source: String) -> SandboxReportDto {
+    let report = scan_source(&source);
+    SandboxReportDto {
+        shell_escape: report.shell_escape,
+        traversal_inputs: report.traversal_inputs,
+    }
+}
+
 /// Build and run the Galley desktop application.
 pub fn run() {
     tauri::Builder::default()
@@ -1158,7 +1180,8 @@ pub fn run() {
             export_bundle_to,
             export_pdf_to,
             export_pandoc,
-            export_share_bundle_to
+            export_share_bundle_to,
+            scan_document_source
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");
