@@ -9,7 +9,9 @@
   import { selectLanguageBackend, type LanguageBackend } from './lib/language-backend';
   import { mergeDiagnostics } from './lib/diagnostics';
   import { RecentProjectsStore } from './lib/recent-projects';
-  import { CompilePrefsStore, PreviewPrefsStore } from './lib/settings-store';
+  import { CompilePrefsStore, PreviewPrefsStore, PrivacyPrefsStore } from './lib/settings-store';
+  import { buildFeedbackUrl } from './lib/feedback';
+  import appPackage from '../package.json';
   import { EditorPrefsStore, type EditorPrefs, type KeymapMode } from './lib/keymap-prefs';
   import { type SpellChecker, buildSpellChecker } from './lib/spell-check';
   import {
@@ -144,6 +146,8 @@
   const prefsStore = new CompilePrefsStore(window.localStorage);
   const previewPrefsStore = new PreviewPrefsStore(window.localStorage);
   const editorPrefsStore = new EditorPrefsStore(window.localStorage);
+  const privacyStore = new PrivacyPrefsStore(window.localStorage);
+  const appVersion = appPackage.version;
   const backend = selectBackend();
   // The injected timer/clock/bell are construction-time configuration, not
   // reactive inputs, so read their initial values untracked.
@@ -182,6 +186,7 @@
   let compilePrefs = $state(prefsStore.prefs);
   let previewPrefs = $state(previewPrefsStore.prefs);
   let editorPrefs = $state<EditorPrefs>(editorPrefsStore.prefs);
+  let privacyPrefs = $state(privacyStore.prefs);
   let spellChecker = $state<SpellChecker | null>(null);
   let revealTarget = $state<RevealRequest | null>(null);
   let editorScrollFraction = $state<number | undefined>(undefined);
@@ -465,6 +470,16 @@
 
   function changeSpellCheck(enabled: boolean) {
     editorPrefsStore.setSpellCheck(enabled);
+  }
+
+  function changeCrashReports(enabled: boolean) {
+    privacyStore.setCrashReports(enabled);
+    privacyPrefs = privacyStore.prefs;
+  }
+
+  function openFeedback() {
+    const url = buildFeedbackUrl({ version: appVersion, os: navigator.userAgent });
+    window.open(url, '_blank', 'noopener');
   }
 
   async function handleSave() {
@@ -862,6 +877,8 @@
       keymapMode={editorPrefs.keymapMode}
       spellCheck={editorPrefs.spellCheck}
       syncScroll={previewPrefs.syncScroll}
+      crashReports={privacyPrefs.crashReports}
+      {appVersion}
       {aiBackend}
       projectRoot={project.project?.root ?? ''}
       onthemechange={changeTheme}
@@ -870,6 +887,8 @@
       onkeymapchange={changeKeymapMode}
       onspellcheckchange={changeSpellCheck}
       onsyncscrollchange={changeSyncScroll}
+      oncrashreportschange={changeCrashReports}
+      onfeedback={openFeedback}
       onclose={() => (settingsOpen = false)}
     />
   {/if}

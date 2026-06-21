@@ -4,6 +4,30 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-21
+
+Beta: feature freeze plus opt-in, privacy-respecting crash reporting, a feedback channel, and a
+privacy notice. Installers go to the cohort on all three OSes.
+
+### Added
+
+- **Opt-in crash reporting** — off by default. A `PrivacyPrefsStore` persists the consent flag and
+  `crash-report.ts` builds an anonymised report (`buildCrashReport` returns `null` without consent;
+  with consent it strips absolute paths/URLs from the stack and never includes document content).
+  No telemetry endpoint ships — sending is deferred to post-beta (§8.4); the consent model lands
+  first. Toggle in **Settings → About**. 100 % covered.
+- **Feedback channel** — `feedback.ts` builds a pre-filled GitHub issue URL stamped with the
+  version and OS; **Settings → About → Send feedback…** opens it for the user to submit. 100 %
+  covered.
+- **`docs/privacy.md`** — the full privacy notice (local-first, opt-in network features, the crash
+  reporting and feedback model). **ADR-0032**.
+- The **About** panel now shows the version (single-sourced from `package.json`).
+
+### Changed
+
+- **Feature freeze** for the beta line — subsequent work is stabilisation toward the v0.9.0
+  release candidate.
+
 ## [0.7.3] - 2026-06-21
 
 Packaging, app identity & installers: native installers for every OS, file associations, a

@@ -11,6 +11,8 @@ const base = {
   keymapMode: 'default' as const,
   spellCheck: false,
   syncScroll: false,
+  crashReports: false,
+  appVersion: '0.8.0',
   aiBackend: browserAiBackend(),
   onthemechange: () => {},
   onautocompilechange: () => {},
@@ -18,6 +20,8 @@ const base = {
   onkeymapchange: () => {},
   onspellcheckchange: () => {},
   onsyncscrollchange: () => {},
+  oncrashreportschange: () => {},
+  onfeedback: () => {},
   onclose: () => {}
 };
 
@@ -54,6 +58,20 @@ describe('Settings', () => {
     expect(screen.getByText(/local-first LaTeX studio/)).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Appearance' }));
     expect(screen.getByText('Theme')).toBeTruthy();
+  });
+
+  it('shows the version and wires crash reporting and feedback in About', async () => {
+    const oncrashreportschange = vi.fn();
+    const onfeedback = vi.fn();
+    render(Settings, { props: { ...base, appVersion: '1.2.3', oncrashreportschange, onfeedback } });
+    await fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    expect(screen.getByText('1.2.3')).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole('switch', { name: 'Send anonymous crash reports' }));
+    expect(oncrashreportschange).toHaveBeenCalledWith(true);
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Send feedback…' }));
+    expect(onfeedback).toHaveBeenCalledTimes(1);
   });
 
   it('reflects and toggles the compilation preferences', async () => {
