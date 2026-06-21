@@ -181,10 +181,12 @@ export class CompilePrefsStore {
 export interface PrivacyPrefs {
   /** Send anonymised crash reports. Off by default — opt-in only (§8.4). */
   crashReports: boolean;
+  /** Check GitHub for a newer release on launch and offer it. On by default. */
+  updateChecks: boolean;
 }
 
-/** The shipped defaults: nothing leaves the machine. */
-export const DEFAULT_PRIVACY_PREFS: PrivacyPrefs = { crashReports: false };
+/** The shipped defaults: no crash reports; update checks on so users hear about fixes. */
+export const DEFAULT_PRIVACY_PREFS: PrivacyPrefs = { crashReports: false, updateChecks: true };
 
 /** Storage key for the persisted privacy preferences. */
 export const PRIVACY_PREFS_STORAGE_KEY = 'galley:privacy-prefs';
@@ -204,7 +206,10 @@ export function parsePrivacyPrefs(raw: string | null): PrivacyPrefs {
     return { ...DEFAULT_PRIVACY_PREFS };
   }
   const record = data as Record<string, unknown>;
-  return { crashReports: readBool(record.crashReports, DEFAULT_PRIVACY_PREFS.crashReports) };
+  return {
+    crashReports: readBool(record.crashReports, DEFAULT_PRIVACY_PREFS.crashReports),
+    updateChecks: readBool(record.updateChecks, DEFAULT_PRIVACY_PREFS.updateChecks)
+  };
 }
 
 /** Serialize privacy preferences for storage. */
@@ -239,6 +244,11 @@ export class PrivacyPrefsStore {
   /** Enable or disable anonymised crash reporting. */
   setCrashReports(crashReports: boolean): void {
     this.#commit({ ...this.#prefs, crashReports });
+  }
+
+  /** Enable or disable launch-time update checks. */
+  setUpdateChecks(updateChecks: boolean): void {
+    this.#commit({ ...this.#prefs, updateChecks });
   }
 
   /** Subscribe to preference changes; returns an unsubscribe function. */

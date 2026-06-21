@@ -4,6 +4,32 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-06-21
+
+One-command install, in-app update detection, and uninstall — a Helio-style terminal experience
+with the struck **GALLEY** wordmark.
+
+### Added
+
+- **One-command install** (`scripts/install/install.sh`, `install.ps1`) — `curl … | sh` /
+  `irm … | iex` downloads the right native build, verifies its SHA-256, installs a `galley`
+  launcher, and registers the menu icon. Prints the brand wordmark on a red ribbon platen baseline,
+  with the version shown on install, update, and uninstall.
+- **`galley` launcher** with subcommands: `galley` (launch), `galley version`, `galley update`
+  (re-runs the installer for the latest), and `galley uninstall` (removes Galley, leaves projects).
+- **In-app update detection** — on launch (toggle in **Settings → About**, on by default) the app
+  asks the Rust shell (`check_latest_release`, which queries GitHub) for the latest version and, if
+  newer, shows a dismissible banner offering the update. `update-backend.ts` + `update-check.ts`
+  (`tagToVersion`, `isUpdateAvailable`) are 100 % covered; the egress stays in the core process so
+  the webview CSP is never relaxed.
+- **`PrivacyPrefs.updateChecks`** (on by default) controls the launch-time check.
+- **ADR-0034**, `docs/install.md`. The version is shown in the app (Settings → About) and in the
+  terminal across install / update / delete.
+
+### Changed
+
+- **README quickstart** leads with the one-line install.
+
 ## [0.9.1] - 2026-06-21
 
 Media & QA: generated screenshots and a demo recording, a real-user QA pass, and a first-run fix.

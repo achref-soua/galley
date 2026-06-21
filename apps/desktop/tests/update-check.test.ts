@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { parseVersion, compareVersions, isUpdateAvailable } from '../src/lib/update-check';
+import {
+  parseVersion,
+  compareVersions,
+  isUpdateAvailable,
+  tagToVersion
+} from '../src/lib/update-check';
+
+describe('update-check — tagToVersion', () => {
+  it('strips a leading v when present', () => {
+    expect(tagToVersion('v0.9.2')).toBe('0.9.2');
+    expect(tagToVersion('0.9.2')).toBe('0.9.2');
+  });
+});
 
 describe('update-check — parseVersion', () => {
   it('parses a well-formed version', () => {

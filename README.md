@@ -38,6 +38,28 @@ a monospace impression struck into warm paper, restrained and tactile.
 > performance budgets; four accessible themes with i18n and onboarding; opt-in crash reporting; and
 > native installers for Windows, macOS, and Linux. A full QA pass and v1.0.0 follow.
 
+## Install
+
+One command — it downloads the right native build, verifies its checksum, installs a `galley`
+launcher, and adds the menu icon:
+
+```sh
+# Linux / macOS
+curl -fsSL https://github.com/achref-soua/galley/releases/latest/download/install.sh | sh
+```
+
+```powershell
+# Windows
+irm https://github.com/achref-soua/galley/releases/latest/download/install.ps1 | iex
+```
+
+<img src="docs/assets/install.png" alt="Galley installer — the struck GALLEY wordmark and install steps" width="620">
+
+Then `galley` launches it, **`galley update`** upgrades to the latest, `galley version` prints the
+installed version, and **`galley uninstall`** removes it (your projects are untouched). Galley also
+checks for updates on launch and offers them in-app (toggle in Settings → About). Full details in
+[`docs/install.md`](docs/install.md).
+
 ## A look around
 
 |                                                |                                                       |
@@ -196,21 +218,22 @@ just package                 # build the native installer for your OS
 The quality gate is **manual** for now (GitHub Actions is present but dormant). Run it
 before every change:
 
-| Command            | What it does                                                     |
-| ------------------ | ---------------------------------------------------------------- |
-| `just ci`          | The full gate: format → lint → coverage → audit → docs → build   |
-| `just fmt`         | Auto-format Rust and web sources                                 |
-| `just test`        | Run all tests                                                    |
-| `just cover`       | Coverage gate — **fails below 100%** (line/branch)               |
-| `just lint`        | clippy (deny warnings) + eslint                                  |
-| `just build`       | Build all crates and the frontend bundle                         |
-| `just icons`       | Regenerate the app icon set from the brand master                |
-| `just prewarm`     | Warm the Tectonic package cache so compiles work offline         |
-| `just e2e`         | Playwright end-to-end smoke tests (needs a browser)              |
-| `just package`     | Build every native installer for the current OS                  |
-| `just checksums`   | Write `SHA256SUMS.txt` for the built installers                  |
-| `just screenshots` | Regenerate the README screenshots into `docs/assets/`            |
-| `just demo`        | Record the demo walkthrough (`.webm`; `.mp4`/`.gif` need ffmpeg) |
+| Command             | What it does                                                     |
+| ------------------- | ---------------------------------------------------------------- |
+| `just ci`           | The full gate: format → lint → coverage → audit → docs → build   |
+| `just fmt`          | Auto-format Rust and web sources                                 |
+| `just test`         | Run all tests                                                    |
+| `just cover`        | Coverage gate — **fails below 100%** (line/branch)               |
+| `just lint`         | clippy (deny warnings) + eslint                                  |
+| `just build`        | Build all crates and the frontend bundle                         |
+| `just icons`        | Regenerate the app icon set from the brand master                |
+| `just prewarm`      | Warm the Tectonic package cache so compiles work offline         |
+| `just e2e`          | Playwright end-to-end smoke tests (needs a browser)              |
+| `just package`      | Build every native installer for the current OS                  |
+| `just checksums`    | Write `SHA256SUMS.txt` for the built installers                  |
+| `just screenshots`  | Regenerate the README screenshots into `docs/assets/`            |
+| `just demo`         | Record the demo walkthrough (`.webm`; `.mp4`/`.gif` need ffmpeg) |
+| `just install-shot` | Render the installer terminal screenshot from the real script    |
 
 Galley installs natively on Windows, macOS, and Linux — each `just package` builds that OS's
 full installer set (Linux `.AppImage`/`.deb`/`.rpm`, Windows `.msi`/NSIS `.exe`, macOS
