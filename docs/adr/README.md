@@ -37,3 +37,4 @@ codebase stays legible.
 | 0030 | Accessibility, i18n, themes & onboarding: HC themes, i18n, first-run tour   | Accepted |
 | 0031 | Packaging, app identity & installers: per-OS bundles, associations, updater | Accepted |
 | 0032 | Beta: opt-in crash reporting, feedback channel, privacy notice              | Accepted |
+| 0033 | Release candidate: docs completeness and performance/security sign-off      | Accepted |

@@ -4,6 +4,27 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-21
+
+Release candidate: complete documentation and a recorded performance & security sign-off. No new
+product surface — stabilisation toward v1.0.0.
+
+### Added
+
+- **`docs/user-guide.md`** — a complete walkthrough of every feature: editing/compile, errors,
+  language intelligence, structure/navigation, math/tables/figures, bibliography, the visual
+  editor, AI assistant & agents, version history, import/export, templates, appearance, and privacy.
+- **`docs/migration.md`** — importing from a folder, Overleaf (`.zip`/git URL), or arXiv, and the
+  clean round-trip back out.
+- **`docs/release-readiness.md`** — the RC sign-off: what is verified (quality gate, security,
+  bundle budget) and what is pending real hardware or a non-Linux build (runtime perf numbers,
+  Windows/macOS installers), plus the criteria for v1.0.0.
+- **ADR-0033**.
+
+### Changed
+
+- **README** marks the status as release candidate and links the new guides.
+
 ## [0.8.0] - 2026-06-21
 
 Beta: feature freeze plus opt-in, privacy-respecting crash reporting, a feedback channel, and a
