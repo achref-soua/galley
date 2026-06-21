@@ -35,6 +35,7 @@ const baseProps = () => ({
   registry: makeRegistry(),
   windowBackend: makeWindowBackend(),
   onopen: vi.fn(),
+  onopenfolder: vi.fn(),
   onopennewwindow: vi.fn(),
   onnew: vi.fn(),
   ontemplate: vi.fn(),
@@ -68,6 +69,13 @@ describe('ProjectDashboard empty state', () => {
     const { getByText } = render(ProjectDashboard, { props: { ...baseProps(), ontemplate } });
     await fireEvent.click(getByText('From template…'));
     expect(ontemplate).toHaveBeenCalledOnce();
+  });
+
+  it('calls onopenfolder when Open a folder… is clicked', async () => {
+    const onopenfolder = vi.fn();
+    const { getByText } = render(ProjectDashboard, { props: { ...baseProps(), onopenfolder } });
+    await fireEvent.click(getByText('Open a folder…'));
+    expect(onopenfolder).toHaveBeenCalledOnce();
   });
 });
 

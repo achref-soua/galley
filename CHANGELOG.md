@@ -4,6 +4,27 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-06-21
+
+Media & QA: generated screenshots and a demo recording, a real-user QA pass, and a first-run fix.
+
+### Added
+
+- **Generated marketing media** — `just screenshots` captures the launcher, first-run tour, the
+  Onionskin/Carbon/Carbon-High-Contrast editor, and Settings into `docs/assets/`; `just demo`
+  records a walkthrough (`docs/assets/galley-demo.webm`; `.mp4`/`.gif` when a system ffmpeg is
+  present, via Playwright's bundled recorder). README hero, gallery, and demo link wired in.
+
+### Fixed
+
+- **First-run users can open an existing folder from the launcher.** The project dashboard offered
+  New project / template / import / recents but no "Open a folder…" — that action lived only in the
+  sidebar, behind the launcher overlay, so a first-time user with no recents was stuck. Added it to
+  the dashboard, sharing one handler with the sidebar. _(Found in the real-user QA pass.)_
+- **Refreshed the e2e smoke suite** — it predated the project launcher and the onboarding tour;
+  flows now route through the launcher, with a dedicated first-run-tour test and disambiguated
+  high-contrast theme controls. 10/10 e2e green.
+
 ## [0.9.0] - 2026-06-21
 
 Release candidate: complete documentation and a recorded performance & security sign-off. No new

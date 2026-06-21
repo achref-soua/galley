@@ -7,8 +7,14 @@
     <img src="https://img.shields.io/badge/license-MIT-A8362B" alt="License: MIT" />
     <img src="https://img.shields.io/badge/coverage-100%25-1C1A17" alt="Coverage: 100%" />
     <img src="https://img.shields.io/badge/CI-manual%20(just%20ci)-4A443B" alt="CI: manual" />
-    <img src="https://img.shields.io/badge/status-early%20development-9A8E7E" alt="Status: early development" />
+    <img src="https://img.shields.io/badge/status-release%20candidate-9A8E7E" alt="Status: release candidate" />
   </p>
+
+  <p>
+    <img src="docs/assets/editor-onionskin.png" alt="The Galley editor" width="900" />
+  </p>
+
+  <p><em>▶ Watch the <a href="docs/assets/galley-demo.webm">demo walkthrough</a>.</em></p>
 </div>
 
 ---
@@ -22,14 +28,27 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — release candidate.** This is `v0.9.0`: the **release candidate**, with complete
-> documentation and a recorded performance & security sign-off.
+> **Status — release candidate.** This is `v0.9.1`: the **release candidate** with generated
+> screenshots and a demo recording, complete documentation, and a recorded performance & security
+> sign-off.
 > The full product is in place — the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js**
 > core; structured diagnostics and TexLab language intelligence; the dual code/visual editor; math,
 > tables, assets, and bibliography; the provider-agnostic AI assistant and agents; git-backed
 > version history; Overleaf/arXiv import and clean export; a template gallery; security hardening;
 > performance budgets; four accessible themes with i18n and onboarding; opt-in crash reporting; and
 > native installers for Windows, macOS, and Linux. A full QA pass and v1.0.0 follow.
+
+## A look around
+
+|                                                |                                                       |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| ![Project launcher](docs/assets/dashboard.png) | ![First-run tour](docs/assets/onboarding.png)         |
+| ![Carbon theme](docs/assets/editor-carbon.png) | ![High-contrast](docs/assets/editor-carbon-hc.png)    |
+| ![Settings](docs/assets/settings.png)          | ![Onionskin editor](docs/assets/editor-onionskin.png) |
+
+> Screenshots are generated from the live UI with `just screenshots`, and the demo with
+> `just demo`, so they never go stale. (The web preview shows a placeholder proof; the packaged
+> app renders the real compiled PDF.)
 
 ## Editing & compiling
 
@@ -177,19 +196,21 @@ just package                 # build the native installer for your OS
 The quality gate is **manual** for now (GitHub Actions is present but dormant). Run it
 before every change:
 
-| Command          | What it does                                                   |
-| ---------------- | -------------------------------------------------------------- |
-| `just ci`        | The full gate: format → lint → coverage → audit → docs → build |
-| `just fmt`       | Auto-format Rust and web sources                               |
-| `just test`      | Run all tests                                                  |
-| `just cover`     | Coverage gate — **fails below 100%** (line/branch)             |
-| `just lint`      | clippy (deny warnings) + eslint                                |
-| `just build`     | Build all crates and the frontend bundle                       |
-| `just icons`     | Regenerate the app icon set from the brand master              |
-| `just prewarm`   | Warm the Tectonic package cache so compiles work offline       |
-| `just e2e`       | Playwright end-to-end smoke tests (needs a browser)            |
-| `just package`   | Build every native installer for the current OS                |
-| `just checksums` | Write `SHA256SUMS.txt` for the built installers                |
+| Command            | What it does                                                     |
+| ------------------ | ---------------------------------------------------------------- |
+| `just ci`          | The full gate: format → lint → coverage → audit → docs → build   |
+| `just fmt`         | Auto-format Rust and web sources                                 |
+| `just test`        | Run all tests                                                    |
+| `just cover`       | Coverage gate — **fails below 100%** (line/branch)               |
+| `just lint`        | clippy (deny warnings) + eslint                                  |
+| `just build`       | Build all crates and the frontend bundle                         |
+| `just icons`       | Regenerate the app icon set from the brand master                |
+| `just prewarm`     | Warm the Tectonic package cache so compiles work offline         |
+| `just e2e`         | Playwright end-to-end smoke tests (needs a browser)              |
+| `just package`     | Build every native installer for the current OS                  |
+| `just checksums`   | Write `SHA256SUMS.txt` for the built installers                  |
+| `just screenshots` | Regenerate the README screenshots into `docs/assets/`            |
+| `just demo`        | Record the demo walkthrough (`.webm`; `.mp4`/`.gif` need ffmpeg) |
 
 Galley installs natively on Windows, macOS, and Linux — each `just package` builds that OS's
 full installer set (Linux `.AppImage`/`.deb`/`.rpm`, Windows `.msi`/NSIS `.exe`, macOS

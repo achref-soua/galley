@@ -63,6 +63,14 @@ package:
 e2e:
     pnpm --filter @galley/desktop test:e2e
 
+# Regenerate the marketing screenshots into docs/assets/ (needs a Playwright browser).
+screenshots:
+    cd apps/desktop && pnpm exec playwright test --config playwright.screenshots.config.ts capture.spec.ts
+
+# Record the demo walkthrough → docs/assets/galley-demo.{webm,mp4,gif}.
+demo:
+    bash scripts/media/demo.sh
+
 # Pre-warm the Tectonic package cache so the first real compile needs no network.
 # Run once on a machine with connectivity; afterwards compiles work fully offline.
 prewarm:

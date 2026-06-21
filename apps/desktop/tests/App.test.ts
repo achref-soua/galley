@@ -170,7 +170,9 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
   async function openDemoFolder() {
     renderApp();
     expect(screen.getByText('No document')).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    // The launcher dashboard is on top at first render; open the demo from it.
+    const dashboard = screen.getByRole('region', { name: 'Project dashboard' });
+    await fireEvent.click(within(dashboard).getByRole('button', { name: 'Open a folder…' }));
     // The demo project opens with its root document showing.
     await screen.findByLabelText('Source');
     return screen.getByLabelText('Source') as HTMLTextAreaElement;
@@ -598,7 +600,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         assetBackend: fakeAssets
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     await waitFor(() => expect(screen.getByText('figure.png')).toBeTruthy());
     await fireEvent.click(screen.getByText('figure.png'));
@@ -649,7 +655,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         bell
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     expect(citationsCalled).toBe(true);
 
@@ -785,7 +795,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         assetBackend: fakeAssets
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
 
     const editorArea = document.querySelector('.editor-area')!;
@@ -844,7 +858,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
         bell
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     await waitFor(() => expect(captured).toBeDefined());
 
@@ -882,7 +900,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
       return { getValue: () => input.value };
     };
     renderApp({ mathFieldSetup: fakeMathSetup });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     const textarea = (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
     await fireEvent.click(screen.getByTitle('Insert equation'));
     expect(screen.getByRole('dialog', { name: 'Equation editor' })).toBeTruthy();
@@ -893,7 +915,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
 
   it('insertTable inserts a tabular block at the cursor via the table builder', async () => {
     renderApp();
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     const textarea = (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
     await fireEvent.click(screen.getByTitle('Insert table'));
     expect(screen.getByRole('dialog', { name: 'Table builder' })).toBeTruthy();
@@ -993,7 +1019,11 @@ describe('App — SyncTeX forward and inverse search', () => {
         synctex: fakeSynctex
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
 
     // Ctrl+Enter fires forward search. No project file → activePath is set.
@@ -1048,7 +1078,11 @@ describe('App — SyncTeX forward and inverse search', () => {
         synctex: fakeSynctex
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     await fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
     await waitFor(() => expect(forwardCalled).toBe(true));
@@ -1109,7 +1143,11 @@ describe('App — SyncTeX forward and inverse search', () => {
       }
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
     const canvas = await screen.findByLabelText('Proof');
@@ -1174,7 +1212,11 @@ describe('App — SyncTeX forward and inverse search', () => {
       }
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     await fireEvent.click(screen.getByRole('button', { name: 'Compile' }));
     const canvas = await screen.findByLabelText('Proof');
@@ -1218,7 +1260,11 @@ describe('App — layout, drag/drop, and review handlers', () => {
         bell
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     return (await screen.findByLabelText('Source')) as HTMLTextAreaElement;
   }
 
@@ -1383,7 +1429,11 @@ describe('App — layout, drag/drop, and review handlers', () => {
         aiBackend
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     // Open the AI chat panel — now project.project.root is defined
     await fireEvent.click(screen.getByRole('button', { name: 'Open assistant' }));
@@ -1416,7 +1466,11 @@ describe('App — layout, drag/drop, and review handlers', () => {
         agentAutonomous: true
       }
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await screen.findByLabelText('Source');
     // Open the agent orchestrator panel via the command palette
     await fireEvent.keyDown(window, { key: 'p', ctrlKey: true, shiftKey: true });
@@ -1466,7 +1520,11 @@ describe('App — layout, drag/drop, and review handlers', () => {
           vcsBackend
         }
       });
-      await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+      await fireEvent.click(
+        within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+          name: 'Open a folder…'
+        })
+      );
       return screen.findByLabelText('Source') as Promise<HTMLTextAreaElement>;
     }
 
@@ -1590,7 +1648,11 @@ describe('App — project dashboard', () => {
   it('hides the dashboard when a project opens via Open a folder…', async () => {
     render(App, { props: { editor: fakeEditorFactory() } });
     expect(screen.getByRole('region', { name: 'Project dashboard' })).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
     );
@@ -1607,7 +1669,11 @@ describe('App — project dashboard', () => {
     const { ProjectRegistry } = await import('../src/lib/project-registry');
     const registry = new ProjectRegistry(storage as unknown as Storage);
     render(App, { props: { editor: fakeEditorFactory(), projectRegistry: registry } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await waitFor(() => expect(registry.all().length).toBeGreaterThan(0));
     expect(registry.all()[0].name).toBe('galley-project');
   });
@@ -1615,7 +1681,11 @@ describe('App — project dashboard', () => {
   it('toggles the dashboard with the "All projects" titlebar button when a project is open', async () => {
     render(App, { props: { editor: fakeEditorFactory() } });
     // Open a project to close the dashboard.
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
     );
@@ -1631,7 +1701,11 @@ describe('App — project dashboard', () => {
 
   it('shows a close button for the dashboard when a project is open', async () => {
     render(App, { props: { editor: fakeEditorFactory() } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Open a folder…' }));
+    await fireEvent.click(
+      within(screen.getByRole('region', { name: 'Project dashboard' })).getByRole('button', {
+        name: 'Open a folder…'
+      })
+    );
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Project dashboard' })).toBeNull()
     );
