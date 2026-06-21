@@ -40,3 +40,4 @@ codebase stays legible.
 | 0033 | Release candidate: docs completeness and performance/security sign-off      | Accepted |
 | 0034 | One-command install, in-app update detection, and uninstall                 | Accepted |
 | 0035 | Bug sweep: PDF preview, actionable diagnostics, resizable dock, real proof  | Accepted |
+| 0036 | Windows installer trust: embed WebView2, prefer the MSI, graceful Defender  | Accepted |
