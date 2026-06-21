@@ -4,6 +4,32 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-06-21
+
+Installer fixes & cross-OS release automation: the Windows installer now renders the wordmark
+correctly and is built on a real Windows runner.
+
+### Fixed
+
+- **Windows installer logo no longer mojibakes.** The one-liner now fetches the script from
+  `raw.githubusercontent.com` (served `charset=utf-8`) instead of the release-asset URL
+  (`octet-stream`, which PowerShell decoded as Latin-1 and corrupted every glyph). `install.ps1`
+  also sets `[Console]::OutputEncoding = UTF8` and renders the wordmark with ANSI 24-bit colour.
+- **`install.ps1` fails gracefully** when no prebuilt Windows installer exists yet — it explains
+  the situation and prints the build-from-source steps instead of a raw `Invoke-WebRequest` error.
+
+### Added
+
+- **`.github/workflows/release.yml`** — a tag-triggered matrix that builds the native installers on
+  `ubuntu` / `macos-latest` / `windows-latest` via `tauri-action` and uploads them to the release.
+  A Tauri GUI app cannot be cross-compiled from Linux, so the Windows/macOS bundles must come from
+  their own runners; this publishes them automatically once GitHub Actions is enabled for the repo.
+
+### Changed
+
+- The install one-liners (README, `docs/install.md`) and `galley update` now use the
+  `raw.githubusercontent.com/.../main/scripts/install/` URLs.
+
 ## [0.9.2] - 2026-06-21
 
 One-command install, in-app update detection, and uninstall — a Helio-style terminal experience

@@ -45,12 +45,12 @@ launcher, and adds the menu icon:
 
 ```sh
 # Linux / macOS
-curl -fsSL https://github.com/achref-soua/galley/releases/latest/download/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.sh | sh
 ```
 
 ```powershell
 # Windows
-irm https://github.com/achref-soua/galley/releases/latest/download/install.ps1 | iex
+irm https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.ps1 | iex
 ```
 
 <img src="docs/assets/install.png" alt="Galley installer — the struck GALLEY wordmark and install steps" width="620">
