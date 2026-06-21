@@ -69,8 +69,9 @@ checks for updates on launch and offers them in-app (toggle in Settings → Abou
 | ![Settings](docs/assets/settings.png)          | ![Onionskin editor](docs/assets/editor-onionskin.png) |
 
 > Screenshots are generated from the live UI with `just screenshots`, and the demo with
-> `just demo`, so they never go stale. (The web preview shows a placeholder proof; the packaged
-> app renders the real compiled PDF.)
+> `just demo`, so they never go stale. The proof beside the editor is a real PDF.js rendering of
+> the sample document; the packaged app compiles every document for real with the embedded
+> Tectonic engine.
 
 ## Editing & compiling
 

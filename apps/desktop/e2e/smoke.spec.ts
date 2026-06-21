@@ -91,9 +91,45 @@ test('a failed build lists a friendly problem you can jump to', async ({ page })
   await expect(problem).toBeVisible();
   await expect(page.getByText('1 error')).toBeVisible();
 
-  // Jumping to the problem keeps the editor in view (the cursor moves there).
+  // Expanding the entry reveals the raw log line and a jump-to-source button;
+  // jumping keeps the editor in view (the cursor moves there).
   await problem.click();
+  const jump = page.getByRole('button', { name: /Jump to line/ });
+  await expect(jump).toBeVisible();
+  await jump.click();
   await expect(editor).toBeVisible();
+});
+
+test('zooming the proof re-renders without a detached-buffer error', async ({ page }) => {
+  await openDemo(page);
+  await page.getByRole('button', { name: 'Compile' }).click();
+  await expect(page.getByLabel('Proof')).toBeVisible();
+
+  // Changing the zoom re-renders the same bytes. Before the fix the second
+  // render threw on the already-detached ArrayBuffer and surfaced an error.
+  const zoom = page.getByRole('combobox', { name: 'Zoom' });
+  await zoom.selectOption('2');
+  await zoom.selectOption('1');
+  await expect(page.getByLabel('Proof')).toBeVisible();
+  await expect(page.getByText('Could not render the proof')).toHaveCount(0);
+});
+
+test('the bottom dock can be dragged to reclaim editor space', async ({ page }) => {
+  await openDemo(page);
+  const handle = page.getByRole('button', { name: 'Resize bottom panel' });
+  await expect(handle).toBeVisible();
+
+  const box = await handle.boundingBox();
+  if (box === null) throw new Error('the resize handle has no box');
+  // Drag the handle down to shrink the dock — the editor grows to fill the gap.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 80);
+  await page.mouse.up();
+
+  const stored = await page.evaluate(() => localStorage.getItem('galley:layout'));
+  const layout = JSON.parse(stored ?? '{}');
+  expect(layout.bottomPanelHeight).toBeLessThan(220);
 });
 
 test('editing auto-compiles and shows a fresh proof', async ({ page }) => {

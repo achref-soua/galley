@@ -157,4 +157,34 @@ As shown by Lovelace~\cite{lovelace1843}, the engine computes.
             "a failure should carry a log"
         );
     }
+
+    #[test]
+    #[ignore = "media helper: writes a real sample proof to GALLEY_SAMPLE_PDF"]
+    fn writes_the_sample_proof_for_screenshots() {
+        const SAMPLE: &str = r"\documentclass{article}
+\title{Pull a Proof}
+\author{Galley}
+\date{}
+\begin{document}
+\maketitle
+\section{Introduction}\label{sec:intro}
+Galley sets your source in type and pulls a live proof. The mass--energy
+relation,
+\begin{equation}
+  E = mc^2,
+\end{equation}
+follows from the postulates of special relativity. See Section~\ref{sec:intro}.
+\section{Method}
+Edit on the left; the proof on the right refreshes as you type.
+\end{document}
+";
+        let compiler = EmbeddedCompiler::new(TectonicEngine::new());
+        let request = CompileRequest::new("main.tex", Engine::Tectonic);
+        let result = compiler.compile(&request, SAMPLE);
+        assert!(result.report.is_ok(), "log:\n{}", result.report.log);
+        let pdf = result.pdf.expect("a PDF on success");
+        let out = std::env::var("GALLEY_SAMPLE_PDF").expect("set GALLEY_SAMPLE_PDF");
+        std::fs::write(&out, &pdf).expect("write the sample proof");
+        eprintln!("wrote {} bytes to {out}", pdf.len());
+    }
 }
