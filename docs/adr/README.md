@@ -36,3 +36,4 @@ codebase stays legible.
 | 0029 | Performance & low-spec: budgets, adaptive debounce, lazy load, bundle gate  | Accepted |
 | 0030 | Accessibility, i18n, themes & onboarding: HC themes, i18n, first-run tour   | Accepted |
 | 0031 | Packaging, app identity & installers: per-OS bundles, associations, updater | Accepted |
+| 0032 | Beta: opt-in crash reporting, feedback channel, privacy notice              | Accepted |

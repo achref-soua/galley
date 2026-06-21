@@ -20,6 +20,8 @@
     keymapMode,
     spellCheck,
     syncScroll,
+    crashReports,
+    appVersion,
     aiBackend,
     projectRoot = '',
     onthemechange,
@@ -28,6 +30,8 @@
     onkeymapchange,
     onspellcheckchange,
     onsyncscrollchange,
+    oncrashreportschange,
+    onfeedback,
     onclose
   }: {
     themePreference: ThemePreference;
@@ -37,6 +41,8 @@
     keymapMode: KeymapMode;
     spellCheck: boolean;
     syncScroll: boolean;
+    crashReports: boolean;
+    appVersion: string;
     aiBackend: AiBackend;
     projectRoot?: string;
     onthemechange: (pref: ThemePreference) => void;
@@ -45,6 +51,8 @@
     onkeymapchange: (mode: KeymapMode) => void;
     onspellcheckchange: (enabled: boolean) => void;
     onsyncscrollchange: (enabled: boolean) => void;
+    oncrashreportschange: (enabled: boolean) => void;
+    onfeedback: () => void;
     onclose: () => void;
   } = $props();
 
@@ -168,6 +176,27 @@
         {:else}
           <h2>About</h2>
           <p class="muted">Galley — a local-first LaTeX studio. Pull a proof.</p>
+          <p class="row">
+            <span class="label">Version</span>
+            <span class="value">{appVersion}</span>
+          </p>
+          <p class="row">
+            <span class="label">Send anonymous crash reports</span>
+            <Toggle
+              label="Send anonymous crash reports"
+              checked={crashReports}
+              onchange={(checked) => oncrashreportschange(checked)}
+            />
+          </p>
+          <p class="muted">
+            Off by default. Reports are anonymised — no document content or file paths. See the
+            privacy notice in the docs.
+          </p>
+          <p class="row">
+            <button class="link-btn" type="button" onclick={() => onfeedback()}
+              >Send feedback…</button
+            >
+          </p>
         {/if}
       </div>
     </div>
@@ -294,5 +323,15 @@
     color: var(--fg-faint);
     font-size: var(--galley-text-sm);
     line-height: var(--galley-leading-normal);
+  }
+
+  .link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent-text);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
   }
 </style>

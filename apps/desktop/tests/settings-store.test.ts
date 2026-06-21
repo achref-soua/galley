@@ -11,7 +11,12 @@ import {
   PREVIEW_PREFS_STORAGE_KEY,
   parsePreviewPrefs,
   serializePreviewPrefs,
-  PreviewPrefsStore
+  PreviewPrefsStore,
+  DEFAULT_PRIVACY_PREFS,
+  PRIVACY_PREFS_STORAGE_KEY,
+  parsePrivacyPrefs,
+  serializePrivacyPrefs,
+  PrivacyPrefsStore
 } from '../src/lib/settings-store';
 
 describe('parsePrefs', () => {
@@ -168,5 +173,50 @@ describe('CompilePrefsStore', () => {
     store.subscribe(listener)();
     store.setSoundOnSuccess(true);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe('parsePrivacyPrefs', () => {
+  it('defaults to crash reports off when absent', () => {
+    expect(parsePrivacyPrefs(null)).toEqual(DEFAULT_PRIVACY_PREFS);
+    expect(DEFAULT_PRIVACY_PREFS.crashReports).toBe(false);
+  });
+
+  it('defaults on malformed or non-object data', () => {
+    expect(parsePrivacyPrefs('not json')).toEqual(DEFAULT_PRIVACY_PREFS);
+    expect(parsePrivacyPrefs('5')).toEqual(DEFAULT_PRIVACY_PREFS);
+  });
+
+  it('reads a persisted value', () => {
+    expect(parsePrivacyPrefs(serializePrivacyPrefs({ crashReports: true }))).toEqual({
+      crashReports: true
+    });
+  });
+});
+
+describe('PrivacyPrefsStore', () => {
+  it('starts from the defaults', () => {
+    const { storage } = memoryStorage();
+    expect(new PrivacyPrefsStore(storage).prefs.crashReports).toBe(false);
+  });
+
+  it('starts from persisted preferences', () => {
+    const { storage, map } = memoryStorage();
+    map.set(PRIVACY_PREFS_STORAGE_KEY, serializePrivacyPrefs({ crashReports: true }));
+    expect(new PrivacyPrefsStore(storage).prefs.crashReports).toBe(true);
+  });
+
+  it('persists and notifies on setCrashReports', () => {
+    const { storage, map } = memoryStorage();
+    const store = new PrivacyPrefsStore(storage);
+    const seen: boolean[] = [];
+    const unsubscribe = store.subscribe((p) => seen.push(p.crashReports));
+    store.setCrashReports(true);
+    expect(store.prefs.crashReports).toBe(true);
+    expect(map.get(PRIVACY_PREFS_STORAGE_KEY)).toBe(serializePrivacyPrefs({ crashReports: true }));
+    expect(seen).toEqual([true]);
+    unsubscribe();
+    store.setCrashReports(false);
+    expect(seen).toHaveLength(1);
   });
 });

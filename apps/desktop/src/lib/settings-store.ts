@@ -174,3 +174,78 @@ export class CompilePrefsStore {
     };
   }
 }
+
+// ─── Privacy preferences ─────────────────────────────────────────────────────
+
+/** The user's privacy preferences. */
+export interface PrivacyPrefs {
+  /** Send anonymised crash reports. Off by default — opt-in only (§8.4). */
+  crashReports: boolean;
+}
+
+/** The shipped defaults: nothing leaves the machine. */
+export const DEFAULT_PRIVACY_PREFS: PrivacyPrefs = { crashReports: false };
+
+/** Storage key for the persisted privacy preferences. */
+export const PRIVACY_PREFS_STORAGE_KEY = 'galley:privacy-prefs';
+
+/** Parse persisted privacy preferences, tolerating absent or malformed data. */
+export function parsePrivacyPrefs(raw: string | null): PrivacyPrefs {
+  if (raw === null) {
+    return { ...DEFAULT_PRIVACY_PREFS };
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ...DEFAULT_PRIVACY_PREFS };
+  }
+  if (typeof data !== 'object' || data === null) {
+    return { ...DEFAULT_PRIVACY_PREFS };
+  }
+  const record = data as Record<string, unknown>;
+  return { crashReports: readBool(record.crashReports, DEFAULT_PRIVACY_PREFS.crashReports) };
+}
+
+/** Serialize privacy preferences for storage. */
+export function serializePrivacyPrefs(prefs: PrivacyPrefs): string {
+  return JSON.stringify(prefs);
+}
+
+/** Persists privacy preferences and notifies subscribers on every change. */
+export class PrivacyPrefsStore {
+  #storage: Pick<Storage, 'getItem' | 'setItem'>;
+  #prefs: PrivacyPrefs;
+  #listeners = new Set<(prefs: PrivacyPrefs) => void>();
+
+  constructor(storage: Pick<Storage, 'getItem' | 'setItem'>) {
+    this.#storage = storage;
+    this.#prefs = parsePrivacyPrefs(storage.getItem(PRIVACY_PREFS_STORAGE_KEY));
+  }
+
+  /** The current preferences. */
+  get prefs(): PrivacyPrefs {
+    return this.#prefs;
+  }
+
+  #commit(next: PrivacyPrefs): void {
+    this.#prefs = next;
+    this.#storage.setItem(PRIVACY_PREFS_STORAGE_KEY, serializePrivacyPrefs(next));
+    for (const listener of this.#listeners) {
+      listener(next);
+    }
+  }
+
+  /** Enable or disable anonymised crash reporting. */
+  setCrashReports(crashReports: boolean): void {
+    this.#commit({ ...this.#prefs, crashReports });
+  }
+
+  /** Subscribe to preference changes; returns an unsubscribe function. */
+  subscribe(listener: (prefs: PrivacyPrefs) => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+}

@@ -61,6 +61,22 @@ describe('App shell', () => {
     expect(window.localStorage.getItem('galley:onboarded')).toBe('true');
   });
 
+  it('toggles crash reporting and opens feedback from settings → About', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'About' }));
+
+    await fireEvent.click(screen.getByRole('switch', { name: 'Send anonymous crash reports' }));
+    expect(JSON.parse(window.localStorage.getItem('galley:privacy-prefs')!).crashReports).toBe(
+      true
+    );
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Send feedback…' }));
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
+  });
+
   it('resizes the sidebar by dragging and persists the layout', async () => {
     render(App);
     const sep = screen.getByLabelText('Resize sidebar');
