@@ -4,6 +4,34 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-06-21
+
+Accessibility, i18n, themes & onboarding: two WCAG-AA high-contrast themes, a localization
+scaffolding with an English catalog, a keyboard-navigable first-run tour, and a focus-trap helper.
+
+### Added
+
+- **Two high-contrast themes** — `Onionskin High-Contrast` and `Carbon High-Contrast`, shipped
+  alongside the existing pair as first-class `data-theme` variants. Every text/background pairing
+  clears WCAG AA, most clear AAA; the palette contrast tests assert this against the shipped CSS for
+  all four themes. The theme switcher now lists five preferences. New `THEMES` list and
+  `isHighContrast` helper in `@galley/ui-kit`.
+- **Localization scaffolding** — `i18n.ts` (`interpolate`, `translate`, the `I18n` translator with
+  English fallback), an English message catalog in `locales/en.ts`, and a shared `i18n-store.ts`
+  (`t`). Strings are externalised by dot-namespaced key so the UI can be localised without touching
+  components. 100 % covered.
+- **First-run onboarding tour** — `onboarding.ts` (ordered steps incl. "import your Overleaf
+  project", first-run persistence, navigation helpers) and `OnboardingTour.svelte`, a
+  keyboard-navigable, screen-reader-labelled dialog wired into the app for first launch. Localised
+  through the i18n catalog.
+- **`focus-trap.ts`** — pure keyboard focus-wrap math for modal dialogs. 100 % covered.
+- **ADR-0030**, `docs/accessibility.md`, `docs/i18n.md`, and `docs/download.md`.
+
+### Changed
+
+- **`main.ts`** shows the onboarding tour only on first run (reads the `galley:onboarded` flag).
+- **README** documents the four themes, localization, and onboarding.
+
 ## [0.7.1] - 2026-06-21
 
 Performance & low-spec: explicit budgets, an adaptive auto-compile debounce, memoised heavy

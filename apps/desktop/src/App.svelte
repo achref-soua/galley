@@ -84,6 +84,8 @@
   import { CustomTemplateStore, type TemplateDefinition } from './lib/templates';
   import TemplateGallery from './lib/TemplateGallery.svelte';
   import ExportPanel from './lib/ExportPanel.svelte';
+  import OnboardingTour from './lib/OnboardingTour.svelte';
+  import { markOnboarded } from './lib/onboarding';
 
   // The editor, PDF renderer, and compile timing/sound are injectable so tests
   // can drive the UI with fakes; the packaged app uses the real CodeMirror
@@ -108,7 +110,8 @@
     projectRegistry = new ProjectRegistry(window.localStorage),
     windowBackend = selectWindowBackend(),
     customTemplateStore = new CustomTemplateStore(window.localStorage),
-    exportBackend = selectExportBackend() as ExportBackend
+    exportBackend = selectExportBackend() as ExportBackend,
+    onboarded = true
   }: {
     editor?: EditorFactory;
     createRenderer?: () => PdfRenderer;
@@ -130,6 +133,8 @@
     windowBackend?: WindowBackend;
     customTemplateStore?: CustomTemplateStore;
     exportBackend?: ExportBackend;
+    /** Whether the first-run tour has already been seen (real app reads localStorage). */
+    onboarded?: boolean;
   } = $props();
 
   const RESIZE_STEP = 16;
@@ -157,6 +162,8 @@
 
   let preference = $state<ThemePreference>(theme.preference);
   let layout = $state(layoutController.state);
+  // First-run decision, captured once at construction (not a reactive input).
+  let showOnboarding = $state(untrack(() => !onboarded));
   let settingsOpen = $state(false);
   let importOpen = $state(false);
   let templateGalleryOpen = $state(false);
@@ -923,6 +930,14 @@
       </div>
     </div>
   {/if}
+
+  <OnboardingTour
+    open={showOnboarding}
+    onclose={() => {
+      markOnboarded(window.localStorage);
+      showOnboarding = false;
+    }}
+  />
 </div>
 
 <style>

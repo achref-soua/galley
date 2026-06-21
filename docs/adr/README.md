@@ -34,3 +34,4 @@ codebase stays legible.
 | 0027 | Export formats and the ExportBackend seam                                  | Accepted |
 | 0028 | Security hardening: sandbox, shell-escape, archive, secrets, updater       | Accepted |
 | 0029 | Performance & low-spec: budgets, adaptive debounce, lazy load, bundle gate | Accepted |
+| 0030 | Accessibility, i18n, themes & onboarding: HC themes, i18n, first-run tour  | Accepted |
