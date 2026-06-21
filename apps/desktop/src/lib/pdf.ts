@@ -12,7 +12,13 @@
  * its browser-only globals are absent.
  */
 
+import { once } from './startup';
 import type { SyncTexBox } from './synctex-backend';
+
+// Memoize the heavy dynamic imports so the PDF.js engine and its worker resolve
+// once for the whole session instead of on every page render.
+const loadPdfjs = once(() => import('pdfjs-dist'));
+const loadPdfWorker = once(() => import('pdfjs-dist/build/pdf.worker.min.mjs?url'));
 
 /**
  * Scaled points per PDF user-space point (72.27 TeX pt/inch × 65536 sp/pt ÷ 72 PDF pt/inch).
@@ -95,8 +101,8 @@ export interface PdfRenderer {
 export function pdfjsRenderer(): PdfRenderer {
   return {
     async render(data, canvas, pageNumber, scale) {
-      const pdfjs = await import('pdfjs-dist');
-      const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+      const pdfjs = await loadPdfjs();
+      const worker = await loadPdfWorker();
       // Same-origin, bundled worker — allowed under the app's strict CSP.
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
 

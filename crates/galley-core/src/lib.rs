@@ -21,6 +21,7 @@ pub mod include_graph;
 pub mod intel;
 pub mod manifest;
 pub mod math;
+pub mod perf;
 pub mod project;
 pub mod sandbox;
 pub mod search;
@@ -66,6 +67,10 @@ pub use intel::{
 };
 pub use manifest::{Manifest, ManifestError, MANIFEST_PATH};
 pub use math::{wrap_display, wrap_inline};
+pub use perf::{
+    adaptive_debounce_ms, BudgetReport, BudgetStatus, Measurement, PerfBudget,
+    DEBOUNCE_BYTES_PER_MS, MAX_DEBOUNCE_MS, MIN_DEBOUNCE_MS,
+};
 pub use project::{project_name_from_path, Project};
 pub use sandbox::{
     is_traversal_input, scan_input_paths, scan_shell_escape, scan_source, SandboxReport,

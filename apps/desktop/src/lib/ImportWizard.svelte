@@ -12,6 +12,7 @@
 <script lang="ts">
   import { Button } from '@galley/ui-kit';
   import { selectImportBackend, type ImportBackend, type ProjectAnalysis } from './import-backend';
+  import { phaseLabel } from './import-progress';
   import { type ProjectSnapshot } from './project-backend';
 
   let {
@@ -307,7 +308,7 @@
             type="submit"
             disabled={importing || !projectName.trim() || !parentDir.trim()}
           >
-            {importing ? 'Importing…' : 'Import project'}
+            {importing ? phaseLabel('copy') : 'Import project'}
           </Button>
         </div>
       </form>
