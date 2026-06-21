@@ -22,13 +22,14 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — hardening toward beta.** This is `v0.7.3`: **packaging, app identity & installers**.
+> **Status — release candidate.** This is `v0.9.0`: the **release candidate**, with complete
+> documentation and a recorded performance & security sign-off.
 > The full product is in place — the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js**
 > core; structured diagnostics and TexLab language intelligence; the dual code/visual editor; math,
 > tables, assets, and bibliography; the provider-agnostic AI assistant and agents; git-backed
 > version history; Overleaf/arXiv import and clean export; a template gallery; security hardening;
-> performance budgets; four accessible themes with i18n and onboarding; and native installers for
-> Windows, macOS, and Linux. Beta (`v0.8.0`) and the release candidate (`v0.9.0`) follow.
+> performance budgets; four accessible themes with i18n and onboarding; opt-in crash reporting; and
+> native installers for Windows, macOS, and Linux. A full QA pass and v1.0.0 follow.
 
 ## Editing & compiling
 
@@ -203,6 +204,12 @@ test and coverage runs never need the native TeX libraries. See
 
 ## Documentation
 
+- [User guide](docs/user-guide.md) — every feature, end to end.
+- [Migration & import](docs/migration.md) — bring Overleaf/arXiv/folder projects in (and back out).
+- [Download & install](docs/download.md) · [Packaging](docs/packaging.md) — installers per OS.
+- [Performance](docs/performance.md) · [Accessibility](docs/accessibility.md) ·
+  [Localization](docs/i18n.md) · [Privacy](docs/privacy.md)
+- [Release readiness](docs/release-readiness.md) — the RC sign-off and the path to v1.0.0.
 - [Architecture decisions](docs/adr/) — the choices behind the stack and the testing model.
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
