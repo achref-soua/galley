@@ -121,8 +121,11 @@ export function locationLabel(diagnostic: Diagnostic): string {
   return '';
 }
 
-/** The de-duplication key for a diagnostic: severity, line, and message. */
-function diagnosticKey(diagnostic: Diagnostic): string {
+/**
+ * A stable key for a diagnostic — its severity, line, and message. Used both to
+ * de-duplicate the merged list and to track a row's expansion in the panel.
+ */
+export function diagnosticKey(diagnostic: Diagnostic): string {
   return `${diagnostic.severity}|${diagnostic.line ?? ''}|${diagnostic.message}`;
 }
 
@@ -161,7 +164,7 @@ export function problemList(diagnostics: Diagnostic[]): Diagnostic[] {
   const seen = new Set<string>();
   const unique: Diagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    const key = `${diagnostic.severity}|${diagnostic.line ?? ''}|${diagnostic.message}`;
+    const key = diagnosticKey(diagnostic);
     if (seen.has(key)) {
       continue;
     }

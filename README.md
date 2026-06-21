@@ -28,9 +28,9 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — release candidate.** This is `v0.9.1`: the **release candidate** with generated
-> screenshots and a demo recording, complete documentation, and a recorded performance & security
-> sign-off.
+> **Status — release candidate.** This is `v0.9.4`: a bug-sweep release on the **release candidate**
+> line, with generated screenshots and a demo recording that now show the live proof beside the
+> editor, complete documentation, and a recorded performance & security sign-off.
 > The full product is in place — the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js**
 > core; structured diagnostics and TexLab language intelligence; the dual code/visual editor; math,
 > tables, assets, and bibliography; the provider-agnostic AI assistant and agents; git-backed
@@ -69,8 +69,9 @@ checks for updates on launch and offers them in-app (toggle in Settings → Abou
 | ![Settings](docs/assets/settings.png)          | ![Onionskin editor](docs/assets/editor-onionskin.png) |
 
 > Screenshots are generated from the live UI with `just screenshots`, and the demo with
-> `just demo`, so they never go stale. (The web preview shows a placeholder proof; the packaged
-> app renders the real compiled PDF.)
+> `just demo`, so they never go stale. The proof beside the editor is a real PDF.js rendering of
+> the sample document; the packaged app compiles every document for real with the embedded
+> Tectonic engine.
 
 ## Editing & compiling
 

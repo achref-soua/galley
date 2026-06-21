@@ -5,6 +5,7 @@ import {
   serializeLayout,
   setSidebarWidth,
   setPreviewWidth,
+  setBottomPanelHeight,
   toggleSidebar,
   togglePreview
 } from '@galley/ui-kit';
@@ -45,6 +46,10 @@ export class LayoutController {
 
   setPreviewWidth(width: number): void {
     this.#commit(setPreviewWidth(this.#state, width));
+  }
+
+  setBottomPanelHeight(height: number): void {
+    this.#commit(setBottomPanelHeight(this.#state, height));
   }
 
   toggleSidebar(): void {

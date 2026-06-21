@@ -5,7 +5,7 @@ import type { PdfRenderer } from '../src/lib/pdf';
 import type { EditorFactory, LanguageContext } from '../src/lib/editor';
 import type { AssetBackend } from '../src/lib/asset-backend';
 import type { MathFieldSetup } from '../src/lib/math-field.js';
-import { firePointer, fakeEditorFactory } from './setup';
+import { firePointer, firePointerY, fakeEditorFactory } from './setup';
 import { browserAiBackend } from '../src/lib/ai-backend';
 import { browserImportBackend } from '../src/lib/import-backend';
 
@@ -147,6 +147,25 @@ describe('App shell', () => {
     const stored = JSON.parse(window.localStorage.getItem('galley:layout')!);
     expect(stored.sidebarWidth).toBe(280);
     expect(stored.previewWidth).toBe(496);
+  });
+
+  it('resizes the bottom dock by dragging it up and persists the height', async () => {
+    render(App);
+    const sep = screen.getByLabelText('Resize bottom panel');
+    // Drag down 60px from the default 220 → the dock shrinks to 160.
+    firePointerY('pointerdown', sep, 200);
+    firePointerY('pointermove', window, 260);
+    firePointerY('pointerup', window, 260);
+    expect(JSON.parse(window.localStorage.getItem('galley:layout')!).bottomPanelHeight).toBe(160);
+  });
+
+  it('nudges the bottom dock with the up and down arrows', async () => {
+    render(App);
+    const sep = screen.getByLabelText('Resize bottom panel');
+    await fireEvent.keyDown(sep, { key: 'ArrowUp' });
+    expect(JSON.parse(window.localStorage.getItem('galley:layout')!).bottomPanelHeight).toBe(236);
+    await fireEvent.keyDown(sep, { key: 'ArrowDown' });
+    expect(JSON.parse(window.localStorage.getItem('galley:layout')!).bottomPanelHeight).toBe(220);
   });
 
   it('remembers a persisted layout across mounts', async () => {
@@ -336,8 +355,11 @@ describe('App — projects, editing, and the unsaved-changes guard', () => {
     // The problems panel lists the parsed diagnostic with its summary.
     const row = await screen.findByRole('button', { name: /document never closes/ });
     expect(screen.getByText('1 error')).toBeTruthy();
-    // Clicking jumps to the source line (the fake editor's gotoLine is a no-op).
+    // Expanding the row reveals a jump-to-source button (the fake editor's
+    // gotoLine is a no-op, so the click just exercises the wiring).
     await fireEvent.click(row);
+    const jump = await screen.findByRole('button', { name: /Jump to line/ });
+    await fireEvent.click(jump);
   });
 
   it('shows the build timing in the preview', async () => {

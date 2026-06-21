@@ -49,6 +49,13 @@ export function firePointer(type: string, target: EventTarget, clientX: number):
   target.dispatchEvent(event);
 }
 
+/** Dispatch a pointer event carrying `clientY` (for horizontal resize handles). */
+export function firePointerY(type: string, target: EventTarget, clientY: number): void {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperty(event, 'clientY', { value: clientY });
+  target.dispatchEvent(event);
+}
+
 /** A minimal `matchMedia` stub (jsdom ships none). Tests override `matches`
  *  by reassigning `window.matchMedia` where they need dark / reduced-motion. */
 export function stubMatchMedia(matches = false): typeof window.matchMedia {

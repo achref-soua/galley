@@ -29,24 +29,51 @@ const unlocated = diag({
 });
 
 describe('ProblemsPanel', () => {
-  it('lists problems with a summary and jumps a located row to its line', async () => {
+  it('lists problems with a summary and expands a located row to a jump button', async () => {
     const onjump = vi.fn();
     render(ProblemsPanel, { props: { diagnostics: [located, unlocated], onjump } });
 
     expect(screen.getByText('1 error · 1 warning')).toBeTruthy();
     expect(screen.getByText('line 6')).toBeTruthy();
+    // The plain-language explanation is shown up front, on every row.
     expect(screen.getByText('Brace never closed')).toBeTruthy();
 
-    // The located row is a button that jumps to its source line.
-    await fireEvent.click(screen.getByRole('button', { name: /Brace never closed/ }));
+    // The detail (raw message + jump) is hidden until the row is expanded.
+    expect(screen.queryByText('Undefined control sequence')).toBeNull();
+    const row = screen.getByRole('button', { name: /Brace never closed/ });
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+
+    await fireEvent.click(row);
+    expect(row.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Undefined control sequence')).toBeTruthy();
+
+    // The expanded detail carries a button that jumps to the source line.
+    await fireEvent.click(screen.getByRole('button', { name: 'Jump to line 6' }));
     expect(onjump).toHaveBeenCalledWith(6);
   });
 
-  it('renders an unlocated problem as a non-clickable row', () => {
+  it('expands an unlocated problem for detail but offers no jump', async () => {
     render(ProblemsPanel, { props: { diagnostics: [unlocated], onjump: vi.fn() } });
-    // No jump button for the unlocated warning (it has nowhere to go).
-    expect(screen.queryByRole('button', { name: /Rerun to settle/ })).toBeNull();
+    // Its explanation shows even while collapsed.
     expect(screen.getByText('Rerun to settle')).toBeTruthy();
+
+    const row = screen.getByRole('button', { name: /Rerun to settle/ });
+    await fireEvent.click(row);
+    // The detail is now visible...
+    expect(screen.getByText('There were undefined references')).toBeTruthy();
+    // ...but there is no jump button, since the log placed it nowhere.
+    expect(screen.queryByRole('button', { name: /Jump to line/ })).toBeNull();
+  });
+
+  it('collapses an expanded row again', async () => {
+    render(ProblemsPanel, { props: { diagnostics: [located], onjump: vi.fn() } });
+    const row = screen.getByRole('button', { name: /Brace never closed/ });
+
+    await fireEvent.click(row);
+    expect(screen.getByText('Undefined control sequence')).toBeTruthy();
+
+    await fireEvent.click(row);
+    expect(screen.queryByText('Undefined control sequence')).toBeNull();
   });
 
   it('shows a clean-galley message when there is nothing to report', () => {
@@ -55,7 +82,7 @@ describe('ProblemsPanel', () => {
     expect(screen.getByText('Nothing to report — a clean galley.')).toBeTruthy();
   });
 
-  it('collapses and re-opens the list', async () => {
+  it('collapses and re-opens the whole list', async () => {
     render(ProblemsPanel, { props: { diagnostics: [located], onjump: vi.fn() } });
     expect(screen.getByText('Brace never closed')).toBeTruthy();
 
