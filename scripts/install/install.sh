@@ -2,20 +2,20 @@
 # Galley — one-command installer for Linux and macOS (ADR-0034).
 #
 # Install / update:
-#   curl -fsSL https://github.com/achref-soua/galley/releases/latest/download/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.sh | sh
 #
 # Uninstall:
-#   curl -fsSL https://github.com/achref-soua/galley/releases/latest/download/install.sh | sh -s -- --uninstall
+#   curl -fsSL https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.sh | sh -s -- --uninstall
 #
 # Environment overrides:
-#   GALLEY_VERSION       specific version (e.g. "0.9.2"); default: latest
+#   GALLEY_VERSION       specific version (e.g. "0.9.3"); default: latest
 #   GALLEY_INSTALL_DIR   where the `galley` launcher goes; default: ~/.local/bin
 set -eu
 
 REPO="achref-soua/galley"
 INSTALL_DIR="${GALLEY_INSTALL_DIR:-${HOME}/.local/bin}"
 LIB_DIR="${HOME}/.local/lib/galley"
-INSTALL_SH_URL="https://github.com/${REPO}/releases/latest/download/install.sh"
+INSTALL_SH_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install/install.sh"
 
 # ── colour helpers (typewriter palette) ───────────────────────────────────────
 # Colour on a real terminal, or when rendering the docs screenshot (demo mode).

@@ -1,41 +1,56 @@
-# Galley — one-command installer for Windows (ADR-0034).
+# Galley — one-command installer for Windows (PowerShell 5.1+) (ADR-0034).
 #
 # Install / update:
-#   irm https://github.com/achref-soua/galley/releases/latest/download/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.ps1 | iex
 #
 # Uninstall:
-#   & ([scriptblock]::Create((irm https://github.com/achref-soua/galley/releases/latest/download/install.ps1))) -Uninstall
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.ps1))) -Uninstall
 #
 # Environment override:
-#   $env:GALLEY_VERSION  specific version (e.g. "0.9.2"); default: latest
+#   $env:GALLEY_VERSION  specific version (e.g. "0.9.3"); default: latest
 [CmdletBinding()]
 param([switch]$Uninstall)
 
 $ErrorActionPreference = 'Stop'
-$Repo = 'achref-soua/galley'
-$e = [char]27
-$Paper = "$e[38;2;236;227;208m"; $Ribbon = "$e[38;2;168;54;43m"
-$Sage = "$e[38;2;120;150;120m"; $Muted = "$e[38;2;154;142;126m"; $R = "$e[0m"
 
-function Show-Logo([string]$Version) {
-  Write-Host ""
-  Write-Host "$Paper   ██████╗  █████╗ ██╗     ██╗     ███████╗██╗   ██╗$R"
-  Write-Host "$Paper  ██╔════╝ ██╔══██╗██║     ██║     ██╔════╝╚██╗ ██╔╝$R"
-  Write-Host "$Paper  ██║  ███╗███████║██║     ██║     █████╗   ╚████╔╝ $R"
-  Write-Host "$Paper  ██║   ██║██╔══██║██║     ██║     ██╔══╝    ╚██╔╝  $R"
-  Write-Host "$Paper  ╚██████╔╝██║  ██║███████╗███████╗███████╗   ██║   $R"
-  Write-Host "$Paper   ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝   ╚═╝   $R"
-  Write-Host "$Ribbon  ══════════════════════════════════════════════════$R"
+# Render the Unicode wordmark correctly (must run BEFORE any output). VT/ANSI
+# truecolor is on by default on Windows 10 build 14393+.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+$Repo = 'achref-soua/galley'
+
+# ── ANSI true-color helpers (typewriter palette) ──────────────────────────────
+$E = [char]27
+$P = "${E}[38;2;236;227;208m"  # paper  #ECE3D0
+$RB = "${E}[38;2;168;54;43m"   # ribbon #A8362B
+$SG = "${E}[38;2;120;150;120m" # sage (success)
+$MU = "${E}[38;2;154;142;126m" # muted
+$YW = "${E}[38;2;215;200;0m"   # warnings
+$R = "${E}[0m"
+
+function Show-Logo {
+  param([string]$Version = '')
+  Write-Host ''
+  Write-Host "${P}   ██████╗  █████╗ ██╗     ██╗     ███████╗██╗   ██╗${R}"
+  Write-Host "${P}  ██╔════╝ ██╔══██╗██║     ██║     ██╔════╝╚██╗ ██╔╝${R}"
+  Write-Host "${P}  ██║  ███╗███████║██║     ██║     █████╗   ╚████╔╝ ${R}"
+  Write-Host "${P}  ██║   ██║██╔══██║██║     ██║     ██╔══╝    ╚██╔╝  ${R}"
+  Write-Host "${P}  ╚██████╔╝██║  ██║███████╗███████╗███████╗   ██║   ${R}"
+  Write-Host "${P}   ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝   ╚═╝   ${R}"
+  Write-Host "${RB}  ══════════════════════════════════════════════════${R}"
   if ($Version) {
-    Write-Host "$Muted  a local-first LaTeX studio · Pull a proof.   ${Ribbon}v$Version$R"
+    Write-Host "${MU}  a local-first LaTeX studio · Pull a proof.   ${RB}v$Version${R}"
   } else {
-    Write-Host "$Muted  a local-first LaTeX studio · Pull a proof.$R"
+    Write-Host "${MU}  a local-first LaTeX studio · Pull a proof.${R}"
   }
-  Write-Host ""
+  Write-Host ''
 }
 
-function Step($s, $m) { Write-Host "  $Ribbon$s$R $m" }
-function Ok($m) { Write-Host "  $Sage" -NoNewline; Write-Host "OK$R $m" }
+function Show-Step { param($Icon, $Msg) Write-Host "  ${RB}$Icon${R} $Msg" }
+function Write-Ok { param($Msg) Write-Host "  ${SG}✔${R}  $Msg" }
+function Write-Warn { param($Msg) Write-Host "  ${YW}!${R}  $Msg" }
+function Fail { param($Msg) Write-Host "`n  ${RB}ERROR: $Msg${R}`n"; exit 1 }
 
 # Locate Galley's registry uninstall entry (per-user NSIS install).
 function Get-GalleyUninstall {
@@ -51,17 +66,17 @@ if ($Uninstall) {
   $entry = Get-GalleyUninstall
   Show-Logo ($entry.DisplayVersion)
   if ($entry -and $entry.UninstallString) {
-    Step '⌫' "Removing Galley $($entry.DisplayVersion)..."
+    Show-Step '⌫' "Removing Galley $($entry.DisplayVersion)..."
     Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $entry.UninstallString -Wait
-    Ok 'Galley has been removed. Your projects are untouched.'
+    Write-Ok 'Galley has been removed. Your projects are untouched.'
   } else {
-    Write-Host "  $Muted Galley was not found in the installed programs.$R"
+    Write-Warn 'Galley was not found in the installed programs.'
   }
   return
 }
 
 # Resolve version.
-Step '⟳' 'Checking the latest release...'
+Show-Step '⟳' 'Checking the latest release...'
 if ($env:GALLEY_VERSION) {
   $Version = $env:GALLEY_VERSION -replace '^v', ''
 } else {
@@ -75,27 +90,42 @@ $Asset = "Galley_${Version}_x64-setup.exe"
 $Url = "https://github.com/$Repo/releases/download/v$Version/$Asset"
 $Out = Join-Path $env:TEMP $Asset
 
-Step '⬇' "Fetching v$Version for windows..."
-Invoke-WebRequest -Uri $Url -OutFile $Out
+Show-Step '↓' "Fetching v$Version for windows..."
+$ProgressPreference = 'SilentlyContinue'
+try {
+  Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing
+} catch {
+  Write-Host ''
+  Write-Warn "No prebuilt Windows installer is published for v$Version yet."
+  Write-Host "${MU}  Galley's Windows installer is built on a Windows CI runner. Until it is" -NoNewline
+  Write-Host " published, you can:${R}"
+  Write-Host "${MU}    • watch ${R}https://github.com/$Repo/releases/latest"
+  Write-Host "${MU}    • or build it yourself on Windows:${R}"
+  Write-Host "${P}        git clone https://github.com/$Repo; cd galley${R}"
+  Write-Host "${P}        pnpm install; cargo install tauri-cli --version `"^2`" --locked${R}"
+  Write-Host "${P}        pnpm --filter @galley/desktop tauri build${R}"
+  Write-Host ''
+  exit 1
+}
 
 # Verify the checksum when SHA256SUMS.txt is published.
 try {
-  $sums = (Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS.txt").Content
+  $sums = (Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS.txt" -UseBasicParsing).Content
   $line = ($sums -split "`n" | Where-Object { $_ -match [regex]::Escape($Asset) } | Select-Object -First 1)
   if ($line) {
     $expected = ($line -split '\s+')[0]
     $actual = (Get-FileHash -Algorithm SHA256 $Out).Hash.ToLower()
-    if ($expected -ne $actual) { throw "SHA-256 mismatch: expected $expected, got $actual" }
-    Ok 'Checksum verified.'
+    if ($expected -ne $actual) { Fail "SHA-256 mismatch: expected $expected, got $actual" }
+    Write-Ok 'Checksum verified.'
   }
 } catch {
-  Write-Host "  $Muted (checksum step skipped: $($_.Exception.Message))$R"
+  Write-Warn "checksum step skipped: $($_.Exception.Message)"
 }
 
-Step '▸' 'Running the installer...'
+Show-Step '▸' 'Running the installer...'
 Start-Process -FilePath $Out -Wait
 
-Write-Host ""
-Ok "Galley v$Version is installed. Pin it to the taskbar from the Start menu."
-Write-Host "$Muted  Update later by re-running this one-liner; uninstall with -Uninstall or via Settings > Apps.$R"
-Write-Host ""
+Write-Host ''
+Write-Ok "Galley v$Version is installed. Pin it to the taskbar from the Start menu."
+Write-Host "${MU}  Update later by re-running the one-liner; uninstall with -Uninstall or Settings > Apps.${R}"
+Write-Host ''
