@@ -71,6 +71,10 @@ screenshots:
 demo:
     bash scripts/media/demo.sh
 
+# Render the installer terminal screenshot → docs/assets/install.png (from the real script).
+install-shot:
+    cd apps/desktop && pnpm exec playwright test --config playwright.screenshots.config.ts install-shot.spec.ts
+
 # Pre-warm the Tectonic package cache so the first real compile needs no network.
 # Run once on a machine with connectivity; afterwards compiles work fully offline.
 prewarm:

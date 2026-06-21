@@ -77,6 +77,51 @@ describe('App shell', () => {
     open.mockRestore();
   });
 
+  it('offers an update when a newer release is available and opens it', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    render(App, { props: { updateBackend: { checkLatest: async () => '99.0.0' } } });
+    expect(await screen.findByText('Galley 99.0.0 is available.')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Galley 99.0.0 is available.')).toBeNull();
+    open.mockRestore();
+  });
+
+  it('dismisses the update banner', async () => {
+    render(App, { props: { updateBackend: { checkLatest: async () => '99.0.0' } } });
+    await screen.findByText('Galley 99.0.0 is available.');
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText('Galley 99.0.0 is available.')).toBeNull();
+  });
+
+  it('does not offer an update when already current', async () => {
+    render(App, { props: { updateBackend: { checkLatest: async () => '0.0.1' } } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('button', { name: 'Update' })).toBeNull();
+  });
+
+  it('skips the update check when disabled in settings', async () => {
+    window.localStorage.setItem(
+      'galley:privacy-prefs',
+      JSON.stringify({ crashReports: false, updateChecks: false })
+    );
+    const checkLatest = vi.fn(async () => '99.0.0');
+    render(App, { props: { updateBackend: { checkLatest } } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(checkLatest).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Update' })).toBeNull();
+  });
+
+  it('toggles update checks from settings → About', async () => {
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Check for updates on launch' }));
+    expect(JSON.parse(window.localStorage.getItem('galley:privacy-prefs')!).updateChecks).toBe(
+      false
+    );
+  });
+
   it('resizes the sidebar by dragging and persists the layout', async () => {
     render(App);
     const sep = screen.getByLabelText('Resize sidebar');

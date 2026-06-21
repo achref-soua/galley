@@ -11,6 +11,9 @@
   import { RecentProjectsStore } from './lib/recent-projects';
   import { CompilePrefsStore, PreviewPrefsStore, PrivacyPrefsStore } from './lib/settings-store';
   import { buildFeedbackUrl } from './lib/feedback';
+  import { selectUpdateBackend, type UpdateBackend } from './lib/update-backend';
+  import { isUpdateAvailable } from './lib/update-check';
+  import UpdateBanner from './lib/UpdateBanner.svelte';
   import appPackage from '../package.json';
   import { EditorPrefsStore, type EditorPrefs, type KeymapMode } from './lib/keymap-prefs';
   import { type SpellChecker, buildSpellChecker } from './lib/spell-check';
@@ -113,6 +116,7 @@
     windowBackend = selectWindowBackend(),
     customTemplateStore = new CustomTemplateStore(window.localStorage),
     exportBackend = selectExportBackend() as ExportBackend,
+    updateBackend = selectUpdateBackend(window),
     onboarded = true
   }: {
     editor?: EditorFactory;
@@ -135,6 +139,8 @@
     windowBackend?: WindowBackend;
     customTemplateStore?: CustomTemplateStore;
     exportBackend?: ExportBackend;
+    /** Checks GitHub for a newer release; injectable for tests. */
+    updateBackend?: UpdateBackend;
     /** Whether the first-run tour has already been seen (real app reads localStorage). */
     onboarded?: boolean;
   } = $props();
@@ -187,6 +193,18 @@
   let previewPrefs = $state(previewPrefsStore.prefs);
   let editorPrefs = $state<EditorPrefs>(editorPrefsStore.prefs);
   let privacyPrefs = $state(privacyStore.prefs);
+  let updateVersion = $state<string | null>(null);
+  // On launch (unless disabled), ask the shell whether a newer release exists and
+  // offer it via a dismissible banner. Read the startup inputs once, untracked.
+  untrack(() => {
+    if (privacyPrefs.updateChecks) {
+      void updateBackend.checkLatest().then((latest) => {
+        if (latest !== null && isUpdateAvailable(appVersion, latest)) {
+          updateVersion = latest;
+        }
+      });
+    }
+  });
   let spellChecker = $state<SpellChecker | null>(null);
   let revealTarget = $state<RevealRequest | null>(null);
   let editorScrollFraction = $state<number | undefined>(undefined);
@@ -477,6 +495,16 @@
     privacyPrefs = privacyStore.prefs;
   }
 
+  function changeUpdateChecks(enabled: boolean) {
+    privacyStore.setUpdateChecks(enabled);
+    privacyPrefs = privacyStore.prefs;
+  }
+
+  function openUpdate() {
+    window.open('https://github.com/achref-soua/galley/releases/latest', '_blank', 'noopener');
+    updateVersion = null;
+  }
+
   function openFeedback() {
     const url = buildFeedbackUrl({ version: appVersion, os: navigator.userAgent });
     window.open(url, '_blank', 'noopener');
@@ -661,6 +689,14 @@
     ontoggleviewmode={toggleViewMode}
     ondashboard={() => (dashboardOpen = !dashboardOpen)}
   />
+
+  {#if updateVersion !== null}
+    <UpdateBanner
+      version={updateVersion}
+      onupdate={openUpdate}
+      ondismiss={() => (updateVersion = null)}
+    />
+  {/if}
 
   <main class="workspace">
     {#if !layout.sidebarCollapsed}
@@ -885,6 +921,7 @@
       spellCheck={editorPrefs.spellCheck}
       syncScroll={previewPrefs.syncScroll}
       crashReports={privacyPrefs.crashReports}
+      updateChecks={privacyPrefs.updateChecks}
       {appVersion}
       {aiBackend}
       projectRoot={project.project?.root ?? ''}
@@ -895,6 +932,7 @@
       onspellcheckchange={changeSpellCheck}
       onsyncscrollchange={changeSyncScroll}
       oncrashreportschange={changeCrashReports}
+      onupdatecheckschange={changeUpdateChecks}
       onfeedback={openFeedback}
       onclose={() => (settingsOpen = false)}
     />

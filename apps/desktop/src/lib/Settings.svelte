@@ -21,6 +21,7 @@
     spellCheck,
     syncScroll,
     crashReports,
+    updateChecks,
     appVersion,
     aiBackend,
     projectRoot = '',
@@ -31,6 +32,7 @@
     onspellcheckchange,
     onsyncscrollchange,
     oncrashreportschange,
+    onupdatecheckschange,
     onfeedback,
     onclose
   }: {
@@ -42,6 +44,7 @@
     spellCheck: boolean;
     syncScroll: boolean;
     crashReports: boolean;
+    updateChecks: boolean;
     appVersion: string;
     aiBackend: AiBackend;
     projectRoot?: string;
@@ -52,6 +55,7 @@
     onspellcheckchange: (enabled: boolean) => void;
     onsyncscrollchange: (enabled: boolean) => void;
     oncrashreportschange: (enabled: boolean) => void;
+    onupdatecheckschange: (enabled: boolean) => void;
     onfeedback: () => void;
     onclose: () => void;
   } = $props();
@@ -191,6 +195,14 @@
           <p class="muted">
             Off by default. Reports are anonymised — no document content or file paths. See the
             privacy notice in the docs.
+          </p>
+          <p class="row">
+            <span class="label">Check for updates on launch</span>
+            <Toggle
+              label="Check for updates on launch"
+              checked={updateChecks}
+              onchange={(checked) => onupdatecheckschange(checked)}
+            />
           </p>
           <p class="row">
             <button class="link-btn" type="button" onclick={() => onfeedback()}

@@ -177,9 +177,10 @@ describe('CompilePrefsStore', () => {
 });
 
 describe('parsePrivacyPrefs', () => {
-  it('defaults to crash reports off when absent', () => {
+  it('defaults to crash reports off and update checks on when absent', () => {
     expect(parsePrivacyPrefs(null)).toEqual(DEFAULT_PRIVACY_PREFS);
     expect(DEFAULT_PRIVACY_PREFS.crashReports).toBe(false);
+    expect(DEFAULT_PRIVACY_PREFS.updateChecks).toBe(true);
   });
 
   it('defaults on malformed or non-object data', () => {
@@ -187,23 +188,29 @@ describe('parsePrivacyPrefs', () => {
     expect(parsePrivacyPrefs('5')).toEqual(DEFAULT_PRIVACY_PREFS);
   });
 
-  it('reads a persisted value', () => {
-    expect(parsePrivacyPrefs(serializePrivacyPrefs({ crashReports: true }))).toEqual({
-      crashReports: true
-    });
+  it('reads persisted values for both fields', () => {
+    expect(
+      parsePrivacyPrefs(serializePrivacyPrefs({ crashReports: true, updateChecks: false }))
+    ).toEqual({ crashReports: true, updateChecks: false });
   });
 });
 
 describe('PrivacyPrefsStore', () => {
   it('starts from the defaults', () => {
     const { storage } = memoryStorage();
-    expect(new PrivacyPrefsStore(storage).prefs.crashReports).toBe(false);
+    const store = new PrivacyPrefsStore(storage);
+    expect(store.prefs.crashReports).toBe(false);
+    expect(store.prefs.updateChecks).toBe(true);
   });
 
   it('starts from persisted preferences', () => {
     const { storage, map } = memoryStorage();
-    map.set(PRIVACY_PREFS_STORAGE_KEY, serializePrivacyPrefs({ crashReports: true }));
+    map.set(
+      PRIVACY_PREFS_STORAGE_KEY,
+      serializePrivacyPrefs({ crashReports: true, updateChecks: false })
+    );
     expect(new PrivacyPrefsStore(storage).prefs.crashReports).toBe(true);
+    expect(new PrivacyPrefsStore(storage).prefs.updateChecks).toBe(false);
   });
 
   it('persists and notifies on setCrashReports', () => {
@@ -213,10 +220,19 @@ describe('PrivacyPrefsStore', () => {
     const unsubscribe = store.subscribe((p) => seen.push(p.crashReports));
     store.setCrashReports(true);
     expect(store.prefs.crashReports).toBe(true);
-    expect(map.get(PRIVACY_PREFS_STORAGE_KEY)).toBe(serializePrivacyPrefs({ crashReports: true }));
+    expect(map.get(PRIVACY_PREFS_STORAGE_KEY)).toBe(
+      serializePrivacyPrefs({ crashReports: true, updateChecks: true })
+    );
     expect(seen).toEqual([true]);
     unsubscribe();
     store.setCrashReports(false);
     expect(seen).toHaveLength(1);
+  });
+
+  it('persists setUpdateChecks', () => {
+    const { storage } = memoryStorage();
+    const store = new PrivacyPrefsStore(storage);
+    store.setUpdateChecks(false);
+    expect(store.prefs.updateChecks).toBe(false);
   });
 });

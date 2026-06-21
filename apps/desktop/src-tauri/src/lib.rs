@@ -674,6 +674,34 @@ fn lookup_reference(query: String, kind: String) -> Result<BibEntryDto, String> 
         .ok_or_else(|| "no reference found for that identifier".to_string())
 }
 
+/// Fetch the latest published Galley release tag from GitHub (e.g. `v0.9.2`).
+///
+/// Network egress lives here in the (coverage-excluded) shell so the update check
+/// goes through the core process rather than the webview, whose strict CSP
+/// forbids cross-origin requests. The frontend compares the returned tag with the
+/// running version and offers an update when it is newer.
+#[tauri::command]
+fn check_latest_release() -> Result<String, String> {
+    let agent = concat!(
+        "Galley/",
+        env!("CARGO_PKG_VERSION"),
+        " (https://github.com/achref-soua/galley)"
+    );
+    let url = "https://api.github.com/repos/achref-soua/galley/releases/latest";
+    let text = ureq::get(url)
+        .set("User-Agent", agent)
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|err| err.to_string())?
+        .into_string()
+        .map_err(|err| err.to_string())?;
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|err| err.to_string())?;
+    json.get("tag_name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| "no tag_name in the release response".to_string())
+}
+
 // ── AI commands ───────────────────────────────────────────────────────────────
 
 /// DTO for a provider config as sent to / received from the frontend.
@@ -1181,7 +1209,8 @@ pub fn run() {
             export_pdf_to,
             export_pandoc,
             export_share_bundle_to,
-            scan_document_source
+            scan_document_source,
+            check_latest_release
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Galley application");
