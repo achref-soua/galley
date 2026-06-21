@@ -776,7 +776,8 @@ mod tests {
 
     #[test]
     fn detects_a_rerun_request_from_a_package_with_a_line() {
-        let log = "Package rerunfilecheck Warning: File `main.out' has changed. Rerun on input line 5.";
+        let log =
+            "Package rerunfilecheck Warning: File `main.out' has changed. Rerun on input line 5.";
         let diagnostic = only(log);
         assert_eq!(diagnostic.kind, DiagnosticKind::RerunNeeded);
         assert_eq!(diagnostic.line, Some(5));
