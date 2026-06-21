@@ -22,12 +22,13 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — early development.** This is `v0.2.1`: **outline & multi-file navigation**. On top
-> of the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js** core, structured diagnostics,
-> and TexLab language intelligence (completion, hovers, go-to-definition, live ChkTeX), the
-> editor now shows a **structure sidebar** with the include graph and a jump-to-anything filter,
-> and compiles from the project root when editing an included file. The visual editor and the AI
-> layer arrive in subsequent versioned releases.
+> **Status — hardening toward beta.** This is `v0.7.3`: **packaging, app identity & installers**.
+> The full product is in place — the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js**
+> core; structured diagnostics and TexLab language intelligence; the dual code/visual editor; math,
+> tables, assets, and bibliography; the provider-agnostic AI assistant and agents; git-backed
+> version history; Overleaf/arXiv import and clean export; a template gallery; security hardening;
+> performance budgets; four accessible themes with i18n and onboarding; and native installers for
+> Windows, macOS, and Linux. Beta (`v0.8.0`) and the release candidate (`v0.9.0`) follow.
 
 ## Editing & compiling
 
@@ -175,18 +176,25 @@ just package                 # build the native installer for your OS
 The quality gate is **manual** for now (GitHub Actions is present but dormant). Run it
 before every change:
 
-| Command        | What it does                                                   |
-| -------------- | -------------------------------------------------------------- |
-| `just ci`      | The full gate: format → lint → coverage → audit → docs → build |
-| `just fmt`     | Auto-format Rust and web sources                               |
-| `just test`    | Run all tests                                                  |
-| `just cover`   | Coverage gate — **fails below 100%** (line/branch)             |
-| `just lint`    | clippy (deny warnings) + eslint                                |
-| `just build`   | Build all crates and the frontend bundle                       |
-| `just icons`   | Regenerate the app icon set from the brand master              |
-| `just prewarm` | Warm the Tectonic package cache so compiles work offline       |
-| `just e2e`     | Playwright end-to-end smoke tests (needs a browser)            |
-| `just package` | Build the native installer for the current OS                  |
+| Command          | What it does                                                   |
+| ---------------- | -------------------------------------------------------------- |
+| `just ci`        | The full gate: format → lint → coverage → audit → docs → build |
+| `just fmt`       | Auto-format Rust and web sources                               |
+| `just test`      | Run all tests                                                  |
+| `just cover`     | Coverage gate — **fails below 100%** (line/branch)             |
+| `just lint`      | clippy (deny warnings) + eslint                                |
+| `just build`     | Build all crates and the frontend bundle                       |
+| `just icons`     | Regenerate the app icon set from the brand master              |
+| `just prewarm`   | Warm the Tectonic package cache so compiles work offline       |
+| `just e2e`       | Playwright end-to-end smoke tests (needs a browser)            |
+| `just package`   | Build every native installer for the current OS                |
+| `just checksums` | Write `SHA256SUMS.txt` for the built installers                |
+
+Galley installs natively on Windows, macOS, and Linux — each `just package` builds that OS's
+full installer set (Linux `.AppImage`/`.deb`/`.rpm`, Windows `.msi`/NSIS `.exe`, macOS
+`.dmg`), the app pins to the taskbar/Dock/panel with the **G** icon, and opt-in associations
+let it open `.tex` files. See [`docs/packaging.md`](docs/packaging.md) and
+[`docs/download.md`](docs/download.md).
 
 The embedded Tectonic engine is built only by `just package` (and the manual
 `just prewarm` / `just compile-itest`), behind the `real-compiler` feature, so the core

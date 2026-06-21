@@ -4,6 +4,34 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-06-21
+
+Packaging, app identity & installers: native installers for every OS, file associations, a
+checksums recipe, and the update-availability plumbing — so Galley downloads, installs, pins, and
+opens a `.tex` on Windows, macOS, and Linux.
+
+### Added
+
+- **Cross-OS bundle targets** — `tauri.conf.json` now builds every native installer for the host
+  OS (`targets: "all"`): Linux `.AppImage` / `.deb` / `.rpm`, Windows `.msi` + NSIS `.exe`, macOS
+  `.app` / `.dmg`. Added publisher, homepage, the full icon set, the `.deb` section, the macOS
+  minimum system version, and the NSIS install mode.
+- **File associations** — Galley registers `.tex` (LaTeX Document) and `.galley` (Galley Project)
+  as opt-in editor associations. `file-assoc.ts` (`classifyOpenable`, `isGalleyOpenable`) is the
+  pure routing logic, 100 % covered.
+- **`update-check.ts`** — pure semver comparison (`parseVersion`, `compareVersions`,
+  `isUpdateAvailable`) backing the optional auto-updater's skippable prompt. 100 % covered.
+- **`scripts/release/checksums.sh` + `just checksums`** — emits `SHA256SUMS.txt` (one
+  `<sha256>  <name>` line per installer) so downloads verify with `sha256sum -c`.
+- **ADR-0031** and **`docs/packaging.md`** — per-OS build, signing/notarization (wired, enabled
+  when certs exist), checksums, the updater, and desktop integration.
+
+### Changed
+
+- **Icon set regenerated** from the 1024² master, legible down to 16 px, covering Windows `.ico`,
+  macOS `.icns`, and Linux hicolor PNGs.
+- **README** documents the download/installers and the per-OS `just package` flow.
+
 ## [0.7.2] - 2026-06-21
 
 Accessibility, i18n, themes & onboarding: two WCAG-AA high-contrast themes, a localization
