@@ -69,3 +69,70 @@
 
   --shadow-raised: 0 8px 26px rgba(0, 0, 0, 0.5);
 }
+
+/*
+ * High-contrast accessibility variants (WCAG AA, most pairings AAA). Same
+ * single-`data-theme` model; these push every text/background pairing well past
+ * the legibility floor and strengthen borders for low-vision use.
+ */
+[data-theme='onionskin-hc'] {
+  color-scheme: light;
+
+  --bg: #f6f0e1;
+  --bg-sunken: #e6dcc6;
+  --surface: #efe8d6;
+  --surface-raised: #fbf7ec;
+
+  --fg: #14110d;
+  --fg-muted: #332e26;
+  --fg-faint: #4d463b;
+
+  --border: #4a443b;
+  --border-strong: #14110d;
+
+  --accent: #8a2a21;
+  --accent-fg: #ffffff;
+  --accent-text: #8a2a21;
+
+  --danger: #8a2a21;
+  --danger-text: #8a2a21;
+  --success: #36513b;
+
+  --focus-ring: #8a2a21;
+  --selection-bg: rgba(138, 42, 33, 0.26);
+  --selection-fg: #14110d;
+  --overlay: rgba(20, 18, 16, 0.55);
+
+  --shadow-raised: 0 6px 22px rgba(28, 26, 23, 0.3);
+}
+
+[data-theme='carbon-hc'] {
+  color-scheme: dark;
+
+  --bg: #0a0908;
+  --bg-sunken: #040303;
+  --surface: #17130f;
+  --surface-raised: #201b16;
+
+  --fg: #fdfaf2;
+  --fg-muted: #d6cebd;
+  --fg-faint: #a99d8a;
+
+  --border: #6f665a;
+  --border-strong: #fdfaf2;
+
+  --accent: #cf5446;
+  --accent-fg: #0a0908;
+  --accent-text: #f0a59c;
+
+  --danger: #cf5446;
+  --danger-text: #f0a59c;
+  --success: #9fc0a4;
+
+  --focus-ring: #f0a59c;
+  --selection-bg: rgba(240, 165, 156, 0.26);
+  --selection-fg: #fdfaf2;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --shadow-raised: 0 8px 26px rgba(0, 0, 0, 0.6);
+}

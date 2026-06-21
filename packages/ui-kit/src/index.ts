@@ -20,7 +20,9 @@ export {
   type ThemePreference,
   THEME_PREFERENCES,
   THEME_LABELS,
+  THEMES,
   isTheme,
+  isHighContrast,
   isThemePreference,
   resolveTheme
 } from './theme';

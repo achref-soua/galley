@@ -59,7 +59,9 @@ function ratio(vars: Record<string, string>, fg: string, bg: string): number {
 
 describe.each([
   ['Onionskin', "data-theme='onionskin'"],
-  ['Carbon', "data-theme='carbon'"]
+  ['Carbon', "data-theme='carbon'"],
+  ['Onionskin High-Contrast', "data-theme='onionskin-hc'"],
+  ['Carbon High-Contrast', "data-theme='carbon-hc'"]
 ])('%s theme contrast', (_name, selector) => {
   const vars = themeVars(selector);
 

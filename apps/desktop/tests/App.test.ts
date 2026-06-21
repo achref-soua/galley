@@ -53,6 +53,14 @@ describe('App shell', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('shows the first-run onboarding tour and records completion on close', async () => {
+    render(App, { props: { onboarded: false } });
+    expect(screen.getByRole('dialog', { name: 'Welcome to Galley' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(screen.queryByRole('dialog', { name: 'Welcome to Galley' })).toBeNull();
+    expect(window.localStorage.getItem('galley:onboarded')).toBe('true');
+  });
+
   it('resizes the sidebar by dragging and persists the layout', async () => {
     render(App);
     const sep = screen.getByLabelText('Resize sidebar');

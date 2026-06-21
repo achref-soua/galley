@@ -89,13 +89,17 @@ compilation and can be deleted at any time. Files open and save with a dirty mar
 guard catches unsaved edits before you switch away. Everything stays inside the project
 root: a sandboxed file store refuses absolute paths, `..` traversal, and escaping symlinks.
 
-## Themes
+## Themes & accessibility
 
-Galley ships two first-class themes built from a single token system: **Onionskin**, the
-freshly-typed light sheet, and **Carbon**, the dark carbon-copy. The switcher follows your
-OS on first run, remembers your choice, and repaints the whole app — chrome, editor syntax
-colours, and PDF-viewer chrome — instantly. Reduced-motion is honoured throughout, and the
-palette is checked against WCAG contrast ratios in both themes on every build.
+Galley ships four first-class themes built from a single token system: **Onionskin**, the
+freshly-typed light sheet, and **Carbon**, the dark carbon-copy, each with a **High-Contrast**
+variant for low-vision use. The switcher follows your OS on first run, remembers your choice,
+and repaints the whole app — chrome, editor syntax colours, and PDF-viewer chrome — instantly.
+Every text/background pairing is checked against WCAG on every build (base text clears AAA; the
+high-contrast variants exceed AA throughout). Core flows are keyboard-navigable and
+screen-reader-labelled, reduced-motion is honoured, UI strings are externalised for localization
+(see [`docs/i18n.md`](docs/i18n.md)), and a first-run tour points the way in. More in
+[`docs/accessibility.md`](docs/accessibility.md).
 
 ## Performance
 
