@@ -4,6 +4,44 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-06-21
+
+Performance & low-spec: explicit budgets, an adaptive auto-compile debounce, memoised heavy
+imports, a progress-reported import, and a UI bundle-size gate so Galley stays quick on a modest
+laptop.
+
+### Added
+
+- **`galley-core::perf` module** — pure, I/O-free performance policy. `PerfBudget::REFERENCE`
+  states the master-plan §8.2 budgets (cold start, idle RAM, recompile, frame time, bundle size);
+  `evaluate` classifies a `Measurement` metric by metric into a `BudgetReport`; and
+  `adaptive_debounce_ms` scales the auto-compile delay to document size, clamped between 250 ms and
+  1500 ms. 100 % Rust region/line/function coverage.
+- **`perf-budget.ts`** — the same budgets and `adaptiveDebounceMs` mirrored on the frontend, plus
+  `evaluateBundle` / `countsTowardBudget` for the bundle-size gate. Single source of truth shared
+  with the Rust policy. 100 % Vitest covered.
+- **`startup.ts`** — cold-start primitives: `once` memoises an expensive loader so heavy modules are
+  constructed at most once, and `deferIdle` pushes non-critical work past first paint via
+  `requestIdleCallback` (falling back to `setTimeout`). 100 % covered.
+- **`import-progress.ts`** — a pure progress model for the import wizard (ordered phases, in-voice
+  labels, completion percent). 100 % covered.
+- **`scripts/ci/bundle-gate.sh` + `just bundle-gate`** — sums the gzipped JS + CSS of the built
+  frontend and fails if it exceeds the §8.2 budget (1536 KiB). Wired into `just ci`; the current
+  bundle sits comfortably at ~600 KiB.
+- **ADR-0029** — performance & low-spec decisions (shared budget policy, adaptive debounce, lazy
+  loading via memoised dynamic imports, the bundle gate).
+- **`docs/performance.md`** — the performance budgets, how each is met, and how to measure them.
+
+### Changed
+
+- **Auto-compile debounce is now adaptive** — `ProjectController.edit` scales the debounce to the
+  document length so large documents coalesce a burst of keystrokes into a single build instead of
+  recompiling on every change.
+- **PDF.js engine and worker imports are memoised** — `pdf.ts` resolves the heavy `pdfjs-dist`
+  modules once per session via `once` rather than on every page render.
+- **The import wizard reports its phase** — the confirm step now shows an in-voice phase label while
+  a project is being brought in.
+
 ## [0.7.0] - 2026-06-21
 
 Security hardening: compile sandbox finalised, shell-escape guarded, archive hardened, threat model documented.

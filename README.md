@@ -97,6 +97,16 @@ OS on first run, remembers your choice, and repaints the whole app — chrome, e
 colours, and PDF-viewer chrome — instantly. Reduced-motion is honoured throughout, and the
 palette is checked against WCAG contrast ratios in both themes on every build.
 
+## Performance
+
+Galley is built to stay quick on a modest laptop, with budgets declared in code
+(`galley-core::perf`, mirrored in `perf-budget.ts`): cold start ≤ 2.5 s, idle RAM ≤ ~150 MB,
+sub-second cached recompiles, a 16 ms frame budget, and a ≤ 1536 KiB gzipped UI bundle. The
+auto-compile debounce scales with document size so a 100-page document coalesces a burst of
+keystrokes into one build; MathLive and PDF.js are code-split and loaded on demand; and a
+bundle-size gate runs on every `just ci` (the bundle currently sits at ~600 KiB). See
+[`docs/performance.md`](docs/performance.md).
+
 ## Why Galley
 
 - **Instant & local-first.** A warm, embedded compile engine and an in-memory build cache,

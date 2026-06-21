@@ -27,6 +27,7 @@ import {
 } from './bibliography';
 import { type BibBackend, type LookupKind } from './bib-backend';
 import { type Timer, windowTimer } from './debounce';
+import { adaptiveDebounceMs } from './perf-budget';
 import { type Clock, systemClock } from './timing';
 import { type Bell, webAudioBell } from './bell';
 
@@ -415,7 +416,10 @@ export class ProjectController {
     }
     this.#set({ content });
     if (this.#autoCompile && this.#state.activePath !== null) {
-      this.#timer.set(() => void this.compile(), this.#debounceMs);
+      // Scale the debounce to document size so a large document coalesces a
+      // burst of keystrokes into one build instead of recompiling each time.
+      const delayMs = Math.max(this.#debounceMs, adaptiveDebounceMs(content.length));
+      this.#timer.set(() => void this.compile(), delayMs);
     }
   }
 

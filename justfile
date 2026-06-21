@@ -6,8 +6,8 @@ set shell := ["bash", "-uc"]
 default:
     @just --list
 
-# Full local quality gate: format → lint → coverage → audit → docs → build.
-ci: format lint cover audit docs-gate build
+# Full local quality gate: format → lint → coverage → audit → docs → build → bundle budget.
+ci: format lint cover audit docs-gate build bundle-gate
 
 # Formatting and type checks (no writes).
 format:
@@ -44,6 +44,10 @@ docs-gate:
 # Build every crate and the frontend bundle (no native packaging).
 build:
     bash scripts/ci/build.sh
+
+# UI bundle-size budget — fails if gzipped JS+CSS exceeds the §8.2 budget.
+bundle-gate:
+    bash scripts/ci/bundle-gate.sh
 
 # Regenerate the app icon set from the 1024² brand master.
 icons:
