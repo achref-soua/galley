@@ -36,6 +36,11 @@ export function compareVersions(a: Version, b: Version): number {
   return a.patch - b.patch;
 }
 
+/** Strip a leading `v` from a release tag (e.g. `v0.9.1` → `0.9.1`). */
+export function tagToVersion(tag: string): string {
+  return tag.startsWith('v') ? tag.slice(1) : tag;
+}
+
 /** Whether `latest` is a strictly newer release than `current`. */
 export function isUpdateAvailable(current: string, latest: string): boolean {
   const c = parseVersion(current);

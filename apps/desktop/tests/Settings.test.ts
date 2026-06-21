@@ -12,6 +12,7 @@ const base = {
   spellCheck: false,
   syncScroll: false,
   crashReports: false,
+  updateChecks: true,
   appVersion: '0.8.0',
   aiBackend: browserAiBackend(),
   onthemechange: () => {},
@@ -21,6 +22,7 @@ const base = {
   onspellcheckchange: () => {},
   onsyncscrollchange: () => {},
   oncrashreportschange: () => {},
+  onupdatecheckschange: () => {},
   onfeedback: () => {},
   onclose: () => {}
 };
@@ -72,6 +74,14 @@ describe('Settings', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: 'Send feedback…' }));
     expect(onfeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('toggles launch-time update checks in About', async () => {
+    const onupdatecheckschange = vi.fn();
+    render(Settings, { props: { ...base, updateChecks: true, onupdatecheckschange } });
+    await fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    await fireEvent.click(screen.getByRole('switch', { name: 'Check for updates on launch' }));
+    expect(onupdatecheckschange).toHaveBeenCalledWith(false);
   });
 
   it('reflects and toggles the compilation preferences', async () => {
