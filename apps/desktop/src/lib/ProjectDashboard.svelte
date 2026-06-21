@@ -7,6 +7,7 @@
     registry,
     windowBackend,
     onopen,
+    onopenfolder,
     onopennewwindow,
     onnew,
     ontemplate,
@@ -18,6 +19,8 @@
     windowBackend: WindowBackend;
     /** Open the given project root in this window. */
     onopen: (root: string) => void;
+    /** Pick and open an existing folder (native picker). */
+    onopenfolder: () => void;
     /** Open a new blank window. */
     onopennewwindow: () => void;
     /** Create a new project (pick parent + name). */
@@ -129,6 +132,7 @@
     <h2 class="dash-title">All Projects</h2>
     <div class="dash-actions">
       <Button variant="primary" size="sm" onclick={onnew}>New project…</Button>
+      <Button variant="ghost" size="sm" onclick={onopenfolder}>Open a folder…</Button>
       <Button variant="ghost" size="sm" onclick={ontemplate}>From template…</Button>
       <Button variant="ghost" size="sm" onclick={onimport}>Import…</Button>
       <Button variant="ghost" size="sm" onclick={handleNewWindow}>New window</Button>

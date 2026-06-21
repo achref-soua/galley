@@ -1,17 +1,42 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-test('the workspace shows the wordmark and all three panes', async ({ page }) => {
+// The feature flows run as a returning user; the first-run onboarding tour is a
+// modal overlay that intercepts clicks until dismissed, and is covered by its own
+// test below. Mark onboarding done before each navigation.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('galley:onboarded', 'true'));
+});
+
+/**
+ * The real first-run entry point is the project dashboard launcher. Open the
+ * seeded demo project from it and wait for the editor — this also dismisses the
+ * dashboard overlay so the titlebar becomes interactive.
+ */
+async function openDemo(page: Page): Promise<void> {
   await page.goto('/');
-  await expect(page.getByText('Galley', { exact: true })).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Project dashboard' })
+    .getByRole('button', { name: 'Open a folder…' })
+    .click();
+  await expect(page.getByLabel('LaTeX source')).toBeVisible();
+}
+
+test('first load shows the wordmark and the project dashboard launcher', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Galley', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Project dashboard' })).toBeVisible();
+});
+
+test('opening a project from the dashboard reveals all three panes', async ({ page }) => {
+  await openDemo(page);
   await expect(page.getByLabel('Editor', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Preview', { exact: true })).toBeVisible();
-  await expect(page.getByText('No project open yet.')).toBeVisible();
 });
 
 test('switching the theme repaints the whole app and persists', async ({ page }) => {
-  await page.goto('/');
+  await openDemo(page);
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByRole('radio', { name: 'Carbon' }).click();
+  await page.getByRole('radio', { name: 'Carbon', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'carbon');
 
   await page.reload();
@@ -19,22 +44,16 @@ test('switching the theme repaints the whole app and persists', async ({ page })
 });
 
 test('a pane can be collapsed from the titlebar', async ({ page }) => {
-  await page.goto('/');
+  await openDemo(page);
   await page.getByRole('button', { name: 'Hide preview' }).click();
   await expect(page.getByLabel('Preview', { exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'Show preview' }).click();
   await expect(page.getByLabel('Preview', { exact: true })).toBeVisible();
 });
 
-test('open a project, edit in the CodeMirror editor, and meet the unsaved-changes guard', async ({
-  page
-}) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open a folder…' }).click();
-
-  // The root document opens in the CodeMirror editor.
+test('edit in the CodeMirror editor and meet the unsaved-changes guard', async ({ page }) => {
+  await openDemo(page);
   const editor = page.getByLabel('LaTeX source');
-  await expect(editor).toBeVisible();
   await editor.click();
   await page.keyboard.type(' an unsaved edit');
 
@@ -49,10 +68,7 @@ test('open a project, edit in the CodeMirror editor, and meet the unsaved-change
 });
 
 test('compile the open document and see the proof in the preview', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open a folder…' }).click();
-  await expect(page.getByLabel('LaTeX source')).toBeVisible();
-
+  await openDemo(page);
   await page.getByRole('button', { name: 'Compile' }).click();
 
   // The PDF.js preview renders the proof onto a canvas and reports one page.
@@ -61,8 +77,7 @@ test('compile the open document and see the proof in the preview', async ({ page
 });
 
 test('a failed build lists a friendly problem you can jump to', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open a folder…' }).click();
+  await openDemo(page);
 
   // Replace the document with one that never closes, so the build fails.
   const editor = page.getByLabel('LaTeX source');
@@ -82,9 +97,7 @@ test('a failed build lists a friendly problem you can jump to', async ({ page })
 });
 
 test('editing auto-compiles and shows a fresh proof', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open a folder…' }).click();
-
+  await openDemo(page);
   const editor = page.getByLabel('LaTeX source');
   await editor.click();
   await page.keyboard.type(' edited');
@@ -94,11 +107,8 @@ test('editing auto-compiles and shows a fresh proof', async ({ page }) => {
 });
 
 test('the language server drives completion and the document outline', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open a folder…' }).click();
-
+  await openDemo(page);
   const editor = page.getByLabel('LaTeX source');
-  await expect(editor).toBeVisible();
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type('\\se');
@@ -113,4 +123,19 @@ test('the language server drives completion and the document outline', async ({ 
   await expect(symbol).toBeVisible();
   await symbol.click();
   await expect(editor).toBeVisible();
+});
+
+test('first run shows the onboarding tour and Skip dismisses it', async ({ page }) => {
+  // Undo the returning-user flag from beforeEach so the first-run tour appears.
+  await page.addInitScript(() => window.localStorage.removeItem('galley:onboarded'));
+  await page.goto('/');
+
+  const tour = page.getByRole('dialog', { name: 'Welcome to Galley' });
+  await expect(tour).toBeVisible();
+
+  // Walk one step, then skip; the dashboard launcher is usable afterwards.
+  await tour.getByRole('button', { name: 'Next' }).click();
+  await tour.getByRole('button', { name: 'Skip' }).click();
+  await expect(tour).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Project dashboard' })).toBeVisible();
 });
