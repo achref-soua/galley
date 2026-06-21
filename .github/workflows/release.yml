@@ -78,6 +78,7 @@ jobs:
           Add-Content $env:GITHUB_ENV "TECTONIC_DEP_BACKEND=vcpkg"
           Add-Content $env:GITHUB_ENV "VCPKGRS_TRIPLET=x64-windows-static"
           Add-Content $env:GITHUB_ENV "RUSTFLAGS=-Ctarget-feature=+crt-static"
+          Add-Content $env:GITHUB_ENV "CXXFLAGS=/std:c++17"
 
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
