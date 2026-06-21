@@ -1,0 +1,78 @@
+# Galley release — builds the native installers on each OS and uploads them to the
+# GitHub Release for the pushed tag. This is how the cross-OS installers (the ones
+# the install.sh / install.ps1 one-liners download) are produced: a Tauri GUI app
+# cannot be cross-compiled from Linux, so the Windows and macOS bundles must come
+# from windows-latest / macos-latest runners.
+#
+# Fires on a version tag (e.g. v0.9.3). Requires GitHub Actions to be enabled for
+# the repository; until then the local `just package` builds the current OS's
+# installers by hand.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and attach installers to (e.g. v0.9.3)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libxdo-dev build-essential file
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and upload installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'Galley ${{ github.event.inputs.tag || github.ref_name }}'
+          releaseBody: 'Native installers for Windows, macOS, and Linux. See CHANGELOG.md.'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

@@ -6,13 +6,17 @@ Galley installs with one command and keeps itself current.
 
 ```sh
 # Linux / macOS
-curl -fsSL https://github.com/achref-soua/galley/releases/latest/download/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.sh | sh
 ```
 
 ```powershell
 # Windows
-irm https://github.com/achref-soua/galley/releases/latest/download/install.ps1 | iex
+irm https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.ps1 | iex
 ```
+
+> The one-liner is served from `raw.githubusercontent.com` (UTF-8), so the wordmark renders
+> correctly in PowerShell; the release-asset URL serves `octet-stream`, which PowerShell would
+> mis-decode.
 
 The installer downloads the right native build for your OS, verifies its SHA-256
 against the release's `SHA256SUMS.txt`, installs a small `galley` launcher, and
