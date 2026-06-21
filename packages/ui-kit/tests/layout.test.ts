@@ -5,9 +5,12 @@ import {
   SIDEBAR_MAX,
   PREVIEW_MIN,
   PREVIEW_MAX,
+  BOTTOM_MIN,
+  BOTTOM_MAX,
   clamp,
   setSidebarWidth,
   setPreviewWidth,
+  setBottomPanelHeight,
   toggleSidebar,
   togglePreview,
   serializeLayout,
@@ -47,6 +50,23 @@ describe('setPreviewWidth', () => {
   });
 });
 
+describe('setBottomPanelHeight', () => {
+  it('rounds and keeps a height within bounds', () => {
+    expect(setBottomPanelHeight(DEFAULT_LAYOUT, 300.6).bottomPanelHeight).toBe(301);
+  });
+
+  it('clamps below the minimum and above the maximum', () => {
+    expect(setBottomPanelHeight(DEFAULT_LAYOUT, 10).bottomPanelHeight).toBe(BOTTOM_MIN);
+    expect(setBottomPanelHeight(DEFAULT_LAYOUT, 9999).bottomPanelHeight).toBe(BOTTOM_MAX);
+  });
+
+  it('leaves the other panes untouched', () => {
+    const next = setBottomPanelHeight(DEFAULT_LAYOUT, 320);
+    expect(next.sidebarWidth).toBe(DEFAULT_LAYOUT.sidebarWidth);
+    expect(next.previewWidth).toBe(DEFAULT_LAYOUT.previewWidth);
+  });
+});
+
 describe('collapse toggles', () => {
   it('flips the sidebar flag without touching the preview', () => {
     const next = toggleSidebar(DEFAULT_LAYOUT);
@@ -64,23 +84,54 @@ describe('serialize / parse round-trip', () => {
     const state: LayoutState = {
       sidebarWidth: 320,
       previewWidth: 500,
+      bottomPanelHeight: 300,
       sidebarCollapsed: true,
       previewCollapsed: false
     };
     expect(parseLayout(serializeLayout(state))).toEqual(state);
   });
 
-  it('re-clamps out-of-range stored widths', () => {
+  it('re-clamps out-of-range stored widths and bottom height', () => {
     const restored = parseLayout(
       JSON.stringify({
         sidebarWidth: 5000,
         previewWidth: 10,
+        bottomPanelHeight: 5000,
         sidebarCollapsed: false,
         previewCollapsed: true
       })
     );
     expect(restored.sidebarWidth).toBe(SIDEBAR_MAX);
     expect(restored.previewWidth).toBe(PREVIEW_MIN);
+    expect(restored.bottomPanelHeight).toBe(BOTTOM_MAX);
+  });
+
+  it('defaults the bottom height for a layout persisted before it existed', () => {
+    // A legacy layout (no bottomPanelHeight) is still valid: keep its widths and
+    // fall back to the default dock height rather than discarding the whole thing.
+    const restored = parseLayout(
+      JSON.stringify({
+        sidebarWidth: 300,
+        previewWidth: 460,
+        sidebarCollapsed: false,
+        previewCollapsed: false
+      })
+    );
+    expect(restored.sidebarWidth).toBe(300);
+    expect(restored.bottomPanelHeight).toBe(DEFAULT_LAYOUT.bottomPanelHeight);
+  });
+
+  it('defaults the bottom height when the stored value is not a number', () => {
+    const restored = parseLayout(
+      JSON.stringify({
+        sidebarWidth: 300,
+        previewWidth: 460,
+        bottomPanelHeight: 'tall',
+        sidebarCollapsed: false,
+        previewCollapsed: false
+      })
+    );
+    expect(restored.bottomPanelHeight).toBe(DEFAULT_LAYOUT.bottomPanelHeight);
   });
 });
 

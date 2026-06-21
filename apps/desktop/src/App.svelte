@@ -439,6 +439,7 @@
 
   const sidebarStyle = $derived(`width: ${layout.sidebarWidth}px`);
   const previewStyle = $derived(`width: ${layout.previewWidth}px`);
+  const bottomDockStyle = $derived(`height: ${layout.bottomPanelHeight}px`);
   const documentName = $derived(project.activePath ?? 'No document');
   const dirty = $derived(project.activePath !== null && project.content !== project.savedContent);
   const canCompile = $derived(project.activePath !== null);
@@ -582,6 +583,22 @@
 
   function stepPreview(direction: number) {
     layoutController.setPreviewWidth(layout.previewWidth - direction * RESIZE_STEP);
+    layout = layoutController.state;
+  }
+
+  function startBottomResize() {
+    resizeBaseline = layout.bottomPanelHeight;
+  }
+
+  // Dragging the handle down (positive delta) shrinks the dock so the editor
+  // grows; dragging up enlarges it — mirroring the preview's right-edge handle.
+  function bottomResize(delta: number) {
+    layoutController.setBottomPanelHeight(resizeBaseline - delta);
+    layout = layoutController.state;
+  }
+
+  function stepBottom(direction: number) {
+    layoutController.setBottomPanelHeight(layout.bottomPanelHeight - direction * RESIZE_STEP);
     layout = layoutController.state;
   }
 
@@ -793,20 +810,30 @@
             createEditor={editor}
           />
         </div>
-        <ProblemsPanel {diagnostics} onjump={jumpToLine} />
-        <OutlinePanel
-          symbols={project.symbols}
-          {includes}
-          content={project.content}
-          onjump={(line) => jumpToLine(line + 1)}
-          onopenfile={(path) => void projectController.requestOpenFile(path)}
-          onreorder={handleSectionReorder}
+        <Resizer
+          label="Resize bottom panel"
+          orientation="horizontal"
+          onresizestart={startBottomResize}
+          onresize={bottomResize}
+          onresizeend={endResize}
+          onstep={stepBottom}
         />
-        <ReviewPanel
-          entries={reviewEntries}
-          onaccept={handleAcceptReview}
-          onreject={handleRejectReview}
-        />
+        <div class="bottom-dock" style={bottomDockStyle}>
+          <ProblemsPanel {diagnostics} onjump={jumpToLine} />
+          <OutlinePanel
+            symbols={project.symbols}
+            {includes}
+            content={project.content}
+            onjump={(line) => jumpToLine(line + 1)}
+            onopenfile={(path) => void projectController.requestOpenFile(path)}
+            onreorder={handleSectionReorder}
+          />
+          <ReviewPanel
+            entries={reviewEntries}
+            onaccept={handleAcceptReview}
+            onreject={handleRejectReview}
+          />
+        </div>
         {#if searchOpen}
           <SearchPanel
             root={searchRoot}
@@ -1059,6 +1086,16 @@
   .editor-area {
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  /* The dock below the editor: problems, outline, review. Its height is
+     user-draggable (persisted in the layout store); content scrolls within. */
+  .bottom-dock {
+    flex: none;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
 
   .graphicspath-banner {

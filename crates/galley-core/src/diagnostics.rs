@@ -65,6 +65,15 @@ pub enum DiagnosticKind {
     UndefinedReference,
     /// `LaTeX Warning: Citation `x' … undefined.` — a missing `\cite` key.
     UndefinedCitation,
+    /// `LaTeX Warning: Label(s) may have changed. Rerun …` or `Please rerun …`
+    /// — cross-references shifted and the engine wants another pass.
+    RerunNeeded,
+    /// `Package inputenc Warning: inputenc package ignored with utf8 based
+    /// engines.` — `inputenc` is a no-op under XeTeX/LuaTeX.
+    InputencIgnored,
+    /// `LaTeX Warning: Empty `thebibliography' environment …` — the bibliography
+    /// produced no entries.
+    EmptyBibliography,
     /// Any other `LaTeX Warning: …`.
     LatexWarning,
     /// `Package x Warning: …` — a package raised a warning.
@@ -95,6 +104,9 @@ impl DiagnosticKind {
             DiagnosticKind::LatexError => "latex-error",
             DiagnosticKind::UndefinedReference => "undefined-reference",
             DiagnosticKind::UndefinedCitation => "undefined-citation",
+            DiagnosticKind::RerunNeeded => "rerun-needed",
+            DiagnosticKind::InputencIgnored => "inputenc-ignored",
+            DiagnosticKind::EmptyBibliography => "empty-bibliography",
             DiagnosticKind::LatexWarning => "latex-warning",
             DiagnosticKind::PackageWarning => "package-warning",
             DiagnosticKind::OverfullBox => "overfull-box",
@@ -116,6 +128,9 @@ impl DiagnosticKind {
             | DiagnosticKind::LatexError => Severity::Error,
             DiagnosticKind::UndefinedReference
             | DiagnosticKind::UndefinedCitation
+            | DiagnosticKind::RerunNeeded
+            | DiagnosticKind::InputencIgnored
+            | DiagnosticKind::EmptyBibliography
             | DiagnosticKind::LatexWarning
             | DiagnosticKind::PackageWarning => Severity::Warning,
             DiagnosticKind::OverfullBox | DiagnosticKind::UnderfullBox => Severity::BadBox,
@@ -162,6 +177,18 @@ impl DiagnosticKind {
             DiagnosticKind::UndefinedCitation => {
                 "This \\cite key isn't in your bibliography. Add the entry to your .bib, or correct \
                  the key."
+            }
+            DiagnosticKind::RerunNeeded => {
+                "Cross-references shifted on this pass, so a number or page may be stale. Galley \
+                 re-runs the engine to settle them — if one still looks wrong, compile once more."
+            }
+            DiagnosticKind::InputencIgnored => {
+                "You're on a Unicode engine (XeTeX or LuaTeX), which already reads UTF-8, so \
+                 \\usepackage{inputenc} does nothing here. You can drop that line."
+            }
+            DiagnosticKind::EmptyBibliography => {
+                "The bibliography came out empty — nothing was cited, or the entry list is blank. \
+                 Add a \\bibitem (or a \\cite that matches a .bib entry), then recompile."
             }
             DiagnosticKind::LatexWarning => {
                 "LaTeX finished but flagged something. Often a rerun settles it; sometimes it wants \
@@ -347,7 +374,7 @@ fn parse_warning_line(line: &str) -> Option<Diagnostic> {
     }
     if let Some(rest) = package_warning_body(line) {
         return Some(Diagnostic::new(
-            DiagnosticKind::PackageWarning,
+            classify_package_warning(rest),
             clean(rest),
             None,
             input_line(rest),
@@ -370,7 +397,8 @@ fn package_warning_body(line: &str) -> Option<&str> {
     Some(&rest[at + marker.len()..])
 }
 
-/// Sub-classify a LaTeX warning body into a reference, citation, or generic kind.
+/// Sub-classify a LaTeX warning body into a reference, citation, rerun, empty
+/// bibliography, or generic kind.
 fn classify_latex_warning(rest: &str) -> (DiagnosticKind, String) {
     let message = clean(rest);
     if rest.starts_with("Reference ") && rest.contains("undefined") {
@@ -379,7 +407,31 @@ fn classify_latex_warning(rest: &str) -> (DiagnosticKind, String) {
     if rest.starts_with("Citation ") && rest.contains("undefined") {
         return (DiagnosticKind::UndefinedCitation, message);
     }
+    if rest.contains("thebibliography") {
+        return (DiagnosticKind::EmptyBibliography, message);
+    }
+    if mentions_rerun(rest) {
+        return (DiagnosticKind::RerunNeeded, message);
+    }
     (DiagnosticKind::LatexWarning, message)
+}
+
+/// Sub-classify a `Package … Warning:` body. `inputenc`'s no-op note and any
+/// "rerun" request get their own actionable kinds; everything else is generic.
+fn classify_package_warning(rest: &str) -> DiagnosticKind {
+    if rest.contains("ignored with utf8") {
+        return DiagnosticKind::InputencIgnored;
+    }
+    if mentions_rerun(rest) {
+        return DiagnosticKind::RerunNeeded;
+    }
+    DiagnosticKind::PackageWarning
+}
+
+/// Whether a warning body asks for another compile pass — TeX phrases this as
+/// "Rerun to get …" or "Please rerun …", so match case-insensitively.
+fn mentions_rerun(text: &str) -> bool {
+    text.to_ascii_lowercase().contains("rerun")
 }
 
 /// Recognise an `Overfull`/`Underfull` bad-box line, carrying its first line.
@@ -468,7 +520,7 @@ mod tests {
     use super::*;
 
     /// Every diagnostic kind, for exhaustive metadata checks.
-    const ALL_KINDS: [DiagnosticKind; 14] = [
+    const ALL_KINDS: [DiagnosticKind; 17] = [
         DiagnosticKind::UndefinedControlSequence,
         DiagnosticKind::MissingDollar,
         DiagnosticKind::RunawayArgument,
@@ -478,6 +530,9 @@ mod tests {
         DiagnosticKind::LatexError,
         DiagnosticKind::UndefinedReference,
         DiagnosticKind::UndefinedCitation,
+        DiagnosticKind::RerunNeeded,
+        DiagnosticKind::InputencIgnored,
+        DiagnosticKind::EmptyBibliography,
         DiagnosticKind::LatexWarning,
         DiagnosticKind::PackageWarning,
         DiagnosticKind::OverfullBox,
@@ -708,6 +763,53 @@ mod tests {
     }
 
     #[test]
+    fn detects_a_rerun_request_from_latex_with_no_line() {
+        // "Label(s) may have changed" carries no input line — but it is still an
+        // actionable rerun note, and every panel entry can be expanded for detail.
+        let log = "LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.";
+        let diagnostic = only(log);
+        assert_eq!(diagnostic.kind, DiagnosticKind::RerunNeeded);
+        assert_eq!(diagnostic.severity, Severity::Warning);
+        assert!(diagnostic.line.is_none());
+        assert!(diagnostic.explanation.contains("compile once more"));
+    }
+
+    #[test]
+    fn detects_a_rerun_request_from_a_package_with_a_line() {
+        let log = "Package rerunfilecheck Warning: File `main.out' has changed. Rerun on input line 5.";
+        let diagnostic = only(log);
+        assert_eq!(diagnostic.kind, DiagnosticKind::RerunNeeded);
+        assert_eq!(diagnostic.line, Some(5));
+    }
+
+    #[test]
+    fn detects_the_inputenc_ignored_note() {
+        let log = "Package inputenc Warning: inputenc package ignored with utf8 based engines.";
+        let diagnostic = only(log);
+        assert_eq!(diagnostic.kind, DiagnosticKind::InputencIgnored);
+        assert_eq!(diagnostic.severity, Severity::Warning);
+        assert!(diagnostic.line.is_none());
+        assert!(diagnostic.explanation.contains("inputenc"));
+    }
+
+    #[test]
+    fn detects_an_empty_bibliography_warning_with_its_line() {
+        let log = "LaTeX Warning: Empty `thebibliography' environment on input line 3.";
+        let diagnostic = only(log);
+        assert_eq!(diagnostic.kind, DiagnosticKind::EmptyBibliography);
+        assert_eq!(diagnostic.line, Some(3));
+        assert!(diagnostic.explanation.contains("bibliography"));
+    }
+
+    #[test]
+    fn a_plain_package_warning_is_not_mistaken_for_a_rerun() {
+        // A package note without "rerun" stays a generic package warning.
+        let log = "Package fancyhdr Warning: \\headheight is too small on input line 8.";
+        let diagnostic = only(log);
+        assert_eq!(diagnostic.kind, DiagnosticKind::PackageWarning);
+    }
+
+    #[test]
     fn detects_an_overfull_box_with_a_line_range() {
         let log = "Overfull \\hbox (15.38pt too wide) in paragraph at lines 12--14";
         let diagnostic = only(log);
@@ -771,7 +873,8 @@ mod tests {
                 DiagnosticKind::UndefinedControlSequence,
                 DiagnosticKind::UndefinedReference,
                 DiagnosticKind::OverfullBox,
-                DiagnosticKind::PackageWarning,
+                // "Please rerun …" is now recognised as an actionable rerun note.
+                DiagnosticKind::RerunNeeded,
             ]
         );
         assert_eq!(

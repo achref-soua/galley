@@ -1,27 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Shared, controllable PDF.js mock state.
-const mock = vi.hoisted(() => ({ numPages: 1 }));
+// Shared, controllable PDF.js mock state. `lastData` records the bytes the last
+// getDocument call received, so a test can prove a fresh copy was handed over.
+const mock = vi.hoisted(() => ({ numPages: 1, lastData: null as Uint8Array | null }));
 
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: 'pdf.worker.js' }));
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: () => ({
-    promise: Promise.resolve({
-      numPages: mock.numPages,
-      getPage: () =>
-        Promise.resolve({
-          getViewport: ({ scale }: { scale: number }) => ({
-            width: 120 * scale,
-            height: 160 * scale
-          }),
-          render: () => ({
-            promise: Promise.resolve()
+  getDocument: ({ data }: { data: Uint8Array }) => {
+    // The real PDF.js transfers `data` to its worker, which detaches the backing
+    // ArrayBuffer. Emulate that here so the "render twice from the same bytes"
+    // regression is genuine rather than relying on an inert mock.
+    mock.lastData = data;
+    structuredClone(data.buffer, { transfer: [data.buffer] });
+    return {
+      promise: Promise.resolve({
+        numPages: mock.numPages,
+        getPage: () =>
+          Promise.resolve({
+            getViewport: ({ scale }: { scale: number }) => ({
+              width: 120 * scale,
+              height: 160 * scale
+            }),
+            render: () => ({
+              promise: Promise.resolve()
+            })
           })
-        })
-    })
-  })
+      })
+    };
+  }
 }));
 
 import { pdfjsRenderer, syncTexToCanvas, canvasToPdfPoint, SP_PER_PT } from '../src/lib/pdf';
@@ -85,6 +93,29 @@ describe('canvasToPdfPoint', () => {
 describe('pdfjsRenderer', () => {
   beforeEach(() => {
     mock.numPages = 1;
+    mock.lastData = null;
+  });
+
+  it('copies the bytes per render so the source buffer is never detached', async () => {
+    mock.numPages = 2;
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getContext').mockReturnValue({} as unknown as CanvasRenderingContext2D);
+    const renderer = pdfjsRenderer();
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+
+    await renderer.render(bytes, canvas, 1, 1.5);
+    // PDF.js detached the *copy* it was handed, not our source buffer. Compare
+    // references with `===` (not `toBe`) so the matcher never serialises the now
+    // detached array.
+    expect(mock.lastData === bytes).toBe(false);
+    expect(mock.lastData?.byteLength).toBe(0);
+    expect(bytes.byteLength).toBe(4);
+
+    // A second render of the very same bytes still succeeds — this is the bug:
+    // before the fix the source buffer was already detached and PDF.js threw.
+    const second = await renderer.render(bytes, canvas, 1, 2);
+    expect(second.pageCount).toBe(2);
+    expect(bytes.byteLength).toBe(4);
   });
 
   it('renders a page onto the canvas and reports the page count', async () => {
