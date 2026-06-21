@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { DEFAULT_LAYOUT, SIDEBAR_MAX, PREVIEW_MIN } from '@galley/ui-kit';
+import { DEFAULT_LAYOUT, SIDEBAR_MAX, PREVIEW_MIN, BOTTOM_MAX } from '@galley/ui-kit';
 import { LayoutController, LAYOUT_STORAGE_KEY } from '../src/lib/layout-store';
 
 function makeStorage(initial?: string) {
@@ -49,6 +49,18 @@ describe('LayoutController', () => {
 
     c.setPreviewWidth(10);
     expect(c.state.previewWidth).toBe(PREVIEW_MIN);
+  });
+
+  it('clamps and persists the bottom panel height', () => {
+    const { storage, map } = makeStorage();
+    const c = new LayoutController(storage);
+    const seen = vi.fn();
+    c.subscribe(seen);
+
+    c.setBottomPanelHeight(9999);
+    expect(c.state.bottomPanelHeight).toBe(BOTTOM_MAX);
+    expect(seen).toHaveBeenLastCalledWith(c.state);
+    expect(JSON.parse(map.get(LAYOUT_STORAGE_KEY)!).bottomPanelHeight).toBe(BOTTOM_MAX);
   });
 
   it('toggles the collapse flags', () => {

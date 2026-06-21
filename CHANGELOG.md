@@ -4,6 +4,41 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-06-21
+
+A bug-sweep release: a real-user and code pass that fixed the preview, made compile diagnostics
+actionable, gave the editor's bottom dock a draggable height, and replaced the screenshots with an
+honest editor-and-proof view.
+
+### Fixed
+
+- **The PDF preview no longer breaks on the second render.** PDF.js transfers the bytes to its
+  worker, detaching the backing `ArrayBuffer`; the preview held those bytes immutably and re-rendered
+  them on every page turn and zoom change, so the second render failed with _"ArrayBuffer at index 0
+  is already detached."_ The renderer now hands PDF.js a fresh copy each time, so paging and zoom both
+  work.
+- **Zoom rescales the proof.** With the detached-buffer bug fixed, the 100–200% zoom control
+  re-renders the page at the chosen scale instead of erroring on the first change.
+
+### Added
+
+- **Actionable compile diagnostics.** The log parser now recognises the `inputenc`-ignored note, an
+  empty `thebibliography`, and "rerun to get cross-references right" as their own categories, each
+  with a plain-language explanation and a fix tip. Every entry in the problems panel now expands for
+  detail — the raw log line plus a jump-to-source button — even when the log gave it no line number.
+- **A resizable bottom dock.** The panel below the editor (problems, outline, review) has a
+  draggable, persisted height with a horizontal resize handle (and arrow-key nudges), so it can be
+  shrunk to reclaim editor space. Layouts saved before this release upgrade gracefully.
+- **A real proof beside the editor in the web build.** The engine-less browser/dev build now returns
+  a genuine one-page proof — typeset from a sample document by the embedded Tectonic engine — as its
+  in-memory compile result, so the live preview, the e2e tests, and the regenerated screenshots/demo
+  show an honest editor-and-proof view.
+
+### Changed
+
+- The marketing screenshots and the demo recording now show the editor and the live proof side by
+  side, across the Onionskin, Carbon, and Carbon High-Contrast themes.
+
 ## [0.9.3] - 2026-06-21
 
 Installer fixes & cross-OS release automation: the Windows installer now renders the wordmark

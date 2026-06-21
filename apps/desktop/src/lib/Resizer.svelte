@@ -1,6 +1,7 @@
 <script lang="ts">
   let {
     label,
+    orientation = 'vertical',
     onresizestart,
     onresize,
     onresizeend,
@@ -8,21 +9,32 @@
   }: {
     /** Accessible name for the separator. */
     label: string;
-    /** Pointer drag begins; capture the current pane width here. */
+    /**
+     * `'vertical'` is a vertical bar that resizes a pane's *width* (drag left /
+     * right); `'horizontal'` is a horizontal bar that resizes a pane's *height*
+     * (drag up / down). Defaults to vertical for the sidebar/preview handles.
+     */
+    orientation?: 'vertical' | 'horizontal';
+    /** Pointer drag begins; capture the current pane size here. */
     onresizestart: () => void;
-    /** Pointer moved `delta` px from where the drag began. */
+    /** Pointer moved `delta` px along the resize axis from where the drag began. */
     onresize: (delta: number) => void;
     /** Pointer drag ended. */
     onresizeend: () => void;
-    /** Keyboard nudge: −1 (left) or +1 (right). */
+    /** Keyboard nudge: −1 (left / up) or +1 (right / down). */
     onstep: (direction: number) => void;
   } = $props();
 
-  let startX = 0;
+  const horizontal = $derived(orientation === 'horizontal');
+  let start = 0;
   let dragging = $state(false);
 
+  function axis(event: PointerEvent): number {
+    return horizontal ? event.clientY : event.clientX;
+  }
+
   function onPointerMove(event: PointerEvent) {
-    onresize(event.clientX - startX);
+    onresize(axis(event) - start);
   }
 
   function onPointerUp() {
@@ -33,7 +45,7 @@
   }
 
   function onPointerDown(event: PointerEvent) {
-    startX = event.clientX;
+    start = axis(event);
     dragging = true;
     onresizestart();
     window.addEventListener('pointermove', onPointerMove);
@@ -41,10 +53,12 @@
   }
 
   function onKeyDown(event: KeyboardEvent) {
-    if (event.key === 'ArrowLeft') {
+    const back = horizontal ? 'ArrowUp' : 'ArrowLeft';
+    const forward = horizontal ? 'ArrowDown' : 'ArrowRight';
+    if (event.key === back) {
       event.preventDefault();
       onstep(-1);
-    } else if (event.key === 'ArrowRight') {
+    } else if (event.key === forward) {
       event.preventDefault();
       onstep(1);
     }
@@ -55,6 +69,7 @@
 <button
   type="button"
   class="resizer"
+  class:horizontal
   class:dragging
   aria-label={label}
   onpointerdown={onPointerDown}
@@ -72,6 +87,13 @@
     border: none;
     align-self: stretch;
     transition: background var(--galley-dur-fast) var(--galley-ease-mech);
+  }
+
+  .resizer.horizontal {
+    width: auto;
+    height: 6px;
+    cursor: row-resize;
+    align-self: auto;
   }
 
   .resizer:hover,

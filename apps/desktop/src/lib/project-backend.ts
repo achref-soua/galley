@@ -10,6 +10,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { SAMPLE_PROOF_BASE64 } from './sample-proof';
 import { type DocumentKind, basename, classifyKind } from './file-tree';
 import { type Diagnostic } from './diagnostics';
 import { type SearchQuery, type FileMatches, searchInContent } from './search-content';
@@ -153,17 +154,11 @@ const DEMO_FILES: ReadonlyArray<[string, string]> = [
   ['references.bib', '@book{galley, title = {Galley}}\n']
 ];
 
-/**
- * A tiny, valid one-page PDF (base64) returned by the in-memory compile, so the
- * browser/dev build and the Playwright e2e exercise the real PDF.js preview
- * without a TeX engine. The packaged app compiles for real via the Rust backend.
- */
-const DEMO_PDF_BASE64 =
-  'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvUmVzb3VyY2VzIDw8ID4+ID4+CmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKMjAzCiUlRU9G';
-
-/** Decode the embedded demo PDF to bytes. */
+/** Decode the embedded sample proof (a real typeset one-page PDF) to bytes, so
+ * the browser/dev build and the Playwright e2e exercise the real PDF.js preview
+ * without a TeX engine. The packaged app compiles for real via the Rust backend. */
 function demoPdfBytes(): Uint8Array {
-  const binary = atob(DEMO_PDF_BASE64);
+  const binary = atob(SAMPLE_PROOF_BASE64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);

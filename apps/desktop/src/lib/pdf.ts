@@ -106,7 +106,13 @@ export function pdfjsRenderer(): PdfRenderer {
       // Same-origin, bundled worker — allowed under the app's strict CSP.
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
 
-      const doc = await pdfjs.getDocument({ data }).promise;
+      // PDF.js transfers the bytes to its worker, which *detaches* the
+      // ArrayBuffer it is handed. The caller holds `data` immutably (the live
+      // compile result) and re-renders it on every page turn and zoom change, so
+      // handing PDF.js the original buffer would leave it detached and make the
+      // second render throw "ArrayBuffer at index 0 is already detached". Give
+      // PDF.js a fresh copy each time and the caller's bytes stay intact.
+      const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
       const page = await doc.getPage(pageNumber);
       const viewport = page.getViewport({ scale });
       const context = canvas.getContext('2d');
