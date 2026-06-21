@@ -41,6 +41,24 @@ On **Windows**, update by re-running the one-liner; uninstall with the script's
 `-Uninstall` switch or from **Settings → Apps**. The installed version shows in
 the installer output and in **Add/Remove Programs**.
 
+### Windows Defender / SmartScreen
+
+Galley's Windows installer isn't code-signed yet, so Windows Defender or SmartScreen may flag it as
+unsafe — a **known false positive** for unsigned installers. To keep this to a minimum the one-liner
+installs the **MSI** (which Defender flags far less often than an NSIS `.exe`) and the WebView2
+runtime is embedded so the installer never downloads anything at install time. The download is still
+verified by SHA-256.
+
+If Windows still blocks it:
+
+- Open **Windows Security → Virus & threat protection → Protection history**, select the Galley item,
+  and choose **Actions → Allow**, then re-run the one-liner; or
+- run the verified file the script downloaded (it prints the path) yourself — if SmartScreen appears,
+  click **More info → Run anyway**; or
+- report the false positive at <https://www.microsoft.com/wdsi/filesubmission>.
+
+Code signing (an EV/OV certificate) is the permanent fix and is on the roadmap.
+
 ## In-app updates
 
 On launch (unless disabled in **Settings → About → Check for updates on launch**),

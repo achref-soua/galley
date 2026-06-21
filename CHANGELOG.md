@@ -4,6 +4,26 @@ All notable changes to Galley are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-06-21
+
+A Windows-install trust fix: the unsigned installer was being flagged by Windows Defender as a
+Trojan — a false positive common to unsigned NSIS _downloader_ installers.
+
+### Fixed
+
+- **The Windows installer no longer trips Defender's downloader heuristic.** The WebView2 runtime is
+  now embedded in the installer (`webviewInstallMode: offlineInstaller`) instead of downloaded at
+  install time, so the installer is self-contained and is far less likely to be flagged. The
+  PowerShell one-liner now installs the **MSI** (which Defender flags far less often than an NSIS
+  `.exe`) via `msiexec`, falling back to the NSIS installer only if no MSI is published, and prints
+  clear guidance — allow it in Protection history, run the SHA-256-verified file manually, or report
+  the false positive — if Windows still blocks it.
+
+### Notes
+
+- Galley's installer is still unsigned; code signing (an OV/EV certificate) is the permanent fix and
+  is on the roadmap. The README and `docs/install.md` document how to proceed in the meantime.
+
 ## [0.9.4] - 2026-06-21
 
 A bug-sweep release: a real-user and code pass that fixed the preview, made compile diagnostics

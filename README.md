@@ -28,8 +28,8 @@ LaTeX document — papers, theses, books, CVs, slides, posters, letters, and mor
 The interface borrows from a fine mechanical typewriter: a two-tone black-and-red ribbon,
 a monospace impression struck into warm paper, restrained and tactile.
 
-> **Status — release candidate.** This is `v0.9.4`: a bug-sweep release on the **release candidate**
-> line, with generated screenshots and a demo recording that now show the live proof beside the
+> **Status — release candidate.** This is `v0.9.5`: a bug-sweep line on the **release candidate**
+> milestone, with generated screenshots and a demo recording that show the live proof beside the
 > editor, complete documentation, and a recorded performance & security sign-off.
 > The full product is in place — the warm, incremental CodeMirror 6 + **Tectonic** + **PDF.js**
 > core; structured diagnostics and TexLab language intelligence; the dual code/visual editor; math,
@@ -52,6 +52,12 @@ curl -fsSL https://raw.githubusercontent.com/achref-soua/galley/main/scripts/ins
 # Windows
 irm https://raw.githubusercontent.com/achref-soua/galley/main/scripts/install/install.ps1 | iex
 ```
+
+> **Windows note.** Galley's installer isn't code-signed yet, so Windows Defender or SmartScreen may
+> flag the unsigned installer — a known false positive. The one-liner installs the MSI (less prone to
+> this) and verifies it by SHA-256. If Windows still blocks it, allow the item under **Windows
+> Security → Virus & threat protection → Protection history**, then re-run; the script also prints
+> these steps. Code signing is on the roadmap.
 
 <img src="docs/assets/install.png" alt="Galley installer — the struck GALLEY wordmark and install steps" width="620">
 
