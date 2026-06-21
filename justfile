@@ -79,6 +79,10 @@ compile-itest:
 lsp-itest:
     cargo test -p galley-intel --features real-lsp --test real_lsp -- --ignored --test-threads=1
 
+# Generate SHA-256 checksums for the built installers (run after `just package`).
+checksums:
+    bash scripts/release/checksums.sh
+
 # Sign & notarize artifacts — wired but a no-op until signing certs exist.
 sign:
     @echo "Signing is wired but disabled until certs are configured (see SECURITY.md)."

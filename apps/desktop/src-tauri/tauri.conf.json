@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Galley",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "identifier": "dev.galley.studio",
   "build": {
     "frontendDist": "../dist",
@@ -27,16 +27,46 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": "all",
     "category": "DeveloperTool",
+    "publisher": "Achref Soua",
+    "homepage": "https://github.com/achref-soua/galley",
     "shortDescription": "A local-first LaTeX studio.",
     "longDescription": "Galley \u2014 a local-first, blazing-fast LaTeX studio with a dual code/visual editor, live preview, and a provider-agnostic AI layer.",
     "icon": [
       "icons/32x32.png",
+      "icons/64x64.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["tex"],
+        "name": "LaTeX Document",
+        "description": "LaTeX source document",
+        "role": "Editor"
+      },
+      {
+        "ext": ["galley"],
+        "name": "Galley Project",
+        "description": "Galley project manifest",
+        "role": "Editor"
+      }
+    ],
+    "linux": {
+      "deb": {
+        "section": "editors"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
   }
 }
