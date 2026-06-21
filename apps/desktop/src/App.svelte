@@ -482,6 +482,13 @@
     window.open(url, '_blank', 'noopener');
   }
 
+  // Open an existing folder via the native picker, from either the launcher
+  // dashboard or the sidebar; closing the dashboard is a no-op when already closed.
+  function openExistingFolder() {
+    dashboardOpen = false;
+    void projectController.pickAndOpen();
+  }
+
   async function handleSave() {
     await projectController.save();
     const root = project.project != null ? project.project.root : null;
@@ -664,7 +671,7 @@
           recent={project.recent}
           onopenfile={(path) => void projectController.requestOpenFile(path)}
           onnewproject={(name) => void projectController.pickAndCreate(name)}
-          onopenfolder={() => void projectController.pickAndOpen()}
+          onopenfolder={openExistingFolder}
           onopenrecent={(root) => void projectController.openFolder(root)}
         />
         {#if project.project !== null}
@@ -923,6 +930,7 @@
           onopen={(root) => {
             void projectController.openFolder(root);
           }}
+          onopenfolder={openExistingFolder}
           onopennewwindow={() => {
             dashboardOpen = false;
           }}
