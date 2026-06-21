@@ -73,7 +73,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          vcpkg install --triplet x64-windows-static freetype "harfbuzz[graphite2]" icu
+          vcpkg install --triplet x64-windows-static fontconfig freetype "harfbuzz[graphite2]" icu
           Add-Content $env:GITHUB_ENV "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT"
           Add-Content $env:GITHUB_ENV "TECTONIC_DEP_BACKEND=vcpkg"
           Add-Content $env:GITHUB_ENV "VCPKGRS_TRIPLET=x64-windows-static"
