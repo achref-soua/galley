@@ -86,31 +86,48 @@ if ($env:GALLEY_VERSION) {
 }
 Show-Logo $Version
 
-$Asset = "Galley_${Version}_x64-setup.exe"
-$Url = "https://github.com/$Repo/releases/download/v$Version/$Asset"
-$Out = Join-Path $env:TEMP $Asset
+$Base = "https://github.com/$Repo/releases/download/v$Version"
+$Msi = "Galley_${Version}_x64_en-US.msi"
+$Exe = "Galley_${Version}_x64-setup.exe"
 
+# Download one named asset to the temp directory, returning its path.
+function Get-Asset {
+  param([string]$Name)
+  $dest = Join-Path $env:TEMP $Name
+  $ProgressPreference = 'SilentlyContinue'
+  Invoke-WebRequest -Uri "$Base/$Name" -OutFile $dest -UseBasicParsing
+  return $dest
+}
+
+# Prefer the MSI: an unsigned NSIS .exe is more likely to trip Windows Defender's
+# heuristics than the WiX MSI, and msiexec installs it cleanly. Fall back to the
+# NSIS installer only if no MSI is published for this release.
 Show-Step '↓' "Fetching v$Version for windows..."
-$ProgressPreference = 'SilentlyContinue'
 try {
-  Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing
+  $Asset = $Msi
+  $Out = Get-Asset $Msi
 } catch {
-  Write-Host ''
-  Write-Warn "No prebuilt Windows installer is published for v$Version yet."
-  Write-Host "${MU}  Galley's Windows installer is built on a Windows CI runner. Until it is" -NoNewline
-  Write-Host " published, you can:${R}"
-  Write-Host "${MU}    • watch ${R}https://github.com/$Repo/releases/latest"
-  Write-Host "${MU}    • or build it yourself on Windows:${R}"
-  Write-Host "${P}        git clone https://github.com/$Repo; cd galley${R}"
-  Write-Host "${P}        pnpm install; cargo install tauri-cli --version `"^2`" --locked${R}"
-  Write-Host "${P}        pnpm --filter @galley/desktop tauri build${R}"
-  Write-Host ''
-  exit 1
+  try {
+    $Asset = $Exe
+    $Out = Get-Asset $Exe
+  } catch {
+    Write-Host ''
+    Write-Warn "No prebuilt Windows installer is published for v$Version yet."
+    Write-Host "${MU}  Galley's Windows installer is built on a Windows CI runner. Until it is" -NoNewline
+    Write-Host " published, you can:${R}"
+    Write-Host "${MU}    • watch ${R}https://github.com/$Repo/releases/latest"
+    Write-Host "${MU}    • or build it yourself on Windows:${R}"
+    Write-Host "${P}        git clone https://github.com/$Repo; cd galley${R}"
+    Write-Host "${P}        pnpm install; cargo install tauri-cli --version `"^2`" --locked${R}"
+    Write-Host "${P}        pnpm --filter @galley/desktop tauri build${R}"
+    Write-Host ''
+    exit 1
+  }
 }
 
 # Verify the checksum when SHA256SUMS.txt is published.
 try {
-  $sums = (Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS.txt" -UseBasicParsing).Content
+  $sums = (Invoke-WebRequest -Uri "$Base/SHA256SUMS.txt" -UseBasicParsing).Content
   $line = ($sums -split "`n" | Where-Object { $_ -match [regex]::Escape($Asset) } | Select-Object -First 1)
   if ($line) {
     $expected = ($line -split '\s+')[0]
@@ -122,8 +139,38 @@ try {
   Write-Warn "checksum step skipped: $($_.Exception.Message)"
 }
 
+# Guidance shown when Windows Defender / SmartScreen blocks the unsigned installer.
+function Show-SecurityHelp {
+  Write-Host ''
+  Write-Warn 'Windows blocked the installer.'
+  Write-Host "${MU}  Galley's installer isn't code-signed yet, so Windows Defender/SmartScreen may" -NoNewline
+  Write-Host " flag it as unsafe — this is a known false positive for unsigned installers.${R}"
+  Write-Host "${MU}  The file is verified by SHA-256 above and lives at:${R}"
+  Write-Host "${P}    $Out${R}"
+  Write-Host "${MU}  To proceed:${R}"
+  Write-Host "${MU}    • Windows Security > Virus & threat protection > Protection history >${R}"
+  Write-Host "${MU}      select the Galley item > Actions > Allow, then re-run this command.${R}"
+  Write-Host "${MU}    • Or run the verified file above yourself (double-click, then${R}"
+  Write-Host "${MU}      'More info' > 'Run anyway' if SmartScreen appears).${R}"
+  Write-Host "${MU}    • Or report the false positive: ${R}https://www.microsoft.com/wdsi/filesubmission"
+  Write-Host ''
+}
+
 Show-Step '▸' 'Running the installer...'
-Start-Process -FilePath $Out -Wait
+try {
+  if ($Asset -like '*.msi') {
+    $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', "`"$Out`"" -Wait -PassThru
+    # 0 = success, 1602 = user cancelled, 3010 = success/reboot required.
+    if ($proc.ExitCode -notin @(0, 1602, 3010)) {
+      Fail "the installer exited with code $($proc.ExitCode)."
+    }
+  } else {
+    Start-Process -FilePath $Out -Wait
+  }
+} catch {
+  Show-SecurityHelp
+  exit 1
+}
 
 Write-Host ''
 Write-Ok "Galley v$Version is installed. Pin it to the taskbar from the Start menu."
